@@ -115,4 +115,4 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 - [Workflow and execution-intent contracts](../domain/workflow.md)
 - [Result](../domain/result.md)
 - [Evidence](../domain/evidence.md)
-- Future Capability domain contract
+- [Capability domain](../domain/capability.md)

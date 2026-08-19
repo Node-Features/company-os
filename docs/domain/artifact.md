@@ -36,4 +36,4 @@ Acceptance is a separate governed domain transition over the exact artifact vers
 ## Dependencies
 
 - [Principal](principal.md)
-- Future Organization domain contract
+- [Organization](organization.md)

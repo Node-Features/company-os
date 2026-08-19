@@ -8,7 +8,7 @@ CompanyOS Intelligence provides model-generated reasoning and content through pr
 
 Intelligence owns:
 
-- intelligence capability and request contracts;
+- intelligence-specific specializations of canonical Capability contracts;
 - task analysis into normalized routing requirements;
 - model/provider profile registration and evidence freshness;
 - eligibility filtering and multi-factor routing;
@@ -22,7 +22,7 @@ It does not own organizational objectives, department semantics, policy meaning,
 
 ```mermaid
 flowchart LR
-    Requester[Department or Agent] --> Request[IntelligenceCapabilityRequest]
+    Requester[Department or Agent] --> Request[CapabilityRequest referencing IntelligenceCapability]
     Request --> Analyzer[Task Analyzer]
     Analyzer --> Router[Intelligence Router]
     Governance[Governance policy] --> Router
@@ -44,13 +44,13 @@ The arrows represent evidence and contract flow, not authority transfer. Researc
 
 ### IntelligenceCapability
 
-A versioned provider-independent outcome contract. It declares supported task families, input and output schemas, modalities, tool-use semantics, structured-output requirements, evidence requirements, failure taxonomy, and acceptance criteria. Examples such as summarization or classification are capability categories, not model names.
+An intelligence specialization of the canonical [CapabilityDefinition](../domain/capability.md#capabilitydefinition), not a parallel generic contract. It adds supported intelligence task families, modalities, tool-use semantics, structured-output requirements, and model-evaluation requirements. Generic identity, schemas, evidence, acceptance, failure, lifecycle, Governance mapping, and resource semantics remain owned by the Capability domain. Examples such as summarization or classification are capability categories, not model names.
 
 ### IntelligenceRequest
 
-The immutable request envelope submitted for one capability invocation. It includes request, organization, objective, workflow, department, and requesting-principal identities; IntelligenceCapability ID/version; normalized input references; permitted tools; TaskComplexity; QualityRequirement; PrivacyRequirement; a Finance-resolved ResourceConstraintSet; latency requirement; context-size needs; governance action/resource/context; idempotency identity; and required evidence.
+An intelligence specialization of the canonical [CapabilityRequest](../domain/capability.md#capabilityrequest). It adds TaskComplexity, QualityRequirement, PrivacyRequirement, permitted intelligence tools, context-size needs, latency requirements, and the exact Finance-resolved ResourceConstraintSet reference. Common request, organization, objective, workflow, Principal, input, Governance, idempotency, and evidence fields retain their Capability-domain meaning.
 
-`IntelligenceCapabilityRequest` is the application-facing form that becomes a validated IntelligenceRequest. It cannot contain a preferred provider or model. A temporary operator override is a separate governed routing constraint with explicit reason and expiry, never an untracked request field.
+The application-facing request is a `CapabilityRequest` referencing an IntelligenceCapability; after canonical validation it becomes an IntelligenceRequest specialization. Neither form can contain a preferred provider or model. A temporary operator override is a separate governed routing constraint with explicit reason and expiry, never an untracked request field.
 
 ### TaskComplexity
 
@@ -80,7 +80,7 @@ A replaceable port that translates normalized IntelligenceRequests to one provid
 
 ### RoutingDecision
 
-An immutable explanation of one selection attempt. It records request and analyzer versions; candidate profiles; every exclusion and reason; Governance and Finance evidence versions; scoring dimensions and weights; selected profile; fallback sequence or absence; estimates; constraints; tie-breaking; router version; and timestamp. It is persisted before provider dispatch.
+An immutable explanation of one selection attempt. It records request and analyzer versions; candidate profiles; every exclusion and reason; Governance and Finance evidence versions; scoring dimensions and weights; selected profile; fallback sequence or absence; estimates; constraints; tie-breaking; router version; and timestamp. Runtime persists it as execution state before provider dispatch.
 
 ### ModelEvaluation
 
@@ -96,7 +96,7 @@ ModelEvaluations contribute to the subject's canonical `PerformanceProfile`; Int
 4. Finance verifies the budget account and supplies an exact ResourceConstraintSet, reservation evidence when required, and effective-cost evidence using price, expected usage, retries, failure rate, and verification cost.
 5. Filter profiles by capability fit, modalities, context, tool support, quality threshold, privacy, data location, availability, applicable Finance constraint outcomes, evidence freshness, and operational health.
 6. Rank only eligible profiles using the request's declared priorities across expected quality, historical reliability, latency, effective cost, and M&E confidence.
-7. Persist RoutingDecision and execution intent before dispatch.
+7. The Router returns a RoutingDecision to Runtime. Runtime persists that execution-state decision through its persistence contract before provider dispatch; routing does not create or mutate an authoritative ExecutionIntent.
 8. Execute through the selected ProviderAdapter. Fallback is a new routing attempt with preserved logical request identity and explicit failure evidence.
 9. Validate protocol, schema, tool, safety, and evidence requirements. Model output remains untrusted until accepted through the owning workflow/domain operation.
 10. Publish normalized execution and evaluation observations for M&E; Finance receives actual effective cost; Research may investigate gaps or newly available models.
@@ -171,12 +171,13 @@ No concrete provider, model, gateway, or routing library is selected.
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
-- [Kernel](kernel.md)
 - [Runtime](runtime.md)
-- [Departments](departments.md)
 - [Governance](governance.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
 - [Resource domain](../domain/resource.md)
 - [Proposed ADR-0003](../adr/ADR-0003-model-independent-intelligence.md)
-- Future capability, agent, event, knowledge, persistence, Research, and Finance specifications
+- [Capability domain](../domain/capability.md)
+- [Agent domain](../domain/agent.md)
+- [Event domain](../domain/event.md)
+- [Knowledge domain](../domain/knowledge.md)

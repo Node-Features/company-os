@@ -18,6 +18,17 @@ A `WorkflowDefinition` specifies legal organizational stages, transitions, input
 
 A command plus authoritative Workflow snapshot produces either stable rejection reasons or a Kernel decision containing next state, DomainEvents, and optional ExecutionIntent. Application persists these atomically before notifying Runtime. Runtime returns execution Evidence and a proposed Result through a new Application request.
 
+## First-slice lifecycle
+
+The first slice defines only these Workflow states:
+
+- `PLANNED`: the Workflow exists with an approved Objective and resolved definition references, but execution is not yet eligible for dispatch;
+- `READY`: the `START_WORKFLOW` transition has been accepted and exactly one ExecutionIntent for the first Capability step was committed with the new Workflow version and resulting DomainEvents.
+
+`START_WORKFLOW` has one legal transition: `PLANNED -> READY`. It requires the expected Workflow version; an approved Objective reference; active compatible WorkflowDefinition and CapabilityDefinition references; normalized inputs; and current Governance evidence for the exact proposal. The Kernel enforces these preconditions and decides the transition. Application coordinates atomic persistence of the new Workflow version, DomainEvents, and ExecutionIntent before Runtime is notified.
+
+No other Workflow state or transition is established by this first-slice contract.
+
 ## Invariants
 
 - Only Kernel rules decide legal Workflow state transitions.
@@ -29,7 +40,7 @@ A command plus authoritative Workflow snapshot produces either stable rejection 
 
 ## OPEN QUESTIONS
 
-- What is the smallest first-slice WorkflowDefinition and state vocabulary?
+- What additional states and transitions are required after the first `READY` execution intent completes?
 - Which definition changes are compatible with running Workflows?
 - Which failure outcomes require compensation rather than retry?
 
@@ -40,4 +51,5 @@ A command plus authoritative Workflow snapshot produces either stable rejection 
 - [Evidence](evidence.md)
 - [Result](result.md)
 - [Principal](principal.md)
-- Future Capability and Organization domain contracts
+- [Capability](capability.md)
+- [Organization](organization.md)

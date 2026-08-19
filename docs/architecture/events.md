@@ -63,7 +63,6 @@ Events are immutable. Corrections use a new compensating or superseding event an
 
 ## OPEN QUESTIONS
 
-- What aggregate boundaries determine atomic state-and-event persistence?
 - Which events are retained permanently, compacted, or redacted?
 - What event-schema compatibility policy and registry are required for the first slice?
 - Which integration events may cross organization boundaries, and under what policy?

@@ -12,7 +12,7 @@ The repository has not yet defined who may accept ADRs. This record therefore pr
 
 Introduce a CompanyOS-owned, provider-independent Intelligence boundary:
 
-1. Departments and agents submit an `IntelligenceCapabilityRequest` that describes outcome and constraints without naming a provider or model.
+1. Departments and agents submit a canonical `CapabilityRequest` referencing an IntelligenceCapability specialization and describing outcome and constraints without naming a provider or model.
 2. Task Analyzer produces versioned TaskComplexity and normalized requirements.
 3. Governance and privacy rules determine candidate eligibility; Finance supplies budget and effective-cost constraints.
 4. Intelligence Router filters and ranks eligible ModelProfiles using capability fit, quality, cost, latency, privacy, tools, historical reliability, and M&E evidence.

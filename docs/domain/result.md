@@ -42,4 +42,5 @@ Result acceptance is a separate Kernel decision. Acceptance may advance a Workfl
 - [Evidence](evidence.md)
 - [Objective](objective.md)
 - [Principal](principal.md)
-- Future Capability and Organization domain contracts
+- [Capability](capability.md)
+- [Organization](organization.md)

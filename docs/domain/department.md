@@ -122,4 +122,6 @@ Names and final stable identifiers remain `OPEN QUESTION` until the organization
 - [Event](event.md)
 - [Metric](metric.md)
 - [Knowledge](knowledge.md)
-- Future Organization, Capability, and Agent domain contracts
+- [Organization](organization.md)
+- [Capability](capability.md)
+- [Agent](agent.md)

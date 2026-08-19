@@ -40,4 +40,4 @@ Only an authorized Application/Kernel transition may approve, activate, complete
 - [Evidence](evidence.md)
 - [Resource](resource.md)
 - [Principal](principal.md)
-- Future Organization domain contract
+- [Organization](organization.md)

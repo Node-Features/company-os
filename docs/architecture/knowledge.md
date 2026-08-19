@@ -20,7 +20,7 @@ Knowledge architecture consumes the canonical [Knowledge](../domain/knowledge.md
 4. Detect potential duplicates and contradictions as review signals, not automatic merges.
 5. Freeze the candidate version and submit `knowledge.review` or `knowledge.approve` through an Application use case with current authenticated reviewer evidence.
 6. Governance verifies the human reviewer's Authority, policy, organization and knowledge scope, separation-of-duties requirements, and exact item-version/content digest.
-7. Only a current Governance `ALLOW` for `knowledge.approve` permits the Kernel transition to `APPROVED`; persist the KnowledgeReview, Governance-decision reference, and item transition atomically.
+7. Only a current Governance `ALLOW` for `knowledge.approve` permits the Kernel transition to `APPROVED`; Application coordinates atomic persistence of the KnowledgeReview, Governance-decision reference, and item transition.
 8. Publish to approved retrieval projections only after that commit.
 9. Re-evaluate affected knowledge when sources expire, are retracted, or are superseded.
 

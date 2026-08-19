@@ -38,4 +38,4 @@ Evidence contains:
 - [Event](event.md)
 - [Artifact](artifact.md)
 - [Principal](principal.md)
-- Future Organization domain contract
+- [Organization](organization.md)

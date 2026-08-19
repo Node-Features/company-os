@@ -55,9 +55,9 @@ Transport headers, UI models, provider payloads, and agent messages are translat
 
 ## First vertical slice
 
-The first state-changing slice is `StartWorkflow`: transition one existing `PLANNED` [Workflow](../domain/workflow.md) for an existing approved Objective to `READY` and create exactly one ExecutionIntent for its first Capability step. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, and resource records are referenced by immutable identity/version and are not members of the aggregate.
+The first state-changing slice is `StartWorkflow`. The [Workflow domain](../domain/workflow.md#first-slice-lifecycle) owns its states, legal transition, and preconditions; Application owns only the use-case sequence and transaction coordination. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, and resource records are referenced by immutable identity/version and are not members of the aggregate.
 
-The request must name the Organization, Workflow, expected Workflow version, Objective/version, WorkflowDefinition/version, command identity, idempotency identity, requesting Principal and authenticated-evidence reference, declared time, correlation/causation identities, bounded input Artifact/Evidence references, and applicable ResourceConstraint versions. Missing or stale references reject the operation rather than being inferred.
+The request uses the canonical [WorkflowCommandEnvelope](../domain/command.md#workflowcommandenvelope). Application validates its shape and loads its referenced authoritative versions; it does not redefine or infer missing command fields.
 
 ## Shared command and decision envelopes
 
@@ -108,7 +108,7 @@ Initial `ALLOW` permits persistence of a bounded execution intent only when poli
 
 ## Transaction and notification semantics
 
-- For `StartWorkflow`, the accepted atomic write contains the Workflow transition `PLANNED → READY`, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of any applicable single-use Approval, idempotency outcome, and exactly one caused ExecutionIntent.
+- For `StartWorkflow`, the accepted atomic write contains the canonical [Workflow transition](../domain/workflow.md#first-slice-lifecycle), resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of any applicable single-use Approval, idempotency outcome, and its caused ExecutionIntent.
 - Optimistic-concurrency failure rejects the attempted commit; the use case reloads and re-evaluates rather than merging implicitly.
 - A timeout or lost response is `INDETERMINATE` until reconciled by request/idempotency identity.
 - Retrying the same logical request reuses its idempotency identity and cannot create a second legal transition.
@@ -153,6 +153,7 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 ## Dependencies
 
 - [Top-level architecture](../../ARCHITECTURE.md)
+- [Identity](identity.md)
 - [Kernel](kernel.md)
 - [Governance](governance.md)
 - [Persistence](persistence.md)

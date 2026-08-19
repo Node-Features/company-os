@@ -63,7 +63,7 @@ flowchart LR
     Value --> Budgeting[Forecast and budget update proposal]
 ```
 
-Reservations and estimates are persisted before execution where a hard limit applies. Actual usage is reconciled after execution. Budget changes and exceptional overruns require governed transitions; Finance cannot silently expand a limit to accommodate completed spending.
+Application coordinates persistence of accepted reservations and estimates before execution where a hard limit applies. Runtime records execution usage through its persistence contract, and Finance proposes reconciliation through an Application use case. Budget changes and exceptional overruns require governed transitions; Finance cannot silently expand a limit to accommodate completed spending.
 
 Budgets, constraints, reservations, usage, Metrics, Evaluations, and ResourceEvaluations cross the department boundary only through shared Application, event, workflow, evidence, and persistence contracts. Finance never calls M&E, Research, Intelligence, or Coding Agent implementations to obtain or publish them.
 
@@ -103,7 +103,7 @@ Finance supplies exact ResourceConstraint versions, reservations, usage evidence
 - Cost, compute, time, storage, and concurrency constraints retain their canonical Resource-domain meanings in every consumer.
 - Failed, retried, rejected, and evaluation work is included in effective-cost analysis.
 - Missing or stale pricing and usage evidence produces explicit uncertainty or ineligibility according to policy.
-- Resource-limit and budget transitions are governed, versioned, persisted, and auditable.
+- Resource-limit and budget transitions are governed and versioned; Application coordinates their persistence and audit records.
 - Missing pricing, indeterminate usage, duplicate feedback, and inconclusive ResourceEvaluations fail closed and retain explicit dispositions.
 - No ResourceEvaluation, price signal, variance, or budget recommendation directly creates an Objective.
 
@@ -123,10 +123,11 @@ Finance is accountable for budget variance, forecast accuracy, cost attribution 
 
 - [Department architecture](../architecture/departments.md)
 - [Application layer](../architecture/application.md)
-- [Governance](../architecture/governance.md)
-- [Events](../architecture/events.md)
-- [Persistence](../architecture/persistence.md)
+- [Workflow domain](../domain/workflow.md)
+- [Artifact domain](../domain/artifact.md)
+- [Evidence domain](../domain/evidence.md)
+- [Event domain](../domain/event.md)
 - [Resource domain](../domain/resource.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
-- Future shared workflow, artifact, evidence, price, usage, budget, research-question, and resource-evaluation contracts
+- Future shared price, usage, budget, research-question, and resource-evaluation contracts

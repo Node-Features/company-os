@@ -36,4 +36,4 @@ Delivery attempt, queue position, publication state, and consumer checkpoint are
 ## Dependencies
 
 - [Principal](principal.md)
-- Future Organization domain contract
+- [Organization](organization.md)

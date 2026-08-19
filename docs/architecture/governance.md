@@ -13,8 +13,8 @@ Governance owns:
 - default-deny policy evaluation and restrictive policy composition;
 - assigning the effective autonomy level;
 - returning exactly `ALLOW`, `DENY`, or `REQUIRE_APPROVAL`;
-- creating, resolving, binding, consuming, expiring, and revoking approvals;
-- producing durable, attributable decision and approval evidence;
+- determining approval requirements and verifying Approval evidence against the canonical Approval contract;
+- producing attributable authorization decisions and approval requirements for Application-coordinated persistence;
 - re-evaluating governed actions immediately before dispatch.
 
 Governance consumes authenticated Principal evidence through the [Identity contract](identity.md). It does not authenticate credentials, own Principal lifecycle, resolve arbitrary external subjects, create trusted claims, or manage authentication sessions.
@@ -63,7 +63,7 @@ Absent or unverifiable required input produces `DENY`. Provider names and tool s
 
 ## Approval boundary
 
-An approval binds the approver, requesting principal, action, resource, normalized arguments digest, objective/workflow context, policy and authority versions, expiry, and allowed uses. Approval resolution persists before execution resumes.
+The canonical [Approval domain contract](../domain/approval.md) owns Approval meaning, fields, lifecycle, and invariants. Governance evaluates whether that exact evidence satisfies current policy and Authority; it does not create, transition, consume, or persist Approval records directly.
 
 At execution, Governance verifies that the approval is approved, unexpired, unrevoked, unconsumed when single-use, issued by an authorized human, and still matches the request. Policy and authority are then evaluated again. Approving a request does not execute it; the Application layer records the new `ALLOW` decision for the exact intent before Runtime executes separately.
 
@@ -75,7 +75,7 @@ Knowledge approval is a governed `knowledge.approve` Action on a Resource contai
 
 For a human reviewer, Governance verifies current `AuthenticatedPrincipalEvidence`; active reviewer Authority for the knowledge class and scope; authorship and separation-of-duties constraints; required expertise or role evidence; item status and immutable digest; source/evidence requirements; organization boundary; policy versions; and any additional Approval evidence. Only `ALLOW` may support the separate Kernel transition to `APPROVED`.
 
-`REQUIRE_APPROVAL` means the review action needs further human authorization and leaves the KnowledgeItem unapproved. `DENY`, stale evidence, item mutation, changed sources, or changed reviewer/Authority/policy context requires a new evaluation. Governance records reviewer, authentication evidence, Authority, policies, determining rules, item digest, outcome, reasons, and time.
+`REQUIRE_APPROVAL` means the review action needs further human authorization and leaves the KnowledgeItem unapproved. `DENY`, stale evidence, item mutation, changed sources, or changed reviewer/Authority/policy context requires a new evaluation. The Governance decision contains reviewer, authentication-evidence, Authority, policy, determining-rule, item-digest, outcome, reason, and time references for Application-coordinated persistence.
 
 Deterministic automatic knowledge approval remains prohibited until a dedicated ADR is accepted and applicable policy is activated. The ADR must narrowly identify eligible knowledge classes and establish reproducibility, source eligibility, validation, failure, accountability, rollback, and audit requirements. A general `automatic` autonomy level, model confidence, test result, deterministic derivation, or provider assertion is insufficient.
 
@@ -138,4 +138,5 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - [Policy domain](../domain/policy.md)
 - [Approval domain](../domain/approval.md)
 - [Command domain](../domain/command.md)
-- Future agent and security contracts
+- [Agent domain](../domain/agent.md)
+- Future security contract

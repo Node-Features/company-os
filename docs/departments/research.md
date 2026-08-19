@@ -59,7 +59,7 @@ flowchart LR
     R --> G[Governance and objective process]
 ```
 
-Research persists each accepted contract before dependent work advances. Material scope or method changes create a new question or plan version. Findings and recommendations retain source lineage when transformed into artifacts or proposed knowledge.
+Research produces each contract for validation; Kernel decides legal authoritative transitions and Application coordinates persistence before dependent work advances. Material scope or method changes create a new question or plan version. Findings and recommendations retain source lineage when transformed into artifacts or proposed knowledge.
 
 ## Failure semantics
 
@@ -71,7 +71,7 @@ Research follows the shared [adaptive-loop failure semantics](../architecture/de
 - ResearchQuestion deduplication uses the normalized question, organization, scope, decision context, active validity window, and source Evaluation/ResourceEvaluation versions;
 - duplicate signals or deliveries attach evidence to the existing question when compatible and never create duplicate Findings or Recommendations;
 - a Recommendation has an expiry/review condition and cannot progress after expiry without a new validated version;
-- Governance `DENY` closes the exact recommendation/action version; `REQUIRE_APPROVAL` persists an escalation and waits for human resolution;
+- Governance `DENY` closes the exact recommendation/action version through the owning Application use case; `REQUIRE_APPROVAL` causes Application to persist an escalation and wait for human resolution;
 - source prohibition, invalid scope, exhausted bounds, or an irreparable provenance failure is `TERMINAL`; collection failures that can succeed unchanged may be `RETRYABLE`;
 - repeated transient failure, material source contradiction, high-impact security findings, or exhausted loop depth escalates to attributable human review.
 
@@ -120,11 +120,12 @@ Research is accountable for question cycle time, source diversity and quality, p
 
 - [Department architecture](../architecture/departments.md)
 - [Application layer](../architecture/application.md)
-- [Knowledge](../architecture/knowledge.md)
-- [Events](../architecture/events.md)
-- [Persistence](../architecture/persistence.md)
-- [Governance](../architecture/governance.md)
+- [Workflow domain](../domain/workflow.md)
+- [Artifact domain](../domain/artifact.md)
+- [Evidence domain](../domain/evidence.md)
+- [Event domain](../domain/event.md)
+- [Knowledge domain](../domain/knowledge.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
 - [Resource domain](../domain/resource.md)
-- Future shared workflow, artifact, evidence, finding, recommendation, and resource-evaluation contracts
+- Future shared finding, recommendation, and resource-evaluation contracts

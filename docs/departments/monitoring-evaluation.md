@@ -102,7 +102,7 @@ M&E owns quality and outcome measurements, including cost-versus-quality curves.
 - M&E evidence informs routing but does not select a concrete model or coding agent.
 - Negative, inconclusive, and failed outcomes remain visible and affect performance evidence.
 - Comparisons use compatible task, environment, policy, and time contexts or disclose incompatibility.
-- Evaluation and performance evidence are persisted before dependent routing or objective decisions advance.
+- Application coordinates persistence of accepted Evaluation and performance evidence before dependent routing or objective decisions advance.
 - Inconclusive, duplicate, stale, denied, terminal, retryable, and escalated evaluations remain distinguishable in PerformanceProfile projections.
 - No Evaluation, Metric, or PerformanceProfile directly creates an Objective.
 
@@ -122,9 +122,12 @@ M&E itself is accountable for evaluation coverage, evidence completeness, detect
 
 - [Department architecture](../architecture/departments.md)
 - [Application layer](../architecture/application.md)
-- [Events](../architecture/events.md)
-- [Persistence](../architecture/persistence.md)
+- [Workflow domain](../domain/workflow.md)
+- [Result domain](../domain/result.md)
+- [Artifact domain](../domain/artifact.md)
+- [Evidence domain](../domain/evidence.md)
+- [Event domain](../domain/event.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
 - [Resource domain](../domain/resource.md)
-- Future shared workflow, result, artifact, evidence, research-question, and resource-evaluation contracts
+- Future shared research-question and resource-evaluation contracts

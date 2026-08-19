@@ -231,8 +231,11 @@ No inspected system is selected as CompanyOS department infrastructure.
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
-- [Kernel](kernel.md)
-- [Runtime](runtime.md)
-- [Governance](governance.md)
+- [Application](application.md)
 - [Department domain](../domain/department.md)
-- Future capability, workflow, event, metric, knowledge, persistence, and security specifications
+- [Capability](../domain/capability.md)
+- [Workflow](../domain/workflow.md)
+- [Event](../domain/event.md)
+- [Metric](../domain/metric.md)
+- [Knowledge](../domain/knowledge.md)
+- Future security specification

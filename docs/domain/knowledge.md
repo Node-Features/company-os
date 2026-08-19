@@ -40,4 +40,4 @@ A KnowledgeItem contains:
 - [Evidence](evidence.md)
 - [Event](event.md)
 - [Principal](principal.md)
-- Future Organization domain contract
+- [Organization](organization.md)

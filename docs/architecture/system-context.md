@@ -109,8 +109,11 @@ flowchart LR
 
         Request --> Identity
         Identity -->|authenticated Principal evidence| Application
-        Application --> Governance
-        Application --> Kernel
+        Application -->|preliminary proposal validation| Kernel
+        Kernel -->|immutable proposal| Application
+        Application -->|exact proposal| Governance
+        Governance -->|ALLOW, DENY, or REQUIRE_APPROVAL| Application
+        Application -->|current ALLOW and unchanged proposal| Kernel
         Application -->|atomic state, events, and execution intent| PersistencePort
         Application -.->|notify after commit| Runtime
         Kernel --> Departments

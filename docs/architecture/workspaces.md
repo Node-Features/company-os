@@ -4,23 +4,15 @@ Status: DRAFT
 
 ## Responsibility
 
-A `Workspace` is a leased, isolated execution boundary containing a controlled repository snapshot, tools, filesystem, process environment, network policy, credentials, resource limits, and auditable evidence for one purpose. An `EngineeringWorkspace` is the workspace specialization assigned to one `EngineeringTask` attempt.
+The canonical [Workspace domain contract](../domain/workspace.md) owns Workspace and EngineeringWorkspace identity, lifecycle vocabulary, legal transitions, and invariants. This architecture defines their isolation, provider, management, repository, recovery, and operational boundaries.
 
-CompanyOS owns the workspace contract, lifecycle policy, assignment, isolation requirements, and evidence. A `WorkspaceProvider` supplies the mechanism. A coding-agent provider uses an assigned workspace but neither provisions it nor controls its policy.
+The Workspace domain owns the contract and lifecycle policy. This architecture owns assignment mechanics, isolation requirements, provider ports, and operational evidence. A `WorkspaceProvider` supplies the mechanism. A coding-agent provider uses an assigned workspace but neither provisions it nor controls its policy.
 
 This boundary does not own engineering-task semantics, coding-agent selection, organizational authorization, workflow scheduling, repository hosting, or acceptance of changes. Those remain with [coding-agent orchestration](coding-agents.md), [Governance](governance.md), and the [Runtime](runtime.md).
 
 ## Core contracts
 
-### Workspace
-
-An immutable identity plus versioned specification and changing observed lifecycle state. The specification contains organization and task/attempt IDs; provider class; repository and exact base revision; branch policy; filesystem mounts; toolchain image or environment digest; CPU, memory, storage, process, time, and cost limits; network allowlist; secret grants; logging/redaction policy; and retention policy.
-
-Observed state includes lifecycle phase, lease owner and expiry, provisioned resource identity, current repository revision and cleanliness, active processes, consumed resources, checkpoints, validation artifacts, and cleanup evidence.
-
-### EngineeringWorkspace
-
-A `Workspace` constrained to one engineering attempt. It provides a clean repository checkout at the recorded base revision, a task-specific feature branch, approved development tools, and only the credentials needed for separately authorized operations. Reuse across organizations or unrelated tasks is forbidden. Reuse across attempts requires verified restoration to a declared checkpoint; otherwise a fresh workspace is required.
+`Workspace` and `EngineeringWorkspace` are defined by the [canonical domain contract](../domain/workspace.md#minimum-contract). Architecture consumes their identities, specifications, and current versions without redefining them.
 
 ### WorkspaceProvider
 
@@ -36,28 +28,7 @@ The manager does not execute arbitrary agent-selected commands itself or make do
 
 ## Lifecycle
 
-```mermaid
-stateDiagram-v2
-    [*] --> Requested
-    Requested --> Provisioning: specification persisted
-    Provisioning --> Ready: identity and isolation verified
-    Ready --> Leased: attempt bound
-    Leased --> Active: session started
-    Active --> Suspended: governed checkpoint
-    Suspended --> Active: lease and checkpoint verified
-    Active --> Sealed: execution stopped
-    Leased --> Sealed: cancelled before execution
-    Sealed --> Retained: evidence retention required
-    Sealed --> Destroying: no retention required
-    Retained --> Destroying: retention expires
-    Destroying --> Destroyed: cleanup verified
-    Provisioning --> Failed
-    Active --> Failed
-    Failed --> Destroying
-    Destroyed --> [*]
-```
-
-Every transition is idempotent and persisted before a dependent action. `Failed` does not mean destroyed; cleanup remains an explicit, observable obligation.
+The [Workspace lifecycle](../domain/workspace.md#lifecycle) is canonical. `WorkspaceManager` coordinates its provider operations only after the owning Application use case commits an accepted transition. Provider observations and lease/checkpoint mechanics are Runtime execution records and cannot change lifecycle meaning.
 
 ## Isolation and authority boundaries
 
@@ -105,15 +76,13 @@ OpenHands is the strongest inspected workspace/runtime reference. Aider and JARV
 
 ## Invariants
 
-- One engineering workspace is bound to one organization, task, attempt, immutable base revision, and active lease.
+The canonical [Workspace invariants](../domain/workspace.md#invariants) apply. This architecture additionally requires:
+
 - Coding agents never choose the workspace provider, isolation policy, credentials, base revision, or protected-branch rules.
-- A workspace is not `Ready` until identity, repository state, environment digest, and required isolation controls are verified.
 - No host path, unrelated repository, organization secret, or merge credential is available by default.
 - Network and credentials are default-deny and independently granted, expiring, attributable, and revocable.
 - Workspace observations and agent session history are evidence, not authoritative workflow state.
 - Publication cannot occur with implementation credentials unless that exact action is governed.
-- Resume and retry cannot weaken the original task, policy, budget, or isolation constraints.
-- Cleanup is explicit, idempotent, verified, and auditable.
 - Persistence succeeds before provisioning, leasing, session start, resume, publication, or lifecycle advancement.
 
 ## OPEN QUESTIONS
@@ -123,3 +92,10 @@ OpenHands is the strongest inspected workspace/runtime reference. Aider and JARV
 - What network destinations and package-cache sharing are permitted by default?
 - What fencing and checkpoint guarantees can every initial `WorkspaceProvider` support?
 - Which evidence must be retained when source or command output contains regulated or secret material?
+
+## Dependencies
+
+- [Workspace domain](../domain/workspace.md)
+- [Runtime](runtime.md)
+- [Governance](governance.md)
+- [Persistence](persistence.md)

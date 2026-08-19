@@ -89,6 +89,5 @@ The detailed six-project evidence matrix is maintained in [Runtime: OSS evidence
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
-- [Kernel](kernel.md)
 - [Runtime](runtime.md)
-- Future persistence, events, security, and deployment specifications
+- Future security and deployment specifications

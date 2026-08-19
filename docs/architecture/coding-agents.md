@@ -72,8 +72,8 @@ The persisted routing decision records candidates, exclusions, evidence versions
 ## Execution lifecycle
 
 1. Validate that objective and design approvals, repository identity, immutable base revision, scope, and acceptance criteria exist.
-2. Persist the `EngineeringTask`, governance evidence, and idempotency identity.
-3. Obtain the applicable Finance ResourceConstraintSet and required reservation evidence; route only among profiles within every hard constraint and persist the routing decision before dispatch.
+2. Process EngineeringTask creation through an Application use case: preliminary Kernel validation, Governance evaluation of the exact proposal, final Kernel decision on current `ALLOW`, and Application-coordinated atomic persistence of the accepted task, events, and idempotency outcome.
+3. Obtain the applicable Finance ResourceConstraintSet and required reservation evidence; route only among profiles within every hard constraint, then have Runtime persist the routing decision as execution state before dispatch.
 4. Ask `WorkspaceManager` for an isolated `EngineeringWorkspace` rooted at the exact base revision and a task-specific feature branch.
 5. Start a bounded session with least-privilege tools, credentials, network policy, time and cost limits, and a context manifest.
 6. Allow iterative inspection, planning, editing, shell execution, debugging, and validation. Each effect is attributed and captured as evidence.

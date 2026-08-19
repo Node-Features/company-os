@@ -22,5 +22,6 @@ Statuses mirror existing document metadata. Rows marked `NOT YET SPECIFIED` are 
 | `metric.md` | Metric definitions and observations | DRAFT | Read when measuring performance or outcomes. |
 | `evaluation.md` | Evaluation and performance-profile semantics | DRAFT | Read when judging results or comparative performance. |
 | `resource.md` | Provider-independent resource constraints | DRAFT | Read when constraining cost, compute, time, storage, or concurrency. |
+| `workspace.md` | Workspace identity, lifecycle, transitions, and invariants | DRAFT | Read when changing Workspace or EngineeringWorkspace semantics. |
 | `event.md` | Domain event semantics | DRAFT | Read when emitting or consuming domain events. |
 | `knowledge.md` | Reviewed reusable claims and provenance | DRAFT | Read when curating or retrieving organizational knowledge. |

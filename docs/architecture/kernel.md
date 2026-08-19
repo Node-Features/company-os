@@ -45,9 +45,9 @@ The first implemented aggregate root is one [Workflow](../domain/workflow.md). I
 
 Objective, Organization, Principal, GovernanceDecision, Approval, CapabilityDefinition, ResourceConstraint, Result, Runtime execution state, checkpoint, Artifact, Evidence, Metric, and Knowledge records remain external aggregates or records referenced by immutable identity/version. The Workflow aggregate cannot mutate them.
 
-For the first `START_WORKFLOW` command, proposal validation requires an existing `PLANNED` Workflow, approved Objective reference, active compatible WorkflowDefinition and CapabilityDefinition references, expected Workflow version, normalized inputs, and exact Action/Resource/context data. It produces the immutable [GovernedCommandProposal](../domain/command.md#governedcommandproposal) without state, Events, or intent.
+For the first `START_WORKFLOW` command, proposal validation enforces the preconditions owned by the canonical [Workflow first-slice lifecycle](../domain/workflow.md#first-slice-lifecycle). It produces the immutable [GovernedCommandProposal](../domain/command.md#governedcommandproposal) without state, Events, or intent.
 
-Final validation requires the unchanged proposal, current `ALLOW`, matching authoritative versions, and any applicable Approval evidence. Acceptance produces `PLANNED → READY`, the resulting DomainEvents, and exactly one ExecutionIntent. A version mismatch, changed digest, inactive dependency, illegal state, or stale governance evidence rejects without a decision effect.
+Final validation requires the unchanged proposal, current `ALLOW`, matching authoritative versions, and any applicable Approval evidence. Acceptance produces the transition and effects defined by the Workflow contract. A version mismatch, changed digest, inactive dependency, illegal state, or stale governance evidence rejects without a decision effect.
 
 ## Identity boundary
 
@@ -88,7 +88,11 @@ The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-
 - [System context](system-context.md)
 - [Workflow](../domain/workflow.md)
 - [Organization](../domain/organization.md)
+- [Objective](../domain/objective.md)
+- [Department](../domain/department.md)
 - [Capability](../domain/capability.md)
 - [Command](../domain/command.md)
-- Future domain definitions under [`docs/domain/`](../domain/README.md)
-- Future department domain extensions
+- [Policy](../domain/policy.md)
+- [Approval](../domain/approval.md)
+- [Event](../domain/event.md)
+- [Resource](../domain/resource.md)

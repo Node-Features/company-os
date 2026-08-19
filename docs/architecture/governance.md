@@ -17,7 +17,9 @@ Governance owns:
 - producing durable, attributable decision and approval evidence;
 - re-evaluating governed actions immediately before dispatch.
 
-Governance does not own policy meaning, approval state semantics, identity authentication, workflow legality, application orchestration, execution mechanics, provider behavior, or persistence technology. Domain definitions own meaning; the Kernel owns legal transitions; the [Application layer](application.md) coordinates use cases; Runtime executes only persisted, authorized intent.
+Governance consumes authenticated Principal evidence through the [Identity contract](identity.md). It does not authenticate credentials, own Principal lifecycle, resolve arbitrary external subjects, create trusted claims, or manage authentication sessions.
+
+Governance does not own policy meaning, approval state semantics, identity authentication, workflow legality, application orchestration, execution mechanics, provider behavior, or persistence technology. Domain definitions own meaning; Identity proves the requesting [Principal](../domain/principal.md); the Kernel owns legal transitions; the [Application layer](application.md) coordinates use cases; Runtime executes only persisted, authorized intent.
 
 ## Decision request
 
@@ -25,7 +27,8 @@ Every governance request contains:
 
 | Input | Required meaning |
 |---|---|
-| Principal | Authenticated human, agent, service, or delegated role requesting execution |
+| Principal | Durable human, agent, service, or provider identity and active organization binding resolved through the Principal domain |
+| Authentication evidence | Immutable `AuthenticatedPrincipalEvidence` identity from the Identity boundary, bound to Principal, organization, audience, assurance, time, and request/channel context |
 | Action | Stable, provider-independent operation being requested |
 | Resource | Stable target identity and type, including organization/tenant ownership |
 | Context | Trusted request facts such as objective, workflow, time, risk, budget, channel, environment, and proposed arguments digest |
@@ -37,8 +40,8 @@ Absent or unverifiable required input produces `DENY`. Provider names and tool s
 
 ## Decision pipeline
 
-1. Authenticate the caller and resolve the Principal; authentication failure is `DENY`.
-2. Validate Action, Resource, Context, entity data, policy syntax/schema, and organization scope; uncertainty is `DENY`.
+1. Validate Identity-issued authentication evidence and resolve the exact active Principal and organization-binding versions; invalid, stale, revoked, ambiguous, or insufficient evidence is `DENY`.
+2. Validate Action, Resource, trusted Context/attestations, entity data, policy syntax/schema, and organization scope; uncertainty is `DENY`.
 3. Confirm the Principal has active Authority covering the request; missing, expired, revoked, or exceeded authority is `DENY`.
 4. Evaluate applicable authorization policies using default deny: at least one permit must match and no forbid may match. Evaluation errors fail closed.
 5. Compose applicable autonomy requirements using the most restrictive result: `human_only` > `approval_required` > `automatic`.
@@ -84,6 +87,8 @@ Sensitive arguments are represented by canonical digests plus governed reference
 - Approval cannot exceed the approver's authority.
 - Policy, authority, approval, and decision records are persisted before dependent execution continues.
 - Execution uses the same organization scope and request identity that Governance evaluated.
+- Every decision references the authenticated-evidence, durable-Principal, organization-binding, and assurance versions evaluated.
+- Authentication success never implies authorization, and Governance cannot weaken Identity assurance or accept raw caller claims as trusted evidence.
 - Delegation narrows authority; it cannot amplify the delegator's authority.
 - Policy or authority changes invalidate cached decisions and require re-evaluation.
 - Provider guardrails may add protection but cannot replace CompanyOS Governance.
@@ -105,7 +110,6 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 ## Open questions
 
 - OPEN QUESTION: Is Cedar the first policy evaluator, or should the initial slice implement the CompanyOS contract without it?
-- OPEN QUESTION: Which trusted identity service authenticates human, agent, and service principals?
 - OPEN QUESTION: Which roles may approve each action/resource class, and may dual control be required?
 - OPEN QUESTION: Which context fields are trusted facts, who attests them, and how are canonical argument digests produced?
 - OPEN QUESTION: Are approvals single-use by default, and which low-risk cases permit bounded reuse?
@@ -119,6 +123,8 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - [Kernel](kernel.md)
 - [Runtime](runtime.md)
 - [Application layer](application.md)
+- [Identity](identity.md)
+- [Principal domain](../domain/principal.md)
 - [Policy domain](../domain/policy.md)
 - [Approval domain](../domain/approval.md)
 - Future agent, event, persistence, and security specifications

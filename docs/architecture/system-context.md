@@ -93,7 +93,10 @@ flowchart LR
     Operators[Human operators and reviewers]
 
     subgraph COS[CompanyOS boundary]
-        Kernel[Kernel\norganization, policy, objectives, invariants]
+        Request[Request]
+        Identity[Identity\nauthentication and Principal evidence]
+        Application[Application\nuse-case orchestration]
+        Kernel[Kernel\norganizational semantics and invariants]
         Governance[Governance\nauthority, approvals, overrides]
         Departments[Pluggable departments]
         Runtime[Workflow Runtime]
@@ -104,23 +107,25 @@ flowchart LR
         PersistencePort[Persistence contract]
         Events[Events and audit relationships]
 
-        Kernel --> Governance
+        Request --> Identity
+        Identity -->|authenticated Principal evidence| Application
+        Application --> Governance
+        Application --> Kernel
+        Application -->|atomic state, events, and execution intent| PersistencePort
+        Application -.->|notify after commit| Runtime
         Kernel --> Departments
-        Kernel --> Runtime
-        Governance --> Runtime
-        Departments --> Runtime
+        Departments -->|capability and workflow requests| Application
+        PersistencePort -->|committed execution intent| Runtime
+        Runtime -->|execution state and checkpoints| PersistencePort
         Runtime --> Events
         Daemon --> Runtime
         Departments --> Intelligence
         Departments --> CodingRuntime
         CodingRuntime --> WorkspacePort
-        Kernel --> PersistencePort
-        Runtime --> PersistencePort
-        Governance --> PersistencePort
     end
 
-    Owner --> Governance
-    Operators --> Governance
+    Owner --> Request
+    Operators --> Request
 
     Models[AI model providers] --> Intelligence
     CodingAgents[Coding-agent providers] --> CodingRuntime

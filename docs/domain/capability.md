@@ -26,7 +26,7 @@ Provider-specific options cannot appear in a CapabilityDefinition. A material ch
 
 A `CapabilityRequest` binds one active CapabilityDefinition version to an organization, objective, workflow, execution intent, requesting Principal, normalized inputs, constraints, governance-decision reference, idempotency identity, due/expiry conditions, and required result evidence. It names no concrete provider or model.
 
-Application and Kernel validate the organizational request and persist its ExecutionIntent. Runtime may dispatch only that persisted intent through an eligible implementation selected by the applicable router or registry.
+Application coordinates validation of the organizational request. The Kernel decides whether the resulting transition may include an ExecutionIntent, and Application coordinates atomic persistence of that intent with the accepted state and events. Runtime may dispatch only the persisted intent through an eligible implementation selected by the applicable router or registry.
 
 ## Implementation eligibility
 

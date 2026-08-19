@@ -69,6 +69,16 @@ At execution, Governance verifies that the approval is approved, unexpired, unre
 
 The Application layer constructs and submits the Governance request and persists the decision reference with the resulting state or intent. It cannot modify the request after evaluation, reinterpret the outcome, or make an authorization decision. Immediately before a governed external effect, Runtime requests dispatch authorization through an Application use case so Governance evaluates current evidence for the exact persisted intent.
 
+## Knowledge approval boundary
+
+Knowledge approval is a governed `knowledge.approve` Action on a Resource containing the exact organization, knowledge scope, KnowledgeItem identity/version, and content/source digest. While deterministic automatic approval is disabled, applicable policy classifies this Action as `human_only` and Governance returns `DENY` for agent, service, or provider Principals.
+
+For a human reviewer, Governance verifies current `AuthenticatedPrincipalEvidence`; active reviewer Authority for the knowledge class and scope; authorship and separation-of-duties constraints; required expertise or role evidence; item status and immutable digest; source/evidence requirements; organization boundary; policy versions; and any additional Approval evidence. Only `ALLOW` may support the separate Kernel transition to `APPROVED`.
+
+`REQUIRE_APPROVAL` means the review action needs further human authorization and leaves the KnowledgeItem unapproved. `DENY`, stale evidence, item mutation, changed sources, or changed reviewer/Authority/policy context requires a new evaluation. Governance records reviewer, authentication evidence, Authority, policies, determining rules, item digest, outcome, reasons, and time.
+
+Deterministic automatic knowledge approval remains prohibited until a dedicated ADR is accepted and applicable policy is activated. The ADR must narrowly identify eligible knowledge classes and establish reproducibility, source eligibility, validation, failure, accountability, rollback, and audit requirements. A general `automatic` autonomy level, model confidence, test result, deterministic derivation, or provider assertion is insufficient.
+
 ## Auditability
 
 Each evaluation records a decision identifier; request and correlation identifiers; principal/action/resource; trusted context digest; policy, authority, and autonomy versions; outcome; matched permit/forbid/requirement identifiers; evaluation errors; approval identifier and approver when applicable; timestamps; and eventual execution evidence correlation.
@@ -92,6 +102,8 @@ Sensitive arguments are represented by canonical digests plus governed reference
 - Delegation narrows authority; it cannot amplify the delegator's authority.
 - Policy or authority changes invalidate cached decisions and require re-evaluation.
 - Provider guardrails may add protection but cannot replace CompanyOS Governance.
+- Knowledge becomes `APPROVED` only from a Governance-authorized review of the exact immutable item version; agents, services, providers, and models cannot serve as the reviewer.
+- Deterministic automatic knowledge approval is disabled until a dedicated accepted ADR and active policy explicitly permit narrowly defined cases.
 
 ## OSS evidence
 
@@ -115,6 +127,7 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - OPEN QUESTION: Are approvals single-use by default, and which low-risk cases permit bounded reuse?
 - OPEN QUESTION: How are policy deployment, rollback, simulation, and separation of duties governed?
 - OPEN QUESTION: What retention and confidentiality rules apply to governance evidence?
+- OPEN QUESTION: Should any deterministic knowledge class be eligible for automatic approval under a future dedicated ADR?
 
 ## Dependencies
 

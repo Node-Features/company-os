@@ -15,7 +15,7 @@ Knowledge owns claim/synthesis lifecycle, provenance and lineage, review status,
 | `KnowledgeItem` | A versioned atomic claim or bounded synthesis with stable identity, content, scope, provenance, status, validity and supersession links |
 | `SourceReference` | Immutable reference to an artifact, event, evidence record, approved document, external source, or human attestation, with digest/version when possible |
 | `Provenance` | Who or what produced the item, from which sources, by what method/model/tool/version, when, and under which organization and workflow context |
-| `KnowledgeReview` | Attributable decision accepting, rejecting, requesting changes, expiring, or superseding a specific item version |
+| `KnowledgeReview` | Attributable human review of a specific immutable item version, linked to the Governance decision authorizing that reviewer and action |
 | `KnowledgeProjection` | Search, graph, embedding, summary, cache, or index derived from stored items; reproducible and disposable |
 
 An artifact is an output object. Evidence is an observation used to support a claim or decision. Knowledge is a curated, reusable claim or synthesis derived from sources. A metric is a versioned measurement derived under a definition. None becomes another merely by being indexed together.
@@ -26,7 +26,7 @@ Knowledge uses explicit lifecycle states:
 
 - `DRAFT`: captured or generated but not reviewed; returned only when the caller permits draft material.
 - `IN_REVIEW`: frozen candidate version awaiting accountable review.
-- `APPROVED`: accepted for its declared scope and validity period by an authorized reviewer or approved deterministic derivation rule.
+- `APPROVED`: accepted for its declared scope and validity period by a Governance-authorized human reviewer acting on the exact immutable item version.
 - `REJECTED`: reviewed and not accepted; retained as evidence subject to policy.
 - `SUPERSEDED`: replaced by a linked later approved version.
 - `EXPIRED`: no longer valid because its validity condition or review period ended.
@@ -35,7 +35,7 @@ These are knowledge-record lifecycle states, not the documentation status vocabu
 
 ## Required item fields
 
-Each version records item and version identity; organization and knowledge-scope identity; claim type; normalized content or artifact reference; status; authoring principal; creating workflow/department; source references; provenance method and tool/model versions; evidence links; confidence with interpretation; effective/expiry times; security classification; review identity, rationale reference and timestamp; supersedes/superseded-by links; and created/recorded timestamps.
+Each version records item and version identity; organization and knowledge-scope identity; claim type; normalized content or artifact reference; status; authoring principal; creating workflow/department; source references; provenance method and tool/model versions; evidence links; confidence with interpretation; effective/expiry times; security classification; KnowledgeReview identity, reviewer Principal and authentication-evidence references, Governance decision and Authority versions, rationale reference and timestamp; supersedes/superseded-by links; and created/recorded timestamps.
 
 Confidence never substitutes for approval. A high-confidence generated statement remains `DRAFT`; an approved item may still express uncertainty.
 
@@ -45,11 +45,23 @@ Confidence never substitutes for approval. A high-confidence generated statement
 2. Preserve source identity and content integrity; classify access, retention, and tenant scope.
 3. Normalize into a new immutable `KnowledgeItem` version without overwriting its sources.
 4. Detect potential duplicates and contradictions as review signals, not automatic merges.
-5. Apply the required human or governed deterministic review for the item class.
-6. Persist the review decision and item status before publishing it to approved retrieval projections.
-7. Re-evaluate affected knowledge when sources expire, are retracted, or are superseded.
+5. Freeze the candidate version and submit `knowledge.review` or `knowledge.approve` through an Application use case with current authenticated reviewer evidence.
+6. Governance verifies the human reviewer's Authority, policy, organization and knowledge scope, separation-of-duties requirements, and exact item-version/content digest.
+7. Only a current Governance `ALLOW` for `knowledge.approve` permits the Kernel transition to `APPROVED`; persist the KnowledgeReview, Governance-decision reference, and item transition atomically.
+8. Publish to approved retrieval projections only after that commit.
+9. Re-evaluate affected knowledge when sources expire, are retracted, or are superseded.
 
-Models may extract, summarize, relate, or propose knowledge. They cannot approve their own output. Retrieval-augmented generation returns source and status metadata and does not convert generated answers into stored knowledge automatically.
+Models may extract, summarize, relate, or propose knowledge. Agents, services, providers, models, deterministic rules, ingestion pipelines, and retrieval systems cannot approve knowledge. Retrieval-augmented generation returns source and status metadata and does not convert generated answers into stored knowledge automatically.
+
+## Approval boundary
+
+Knowledge approval is the governed Action `knowledge.approve` against a Resource identifying one organization, knowledge scope, KnowledgeItem ID, immutable version, and content/source digest. The requesting reviewer must be an authenticated active `HumanPrincipal` with current Authority for that knowledge class and scope. Policy may require independence from authorship, multiple reviewers, specialist credentials, or additional Approval evidence.
+
+Governance `DENY` leaves the candidate unchanged or permits a separate rejected-review transition according to the review request. `REQUIRE_APPROVAL` pauses the approval action; it does not approve the KnowledgeItem. A stale item version, changed content or sources, expired reviewer evidence, changed Authority/policy, or mismatched organization requires a new Governance evaluation.
+
+The Application layer coordinates Governance, Kernel legality, and atomic persistence. Knowledge storage, review UI, events, indexes, agents, and departments cannot set `APPROVED` directly. Approval of one version does not approve earlier, later, derived, translated, summarized, or conflicting versions.
+
+Deterministic automatic approval is disabled. It may be considered only after a dedicated ADR is accepted that defines narrowly bounded knowledge classes, derivation reproducibility, source eligibility, validation, failure behavior, human accountability, rollback, audit, and governing policy. Until then, no `automatic` autonomy classification, deterministic pipeline, model evaluation, confidence threshold, or provider claim may replace human review.
 
 ## Retrieval contract
 
@@ -73,8 +85,10 @@ Contradictory approved items are not silently ranked away. They are returned or 
 - Organizational knowledge has attributable provenance and source references.
 - Approved knowledge is structurally distinguishable from drafts, rejected, superseded, and expired versions.
 - Conversation, model output, agent memory, retrieved text, external content, and raw observations are not approved knowledge.
-- Every approved item identifies the accountable reviewer or approved derivation rule and the exact reviewed version.
+- Every approved item identifies the Governance-authorized human reviewer, authenticated Principal evidence, Authority/policy versions, Governance decision, and exact reviewed version/content digest.
 - Knowledge approval cannot legalize a workflow transition, grant authority, or replace Governance.
+- Only an Application/Kernel transition backed by a current Governance `ALLOW` for `knowledge.approve` can set `APPROVED`.
+- Deterministic automatic knowledge approval is prohibited until a dedicated accepted ADR and governing policy explicitly enable narrowly defined cases.
 - Source retraction, expiry, or supersession triggers impact review; prior provenance is never erased by editing a projection.
 - Retrieval respects organization, security classification, purpose, status, and validity before relevance ranking.
 - Vector/search indexes and generated summaries are disposable projections, not canonical records.
@@ -83,8 +97,8 @@ Contradictory approved items are not silently ranked away. They are returned or 
 
 ## OPEN QUESTIONS
 
-- Which roles or departments may approve each knowledge class?
-- Which narrowly defined deterministic derivations, if any, may become approved without human review?
+- Which Governance-authorized human roles, independence rules, and review counts apply to each knowledge class?
+- OPEN QUESTION: Should narrowly defined deterministic approval ever be allowed? It remains disabled until a dedicated ADR is accepted.
 - What contradiction, retraction, freshness, and periodic-review policies apply by knowledge class?
 - What taxonomy and scope hierarchy are required for the first vertical slice?
 - Which sources may be quoted, summarized, or retained under license, privacy, and confidentiality rules?

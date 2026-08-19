@@ -101,6 +101,33 @@ The initially envisioned departments register through the same contract as futur
 
 This table establishes neither detailed workflows nor authority. Those belong in the respective department documents and policies.
 
+## Adaptive feedback loop
+
+Research, Monitoring & Evaluation (M&E), and Finance form a recurring learning loop without sharing ownership:
+
+```mermaid
+flowchart LR
+    Signals[Signals] --> RQ[ResearchQuestion]
+    RQ --> Evidence[Evidence]
+    Evidence --> Finding[Research Finding]
+    Finding --> Recommendation[Recommendation]
+    Recommendation --> Governance[Governance decision]
+    Governance --> Objective[Objective]
+    Objective --> Execution[Department execution]
+    Execution --> Result[Result]
+    Result --> Metric[Metric]
+    Metric --> Evaluation[M&E Evaluation]
+    Evaluation --> Resource[Finance ResourceEvaluation]
+    Resource --> NewQuestion[New ResearchQuestion]
+    Evaluation --> NewQuestion
+```
+
+- [Research](../departments/research.md) asks **what changed?** and owns externally grounded findings and recommendations.
+- [M&E](../departments/monitoring-evaluation.md) asks **did our actions work?** and owns measurement definitions, evaluations, and comparative performance evidence.
+- [Finance](../departments/finance.md) asks **was the outcome worth the resources consumed?** and owns budgets, normalized cost evidence, resource limits, and resource evaluations.
+
+The loop carries persisted contract records, not direct department calls. A recommendation is not an objective, an evaluation is not a governance decision, and a resource evaluation cannot retroactively redefine outcome quality. Governance gates proposals; the Kernel owns objective legality; executing departments own their results.
+
 ## Runtime interaction
 
 - A department initiates work through an application use case and registered workflow contract.

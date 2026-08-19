@@ -1,119 +1,608 @@
+<div align="center">
+
 # CompanyOS
 
-**An open-source organizational runtime for building and operating semi-autonomous AI companies.**
+### An open-source organizational runtime for building and operating semi-autonomous AI companies.
 
-> **Project status:** documentation foundation / pre-alpha. CompanyOS is defining its architecture, domain model, governance boundaries, and reference provenance. Production runtime functionality is not implemented yet.
+**Mission-driven · Governed · Extensible · Model-independent · Human-in-control**
 
-CompanyOS explores how an organization can coordinate people, AI agents, workflows, policies, capabilities, evidence, and resources as one governed system. It is not merely a multi-agent framework: its primary abstraction is the organization itself.
+<p>
+  <img src="https://img.shields.io/badge/status-pre--alpha-6f42c1?style=flat-square" alt="Status: Pre-alpha" />
+  <img src="https://img.shields.io/badge/architecture-in%20design-0969da?style=flat-square" alt="Architecture in design" />
+  <img src="https://img.shields.io/badge/open%20source-built%20for%20contributors-2da44e?style=flat-square" alt="Open Source" />
+</p>
 
-## Vision
+</div>
 
-CompanyOS is intended to connect an organization's:
+---
+
+<p align="center">
+  <img
+    src="./architecture-banner.png"
+    alt="CompanyOS architecture"
+    width="100%"
+  />
+</p>
+
+<p align="center">
+  <sub>
+    Mission and policy govern the organization. Research keeps it relevant.
+    Departments execute. M&E measures outcomes. Finance keeps resource use efficient.
+  </sub>
+</p>
+
+---
+
+## What is CompanyOS?
+
+CompanyOS explores a different abstraction for AI systems:
+
+> **Instead of starting with agents, start with the organization.**
+
+The organization defines its mission, vision, policies, objectives, departments, workflows, capabilities, authority boundaries, and measures of success.
+
+AI agents, coding assistants, models, tools, and infrastructure then operate **inside those organizational boundaries**.
 
 ```text
-mission and vision
-→ policies and objectives
-→ departments and workflows
-→ agents, teams, and capabilities
-→ actions, artifacts, and results
-→ metrics and evaluation
-→ research and strategic adaptation
+Mission + Vision
+       ↓
+Policies + Strategy
+       ↓
+Objectives
+       ↓
+Departments
+       ↓
+Workflows
+       ↓
+Agents + Capabilities
+       ↓
+Actions + Artifacts
+       ↓
+Results
+       ↓
+Metrics + Evaluation
+       ↓
+Research + Strategic Adaptation
 ```
 
-The system is designed for bounded autonomy. Authorized work may continue without constant human presence, while governance determines which actions are automatic, approval-gated, or human-only.
+CompanyOS is therefore **not intended to be another multi-agent framework**.
 
-## Architectural direction
+Its primary abstraction is the **organization itself**.
 
-CompanyOS separates organizational meaning from execution infrastructure:
+---
 
-| Area | Responsibility |
-|---|---|
-| **Kernel** | Organization identity, semantics, policies, objectives, departments, governance, and invariants |
-| **Runtime** | Workflow scheduling, dispatch, execution, retry, cancellation, checkpointing, and resume |
-| **Daemon** | Continuous availability, event processing, waking due work, and health supervision |
-| **Departments** | Pluggable organizational functions using shared contracts and capabilities |
-| **Intelligence** | Provider-independent model capabilities, routing, and evidence-driven selection |
-| **CodingAgentRuntime** | Vendor-independent engineering execution through coding-agent adapters |
-| **Workspaces** | Isolated environments for controlled engineering work |
+## Why CompanyOS?
 
-The canonical architecture will live in [ARCHITECTURE.md](ARCHITECTURE.md). It is currently not yet specified and must not be inferred from this overview.
+Most AI orchestration systems begin with:
+
+```text
+Agent → Tools → Task
+```
+
+CompanyOS begins higher in the hierarchy:
+
+```text
+Company
+  ↓
+Mission
+  ↓
+Governance
+  ↓
+Objectives
+  ↓
+Departments
+  ↓
+Workflows
+  ↓
+Agents / Teams
+  ↓
+Capabilities
+  ↓
+Results
+  ↓
+Evaluation
+```
+
+This allows autonomy to remain bounded by organizational intent rather than by prompts alone.
+
+CompanyOS is being designed around four questions:
+
+> **What should the company do?** — Research + Strategy  
+> **What is it allowed to do?** — Governance  
+> **How does work get executed?** — Runtime + Departments  
+> **Did the work actually produce value?** — M&E + Finance
+
+---
 
 ## Adaptive organization
 
-Three functions form the central learning loop:
-
-- **Research** discovers opportunities, risks, customer needs, technology changes, models, coding agents, and open-source patterns.
-- **Monitoring & Evaluation** independently measures effectiveness, quality, reliability, outcomes, and agent performance.
-- **Finance** governs budgets, resource consumption, pricing intelligence, and effective cost per result.
-
-Together they allow evidence from execution to influence future decisions without giving any model or agent unilateral organizational authority.
-
-## Core principles
-
-- Organizational semantics belong to the Kernel.
-- Execution mechanics belong to the Runtime.
-- Continuous availability belongs to the Daemon.
-- Departments request capabilities, not concrete vendors.
-- Agents cannot directly mutate authoritative workflow state.
-- Domain rules determine legal transitions.
-- Governed actions pass policy and approval checks.
-- Authoritative state is persisted before execution continues.
-- Humans can safely pause, override, or redirect execution.
-- Infrastructure is introduced only for a demonstrated responsibility.
-- Planned features are never presented as implemented features.
-
-## Open-source provenance
-
-CompanyOS studies mature projects to shorten the path to reliable implementation without surrendering its defining abstractions. Current references include:
-
-- [JARVIS](https://github.com/vierisid/jarvis) for selected agent coordination, authority, approval, and audit patterns.
-- [LangGraph](https://github.com/langchain-ai/langgraph) for graph execution and checkpoint concepts.
-- [Temporal](https://github.com/temporalio/temporal) for durable execution and recovery semantics.
-- [Cedar](https://github.com/cedar-policy/cedar) for authorization and policy validation.
-- Inngest, Trigger.dev, OpenAI Agents SDK, and Open Multi-Agent as additional bounded references.
-
-See the [feature-provenance map](docs/references/feature-provenance.md) and [pinned revision lock](docs/references/references.lock.md). References inform decisions; they do not automatically become dependencies.
-
-## Repository guide
+Research, Monitoring & Evaluation, and Finance form the primary organizational feedback system.
 
 ```text
-AGENTS.md                         Agent working rules and context entry point
-ARCHITECTURE.md                   Canonical top-level architecture
-docs/INDEX.md                     Task-to-context routing map
-docs/architecture/                Detailed architecture
-docs/domain/                      Domain concepts and invariants
-docs/adr/                         Accepted architectural decisions
-docs/features/                    Significant feature evidence
-docs/references/                  Pinned open-source research and provenance
-.companyos/agent-memory/          Compact non-canonical routing summaries
+                    Research
+                 "What changed?"
+                       ↓
+             Objectives / Decisions
+                       ↓
+             Operational Departments
+                       ↓
+                    Results
+                  ↙         ↘
+               M&E         Finance
+         "Did it work?"  "Was it worth it?"
+                  ↘         ↙
+                    Evidence
+                       ↓
+                    Research
 ```
 
-Start with [AGENTS.md](AGENTS.md), then use [docs/INDEX.md](docs/INDEX.md) to load only the documentation relevant to a task.
+### 🔎 Research
 
-## Current roadmap
+Continuously investigates:
 
-1. Approve the documentation-control foundation.
-2. Define mission, vision, principles, and non-goals.
-3. Freeze Kernel, Runtime, Daemon, governance, and provider boundaries.
-4. Define domain concepts and invariants.
-5. Complete pinned source studies and architectural decisions.
-6. Specify departments and vertical workflows.
-7. Implement the smallest production-quality vertical slice.
+- customer problems
+- market opportunities
+- competitor movement
+- technology changes
+- security risks
+- open-source ecosystems
+- new AI models
+- new coding agents
+- cheaper or free intelligence resources
 
-Development will proceed through reviewed vertical slices rather than feature-count expansion.
+### 📊 Monitoring & Evaluation
+
+Independently evaluates:
+
+- correctness
+- quality
+- effectiveness
+- reliability
+- business outcomes
+- model performance
+- agent performance
+- coding-agent performance
+- cost-versus-quality
+
+### 💰 Finance
+
+Governs resource intelligence:
+
+- organizational budgets
+- model pricing
+- coding-agent pricing
+- infrastructure expenditure
+- resource consumption
+- cost anomalies
+- effective cost per successful result
+
+Research asks **what changed**.
+
+M&E asks **whether our actions worked**.
+
+Finance asks **whether the outcome justified the resources consumed**.
+
+---
+
+## Architecture
+
+CompanyOS separates **organizational meaning** from **execution infrastructure**.
+
+| Layer | Responsibility |
+|---|---|
+| 🧠 **Organization Kernel** | Organizational semantics, objectives, departments, workflows, capabilities, and invariants |
+| 🛡️ **Governance** | Authority, policies, approvals, budgets, and autonomy boundaries |
+| ⚙️ **Runtime** | Workflow execution, scheduling, retry, cancellation, checkpointing, waiting, and resume |
+| ♾️ **Daemon** | Continuous availability, supervision, due-work activation, and runtime health |
+| 🏢 **Departments** | Pluggable organizational functions operating through shared contracts |
+| ✦ **Intelligence** | Provider-independent intelligence capabilities and evidence-driven model routing |
+| `</>` **Coding Agent Runtime** | Vendor-independent delegation to mature software-engineering assistants |
+| 📦 **Workspaces** | Isolated execution environments for engineering and external-effect work |
+| 💾 **Durable State** | Authoritative state, events, artifacts, knowledge, metrics, and audit evidence |
+
+The architectural boundaries are developed in:
+
+**[ARCHITECTURE.md](ARCHITECTURE.md)**
+
+Detailed architecture lives under:
+
+**[`docs/architecture/`](docs/architecture/)**
+
+> Architecture is currently being specified and audited.  
+> DRAFT documents are not treated as accepted architectural decisions.
+
+---
+
+## Semi-autonomous by design
+
+CompanyOS is designed around **bounded autonomy**.
+
+Actions eventually fall into three authority classes:
+
+| Authority | Meaning |
+|---|---|
+| 🟢 **Automatic** | CompanyOS may execute without human intervention |
+| 🟡 **Approval required** | CompanyOS may prepare the action but must wait for authorization |
+| 🔴 **Human only** | Authority remains exclusively with a human |
+
+A human should be able to leave CompanyOS running, return later, and immediately answer:
+
+> **What did the company discover?**  
+> **What did it decide?**  
+> **What did it do?**  
+> **What needs my attention?**
+
+Human absence should not stop authorized work.
+
+Human intervention should not corrupt running work.
+
+---
+
+## Pluggable departments
+
+Departments are intended to extend CompanyOS without redesigning the organizational kernel.
+
+Current architectural direction includes:
+
+| Department | Primary responsibility |
+|---|---|
+| 🔎 **Research** | Evidence, opportunities, risks, customers, competitors, technologies |
+| 📊 **Monitoring & Evaluation** | Quality, outcomes, effectiveness, reliability, learning |
+| ✏️ **Design** | Product design, UX, specifications, architecture proposals |
+| `</>` **Engineering** | Software implementation, testing, review, maintenance |
+| 🚀 **Deployment** | Releases, infrastructure, production operations |
+| 📚 **Education & Engagement** | Education, awareness, community and user engagement |
+| 💰 **Finance** | Budgets, costs, resource intelligence and efficiency |
+| 🧩 **Future Departments** | Added through the same department extension contracts |
+
+A future department should be installable through stable contracts rather than requiring Kernel changes.
+
+---
+
+## Model and coding-agent independent
+
+CompanyOS should never depend organizationally on one AI provider.
+
+Departments request **capabilities**, not brands.
+
+```text
+Task
+ ↓
+Capability + Complexity
+ ↓
+Governance + Finance constraints
+ ↓
+Research intelligence
+ ↓
+M&E performance evidence
+ ↓
+Router
+ ↓
+Best eligible provider
+```
+
+The same principle applies to coding assistants.
+
+Engineering may eventually delegate repository-scale work to providers such as Codex, Claude Code, Gemini CLI, OpenHands, Aider, or future systems through a common `CodingAgentRuntime`.
+
+```text
+Engineering Task
+      ↓
+Coding Agent Router
+      ↓
+Isolated Workspace
+      ↓
+Implement
+      ↓
+Test
+      ↓
+Commit
+      ↓
+Pull Request
+      ↓
+Independent Review
+      ↓
+Governance Gate
+      ↓
+Merge
+```
+
+CompanyOS owns the engineering process.
+
+The coding assistant remains replaceable.
+
+---
+
+## Open-source engineering provenance
+
+CompanyOS deliberately studies mature open-source systems before implementing difficult infrastructure.
+
+The objective is to **borrow engineering lessons, not blindly copy architectures**.
+
+| Reference | What CompanyOS studies |
+|---|---|
+| [JARVIS](https://github.com/vierisid/jarvis) | Agent coordination, authority, approval, audit patterns |
+| [LangGraph](https://github.com/langchain-ai/langgraph) | Graph execution, state and checkpoint concepts |
+| [Temporal](https://github.com/temporalio/temporal) | Durable execution, recovery and failure semantics |
+| [Cedar](https://github.com/cedar-policy/cedar) | Authorization and policy validation |
+| **Inngest** | Event-driven scheduling and durable background execution |
+| **Trigger.dev** | Long-running tasks, waits and retries |
+| **OpenAI Agents SDK** | Agent, tool, handoff and guardrail patterns |
+| **Open Multi-Agent** | Multi-agent coordination, task DAGs and budgets |
+
+Every significant architectural feature should record:
+
+```text
+Reference studied
+     ↓
+Pattern discovered
+     ↓
+ADOPT / ADAPT / REJECT
+     ↓
+CompanyOS decision
+     ↓
+Vertical implementation
+     ↓
+Tests + evidence
+```
+
+See:
+
+- [`docs/references/feature-provenance.md`](docs/references/feature-provenance.md)
+- [`docs/references/references.lock.md`](docs/references/references.lock.md)
+
+Reference implementations inform CompanyOS.
+
+They do **not automatically become dependencies**.
+
+---
+
+## Vertical-slice development
+
+CompanyOS is intentionally not being built subsystem-by-subsystem.
+
+Development proceeds through small end-to-end slices.
+
+```text
+Problem
+   ↓
+Responsibility boundary
+   ↓
+Open-source reference study
+   ↓
+Architecture decision
+   ↓
+Threat + failure analysis
+   ↓
+Smallest useful implementation
+   ↓
+Tests
+   ↓
+Documentation
+   ↓
+Pull Request
+   ↓
+Evaluation
+```
+
+A meaningful feature should eventually produce three things:
+
+### 1. Working software
+Production-quality implementation and tests.
+
+### 2. GitHub evidence
+Issues, architecture decisions, commits, reviews and PRs.
+
+### 3. Engineering knowledge
+Documentation explaining the problem, trade-offs and implementation for future contributors.
+
+---
+
+## Repository map
+
+```text
+CompanyOS
+│
+├── AGENTS.md
+│   Agent and coding-assistant engineering rules
+│
+├── ARCHITECTURE.md
+│   Canonical architecture overview
+│
+├── ROADMAP.md
+│   Vertical development roadmap
+│
+├── docs/
+│   ├── INDEX.md
+│   │   Task → context navigation
+│   │
+│   ├── architecture/
+│   │   Architectural responsibilities and boundaries
+│   │
+│   ├── domain/
+│   │   Domain concepts, lifecycle semantics and invariants
+│   │
+│   ├── adr/
+│   │   Architecture Decision Records
+│   │
+│   ├── features/
+│   │   Significant feature design and evidence
+│   │
+│   └── references/
+│       Open-source research and provenance
+│
+└── .companyos/
+    └── agent-memory/
+        Compact, non-canonical context for coding agents
+```
+
+### Recommended reading order
+
+```text
+README
+   ↓
+AGENTS.md
+   ↓
+docs/INDEX.md
+   ↓
+ARCHITECTURE.md
+   ↓
+relevant domain / architecture docs
+   ↓
+accepted ADRs
+   ↓
+feature specification
+```
+
+This keeps both humans and coding agents from loading unnecessary context.
+
+---
+
+## Roadmap
+
+CompanyOS is currently in its **architecture and documentation-control phase**.
+
+### Phase 0 — Foundation
+
+- [x] Define project direction
+- [x] Establish documentation hierarchy
+- [x] Establish open-source provenance process
+- [ ] Complete architecture reconciliation
+- [ ] Resolve remaining ownership boundaries
+- [ ] Accept foundational ADRs
+
+### Phase 1 — First vertical slice
+
+```text
+Organization
+   ↓
+Mission / Vision
+   ↓
+Objective
+   ↓
+Department
+   ↓
+Workflow
+   ↓
+Execution
+   ↓
+Persisted result
+   ↓
+Event
+```
+
+### Phase 2 — Governed execution
+
+```text
+Action
+ ↓
+Policy decision
+ ↓
+ALLOW / DENY / REQUIRE_APPROVAL
+ ↓
+Execution / Wait
+ ↓
+Resume
+```
+
+### Phase 3 — Adaptive organization
+
+```text
+Research
+ ↓
+Execution
+ ↓
+M&E
+ ↓
+Finance
+ ↓
+Research
+```
+
+See the full **[ROADMAP.md](ROADMAP.md)**.
+
+---
 
 ## Contributing
 
-CompanyOS is at an early architecture stage. Before proposing code:
+CompanyOS is being designed as an open-source engineering project, not a closed internal prototype.
 
-1. Read [AGENTS.md](AGENTS.md) and the [context map](docs/INDEX.md).
-2. Identify the owning module and applicable invariants.
-3. Inspect relevant accepted ADRs and pinned references.
-4. Propose the smallest vertical change, including failure, security, and validation considerations.
-5. Avoid introducing infrastructure without a concrete requirement.
+Useful contribution areas will include:
 
-Contribution guidelines, security reporting instructions, and licensing terms will be added before accepting production contributions.
+<p>
+  <img src="https://img.shields.io/badge/Kernel-Architecture-2da44e?style=flat-square" />
+  <img src="https://img.shields.io/badge/Workflow-Runtime-0969da?style=flat-square" />
+  <img src="https://img.shields.io/badge/Departments-Extensions-8250df?style=flat-square" />
+  <img src="https://img.shields.io/badge/AI-Providers-bf8700?style=flat-square" />
+  <img src="https://img.shields.io/badge/Coding%20Agents-Adapters-1f883d?style=flat-square" />
+  <img src="https://img.shields.io/badge/Governance-Security-d1242f?style=flat-square" />
+</p>
 
-## Important note
+Before proposing a change:
 
-CompanyOS is experimental, pre-alpha software. The repository currently contains architectural and research documentation, not a production-ready autonomous-company runtime.
+1. Read **[AGENTS.md](AGENTS.md)**.
+2. Locate the responsible module through **[`docs/INDEX.md`](docs/INDEX.md)**.
+3. Read applicable domain invariants and accepted ADRs.
+4. Study relevant pinned open-source references when appropriate.
+5. Propose the **smallest vertical change**.
+6. Include failure, security, test, and architectural considerations.
+7. Avoid introducing infrastructure without a demonstrated responsibility.
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the evolving contributor workflow.
+
+---
+
+## Security
+
+Semi-autonomous systems require strict authority boundaries.
+
+CompanyOS is being designed around:
+
+- least privilege
+- explicit capabilities
+- policy-gated external effects
+- human approval boundaries
+- auditable actions
+- isolated engineering workspaces
+- provider independence
+- durable state
+- failure recovery
+- provenance-preserving evidence
+
+Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
+
+---
+
+## Project status
+
+> [!WARNING]
+> **CompanyOS is currently pre-alpha.**
+>
+> The repository is primarily defining architecture, domain semantics, governance boundaries, reference provenance, and the first executable vertical slice.
+>
+> Documentation marked **DRAFT** is not an accepted architectural contract unless an accepted ADR or canonical domain specification explicitly establishes it.
+
+No production-ready autonomous-company runtime is claimed at this stage.
+
+---
+
+<div align="center">
+
+## Build the organization layer for AI.
+
+**Mission-driven. Evidence-driven. Governed. Extensible.**
+
+<br />
+
+<a href="./CONTRIBUTING.md">
+  <img src="https://img.shields.io/badge/Contribute_to_CompanyOS-181717?style=for-the-badge&logo=github&logoColor=white" />
+</a>
+
+<br /><br />
+
+<sub>
+Built openly for engineers interested in AI orchestration, distributed systems,
+organizational runtimes, durable execution, governance, and autonomous software engineering.
+</sub>
+
+</div>

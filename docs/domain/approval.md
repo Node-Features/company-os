@@ -46,13 +46,13 @@ Terminal transitions are immutable. Reconsideration creates a new Approval rathe
 
 ## Resolution and execution
 
-1. Governance persists `REQUIRE_APPROVAL` and a `PENDING` Approval before Runtime waits.
-2. An authenticated human decision maker reviews immutable request details and approves or rejects.
-3. Resolution uses an atomic status/version check so duplicate or competing decisions cannot overwrite one another.
-4. Runtime wakes after the resolved state is persisted; notification delivery alone is not resolution.
-5. Governance re-evaluates policy, Authority, context, request digest, expiry, revocation, and approver eligibility.
-6. A matching Approval may produce a fresh `ALLOW`; execution remains a separate Runtime operation.
-7. Consumption and execution correlation are persisted idempotently.
+1. Governance evaluates the immutable proposal and produces an attributable `REQUIRE_APPROVAL` Decision with the applicable approval constraints; it does not persist the result directly.
+2. Application atomically persists the Decision, immutable `PendingCommand`, `PENDING` Approval, audit record, and idempotency result before returning `APPROVAL_REQUIRED` or notifying Runtime. This transaction creates no target-domain transition or execution intent.
+3. An authenticated human decision maker reviews the immutable request details and approves or rejects.
+4. Application coordinates resolution through an atomic status/version transition with its audit and idempotency records so duplicate or competing decisions cannot overwrite one another.
+5. Runtime wakes only after the resolved state is persisted; notification delivery alone is not resolution.
+6. On resume, Application reloads the pending command and authoritative state, and Governance re-evaluates policy, Authority, context, request digest, expiry, revocation, and approver eligibility.
+7. A matching Approval may produce a fresh `ALLOW`; Application must still obtain the final Kernel decision before atomically persisting the target-domain transition, events, Approval consumption, pending-command closure, and execution intent.
 
 ## Invariants
 
@@ -74,7 +74,7 @@ Audit evidence must distinguish request creation, notification delivery, view/ac
 
 ## Relationship to policy
 
-[Policy](policy.md) determines whether approval is required and who may decide. [Governance](../architecture/governance.md) owns evaluation and verifies Approval evidence. Runtime owns durable waiting and resume, not Approval meaning.
+[Policy](policy.md) determines whether approval is required and who may decide. [Governance](../architecture/governance.md) owns evaluation and verifies Approval evidence. [Application](../architecture/application.md) coordinates atomic persistence. Runtime owns durable waiting and resume, not Approval meaning or persistence coordination.
 
 ## Open questions
 

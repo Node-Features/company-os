@@ -1,0 +1,9 @@
+# Testing Documentation
+
+This directory owns the strategy for verifying invariants, contracts, workflows, policies, resilience, and isolation.
+
+| Document | Purpose | Status | Read when |
+|---|---|---|---|
+| `strategy.md` | Overall testing responsibilities and levels | NOT YET SPECIFIED | Read when planning validation. |
+| `contract-tests.md` | Shared-contract and adapter verification | NOT YET SPECIFIED | Read when changing interfaces or adapters. |
+| `failure-injection.md` | Crash, retry, replay, and recovery testing | NOT YET SPECIFIED | Read when validating failure behavior. |

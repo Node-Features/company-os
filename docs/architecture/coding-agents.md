@@ -126,4 +126,3 @@ An indeterminate external effect, including an uncertain push or PR creation, is
 - Which Git actions may be automatic at each autonomy level?
 - Which provider session checkpoints are portable enough to resume safely?
 - What evidence-retention and redaction periods apply to prompts, patches, and command output?
-

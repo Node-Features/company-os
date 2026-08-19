@@ -123,4 +123,3 @@ OpenHands is the strongest inspected workspace/runtime reference. Aider and JARV
 - What network destinations and package-cache sharing are permitted by default?
 - What fencing and checkpoint guarantees can every initial `WorkspaceProvider` support?
 - Which evidence must be retained when source or command output contains regulated or secret material?
-

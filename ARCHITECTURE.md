@@ -16,6 +16,7 @@ See [System Context](docs/architecture/system-context.md) for actors, terminolog
 
 - **Kernel:** organizational semantics and invariants.
 - **Application:** use-case orchestration across Governance, Kernel, Persistence, and Runtime.
+- **Identity:** authentication and trusted evidence for durable Principal identities; see [Identity](docs/architecture/identity.md).
 - **Runtime:** workflow execution mechanics.
 - **Daemon:** continuous availability and supervision.
 - **Departments:** pluggable organizational functions using shared contracts.
@@ -23,6 +24,8 @@ See [System Context](docs/architecture/system-context.md) for actors, terminolog
 - **CodingAgentRuntime:** provider-independent engineering execution.
 - **Workspaces:** isolated execution environments behind a stable contract.
 - **Governance:** authority, policy, approvals, overrides, and external-action gates.
+- **Events:** event-flow boundaries, publication, and consumption semantics; see [Events](docs/architecture/events.md).
+- **Knowledge:** governed organizational knowledge handling and reuse; see [Knowledge](docs/architecture/knowledge.md).
 - **Persistence:** authoritative durable state behind CompanyOS-owned transactional contracts.
 
 These responsibilities require further specification in [detailed architecture documents](docs/architecture/README.md). No concrete database, workflow engine, agent framework, model provider, coding-agent provider, or workspace provider is selected by this draft.

@@ -95,3 +95,8 @@ Policy lifecycle is `DRAFT -> VALIDATED -> ACTIVE -> SUPERSEDED` or `RETIRED`. I
 - OPEN QUESTION: Are autonomy requirements represented in a separate policy set or as CompanyOS policy metadata?
 - OPEN QUESTION: Which policy changes invalidate pending Approvals?
 - OPEN QUESTION: What static analysis and simulation are mandatory before activation?
+
+## Dependencies
+
+- [Organization](organization.md)
+- [Principal](principal.md)

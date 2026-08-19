@@ -116,6 +116,5 @@ These are separate state changes with separate evidence. Governance evaluates th
 
 ## Dependencies
 
-- [Policy](policy.md)
-- [Approval](approval.md)
-- Future Organization, Membership, Role, Agent, and Provider domain definitions
+- [Organization](organization.md)
+- Future Membership, Role, and Provider domain contracts

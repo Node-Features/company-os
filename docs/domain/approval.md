@@ -83,3 +83,9 @@ Audit evidence must distinguish request creation, notification delivery, view/ac
 - OPEN QUESTION: May an approver edit a request, or must every edit create a new request and Approval?
 - OPEN QUESTION: Which notification and decision channels satisfy identity assurance requirements?
 - OPEN QUESTION: When, if ever, can a bounded reusable human grant be represented as Authority instead of Approval?
+
+## Dependencies
+
+- [Organization](organization.md)
+- [Principal](principal.md)
+- [Policy](policy.md)

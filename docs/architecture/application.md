@@ -149,4 +149,4 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 - [Governance](governance.md)
 - [Persistence](persistence.md)
 - [Events](events.md)
-- Future shared workflow and execution-intent contracts
+- [Workflow and execution-intent contracts](../domain/workflow.md)

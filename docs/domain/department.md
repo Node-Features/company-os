@@ -118,4 +118,8 @@ Names and final stable identifiers remain `OPEN QUESTION` until the organization
 ## Dependencies
 
 - [Policy](policy.md)
-- Future organization, capability, workflow, agent, event, metric, and knowledge domain definitions
+- [Workflow](workflow.md)
+- [Event](event.md)
+- [Metric](metric.md)
+- [Knowledge](knowledge.md)
+- Future Organization, Capability, and Agent domain contracts

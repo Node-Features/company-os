@@ -110,4 +110,6 @@ Contradictory approved items are not silently ranked away. They are returned or 
 - [Governance](governance.md)
 - [Metrics](../domain/metric.md)
 - [Evaluations](../domain/evaluation.md)
-- Future shared artifact, evidence, and knowledge domain contracts
+- [Artifact](../domain/artifact.md)
+- [Evidence](../domain/evidence.md)
+- [Knowledge contract](../domain/knowledge.md)

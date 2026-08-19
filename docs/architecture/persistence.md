@@ -100,4 +100,9 @@ Execution checkpoints may commit separately from organizational state because th
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [Events](events.md)
-- Future shared workflow, execution-state, artifact, evidence, metric, and knowledge domain contracts
+- [Workflow and execution-intent contracts](../domain/workflow.md)
+- [Artifact](../domain/artifact.md)
+- [Evidence](../domain/evidence.md)
+- [Metric](../domain/metric.md)
+- [Knowledge](../domain/knowledge.md)
+- Future execution-state domain contract

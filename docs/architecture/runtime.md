@@ -112,4 +112,7 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 - [Application layer](application.md)
 - [Persistence](persistence.md) execution-state port
 - [Events](events.md)
-- Future shared workflow, execution-intent, and capability contracts
+- [Workflow and execution-intent contracts](../domain/workflow.md)
+- [Result](../domain/result.md)
+- [Evidence](../domain/evidence.md)
+- Future Capability domain contract

@@ -91,4 +91,5 @@ Activation and supersession are governed, persisted M&E operations. Historical M
 
 ## Dependencies
 
-- Future Evidence, Objective, Result, and Principal domain definitions
+- [Evidence](evidence.md)
+- [Principal](principal.md)

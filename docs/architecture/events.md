@@ -107,4 +107,9 @@ Events are immutable. Corrections use a new compensating or superseding event an
 ## Dependencies
 
 - [Top-level architecture](../../ARCHITECTURE.md)
-- Future shared event, workflow, evidence, artifact, metric, and knowledge domain contracts
+- [Event](../domain/event.md)
+- [Workflow](../domain/workflow.md)
+- [Evidence](../domain/evidence.md)
+- [Artifact](../domain/artifact.md)
+- [Metric](../domain/metric.md)
+- [Knowledge](../domain/knowledge.md)

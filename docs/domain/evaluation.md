@@ -110,4 +110,8 @@ A specialization must:
 ## Dependencies
 
 - [Metric](metric.md)
-- Future Evidence, Result, Objective, Principal, and Resource domain definitions
+- [Evidence](evidence.md)
+- [Result](result.md)
+- [Objective](objective.md)
+- [Principal](principal.md)
+- [Resource](resource.md)

@@ -59,8 +59,8 @@ Timestamps do not define processing order. Per-aggregate versions establish tran
 
 ## Publication and consumption
 
-1. The Application use case loads authoritative state, obtains applicable Governance evidence, and asks the Kernel to validate the command.
-2. The Application layer coordinates atomic persistence of the accepted state transition, its domain events, and any caused execution intent.
+1. The Application use case loads authoritative state and asks the Kernel for non-mutating proposal validation.
+2. Governance evaluates that exact proposal; only on current `ALLOW` does the Application layer request the final Kernel decision and coordinate atomic persistence of the accepted state transition, its domain events, and any caused execution intent.
 3. After commit, publish integration or Runtime notifications from persisted records using an outbox-equivalent mechanism.
 4. Consumers deduplicate by event identity and record their own progress before acknowledging work.
 5. Consumer failure never rolls back an already committed source fact; recovery replays the persisted event.

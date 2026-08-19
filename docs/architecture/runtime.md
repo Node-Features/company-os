@@ -32,13 +32,13 @@ The Runtime does not own:
 
 ## Execution model
 
-1. An [Application use case](application.md) loads authoritative state, obtains Governance evidence, asks the Kernel for a decision, and atomically persists accepted state, domain events, and execution intent.
+1. An [Application use case](application.md) loads authoritative state, asks the Kernel for non-mutating proposal validation, submits the exact proposal to Governance, and only on current `ALLOW` asks the Kernel for its final decision before atomically persisting accepted state, domain events, and execution intent.
 2. After commit, the Application layer notifies Runtime; notification is only a wake-up hint because the persisted intent remains discoverable.
 3. Runtime claims the due persisted intent using a bounded lease and creates or resumes an execution attempt.
 4. Runtime dispatches a capability request to an eligible executor through a provider-independent contract.
 5. Results, failures, heartbeats, and provider identifiers are captured as execution evidence.
 6. Runtime submits the result and execution evidence through a new Application use case.
-7. The Application layer reloads state, obtains required Governance evidence, asks the Kernel to interpret the result, and persists any authoritative transition before dependent work is scheduled.
+7. The Application layer reloads state, obtains a Kernel-validated proposal for interpreting the result, submits that exact proposal to Governance, and only on current `ALLOW` asks the Kernel for its final decision and persists any authoritative transition before dependent work is scheduled.
 8. Transient failures produce a durable next-attempt time; permanent or exhausted failures produce a terminal execution result for Kernel interpretation.
 
 Waiting is persisted state plus a wake condition, not a sleeping process. Resume reconstructs execution from persisted state and is safe after duplicate wake-ups.

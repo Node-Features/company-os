@@ -63,7 +63,7 @@ Requested effects describe intent; they are not proof that work occurred. Persis
 
 ## Relationship to Application, Runtime, and Daemon
 
-The [Application layer](application.md) loads authoritative state, obtains Governance evidence, invokes the Kernel, and coordinates atomic persistence of an accepted state, its domain events, and caused execution intent. The [Runtime](runtime.md) executes only persisted intent and returns evidence through a new Application use case. The [Daemon](daemon.md) keeps Runtime components available but has no path around Application orchestration or Kernel decisions.
+The [Application layer](application.md) loads authoritative state and first invokes the Kernel's non-mutating proposal validation. Governance evaluates that exact proposal. Only on current `ALLOW` does Application invoke the Kernel's final decision and coordinate atomic persistence of accepted state, domain events, and caused execution intent. The [Runtime](runtime.md) executes only persisted intent and returns evidence through a new Application use case. The [Daemon](daemon.md) keeps Runtime components available but has no path around Application orchestration or Kernel decisions.
 
 The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-evidence). Those systems largely illuminate execution mechanics; none is adopted as CompanyOS domain authority.
 

@@ -6,7 +6,7 @@ Status: DRAFT
 
 Finance answers: **Was the outcome worth the resources consumed?** It supplies resource intelligence, budgets, normalized price and usage evidence, resource limits, and evaluations of effective cost relative to measured outcomes.
 
-Finance owns financial and resource constraints. It does not determine whether an output is correct, conduct primary external research, select concrete providers, authorize actions by itself, execute department work, or change objective success criteria.
+Finance owns the lifecycle and quality of canonical financial and [resource constraints](../domain/resource.md). It does not determine whether an output is correct, conduct primary external research, select concrete providers, authorize actions by itself, execute department work, or change objective success criteria.
 
 ## Responsibilities
 
@@ -31,7 +31,7 @@ A versioned resource envelope for an organization scope, owner, period, currency
 
 ### ResourceConstraint
 
-A request- or workflow-scoped ceiling for cost, tokens, compute, storage, duration, concurrency, or another governed resource. It states enforcement behavior when estimates or actuals approach or exceed the limit.
+The canonical Finance-owned limit contract defined by the [Resource domain](../domain/resource.md). Its specializations are `CostConstraint`, `ComputeConstraint`, `TimeConstraint`, `StorageConstraint`, and `ConcurrencyConstraint`. Finance issues, versions, composes, reserves against, and reconciles these constraints; consumers do not redefine them.
 
 ### PriceProfile
 
@@ -71,7 +71,7 @@ Research answers whether a cheaper/free alternative or market change exists and 
 
 Finance consumes M&E outcome evidence without rewriting it. It may calculate cost-versus-quality and Pareto comparisons, but an option below the minimum M&E quality or Governance eligibility threshold is not made acceptable merely because it is cheaper.
 
-Finance supplies constraints and evidence to Intelligence and CodingAgent routers. Routers select among eligible profiles; Finance never chooses a provider directly.
+Finance supplies exact ResourceConstraint versions, reservations, usage evidence, and constraint outcomes to Intelligence and CodingAgent routers. Routers select among eligible profiles; Finance never chooses a provider directly, and routers never relax or reinterpret Finance contracts.
 
 ## Invariants
 
@@ -81,6 +81,7 @@ Finance supplies constraints and evidence to Intelligence and CodingAgent router
 - Finance cannot redefine M&E quality, correctness, or success to improve a resource evaluation.
 - M&E cannot alter price, allocation, or budget evidence to improve an outcome evaluation.
 - Routers consume Finance constraints and evidence but retain provider selection responsibility.
+- Cost, compute, time, storage, and concurrency constraints retain their canonical Resource-domain meanings in every consumer.
 - Failed, retried, rejected, and evaluation work is included in effective-cost analysis.
 - Missing or stale pricing and usage evidence produces explicit uncertainty or ineligibility according to policy.
 - Resource-limit and budget transitions are governed, versioned, persisted, and auditable.
@@ -102,6 +103,7 @@ Finance is accountable for budget variance, forecast accuracy, cost attribution 
 - [Department architecture](../architecture/departments.md)
 - [Governance](../architecture/governance.md)
 - [Persistence](../architecture/persistence.md)
+- [Resource domain](../domain/resource.md)
 - [Intelligence](../architecture/intelligence.md)
 - [Coding agents](../architecture/coding-agents.md)
 - [Research](research.md)

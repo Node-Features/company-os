@@ -16,7 +16,7 @@ Intelligence owns:
 - routing, usage, failure, and execution evidence for M&E evaluation;
 - feedback flow from Research, Monitoring & Evaluation (M&E), Finance, and Governance.
 
-It does not own organizational objectives, department semantics, policy meaning, budgets, Metrics, Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider credentials, workflow execution, or acceptance of model output as authoritative truth.
+It does not own organizational objectives, department semantics, policy meaning, budgets, ResourceConstraint semantics, Metrics, Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider credentials, workflow execution, or acceptance of model output as authoritative truth.
 
 ## Required flow
 
@@ -48,7 +48,7 @@ A versioned provider-independent outcome contract. It declares supported task fa
 
 ### IntelligenceRequest
 
-The immutable request envelope submitted for one capability invocation. It includes request, organization, objective, workflow, department, and requesting-principal identities; IntelligenceCapability ID/version; normalized input references; permitted tools; TaskComplexity; QualityRequirement; PrivacyRequirement; CostConstraint; latency deadline; context-size needs; governance action/resource/context; idempotency identity; and required evidence.
+The immutable request envelope submitted for one capability invocation. It includes request, organization, objective, workflow, department, and requesting-principal identities; IntelligenceCapability ID/version; normalized input references; permitted tools; TaskComplexity; QualityRequirement; PrivacyRequirement; a Finance-resolved ResourceConstraintSet; latency requirement; context-size needs; governance action/resource/context; idempotency identity; and required evidence.
 
 `IntelligenceCapabilityRequest` is the application-facing form that becomes a validated IntelligenceRequest. It cannot contain a preferred provider or model. A temporary operator override is a separate governed routing constraint with explicit reason and expiry, never an untracked request field.
 
@@ -66,7 +66,7 @@ The data-handling boundary for the request. It declares classification, allowed 
 
 ### CostConstraint
 
-A Finance-owned, request-scoped ceiling and accounting contract. It defines currency, maximum estimated and actual cost, budget account, period, token or compute ceilings, fallback reserve, and overrun behavior. It does not select a model or permit spending by itself.
+The monetary specialization of the canonical Finance-owned [ResourceConstraint](../domain/resource.md). Intelligence references its identity/version as part of a ResourceConstraintSet and does not define its fields, composition, reservation, enforcement, or reconciliation semantics. Compute, time, storage, and concurrency limits use their respective canonical specializations rather than being folded into CostConstraint.
 
 ### ModelProfile
 
@@ -93,8 +93,8 @@ ModelEvaluations contribute to the subject's canonical `PerformanceProfile`; Int
 1. Validate the capability, request schema, identities, evidence requirements, and absence of direct provider selection.
 2. Task Analyzer produces versioned complexity and requirement features. Analyzer uncertainty can raise requirements but cannot silently relax them.
 3. Governance evaluates each provider/model profile for policy and privacy eligibility. `DENY` removes it; `REQUIRE_APPROVAL` pauses routing and cannot enter the eligible set.
-4. Finance verifies the budget account and supplies effective-cost constraints using price, expected usage, retries, failure rate, and verification cost.
-5. Filter profiles by capability fit, modalities, context, tool support, quality threshold, privacy, data location, availability, deadline, cost ceiling, evidence freshness, and operational health.
+4. Finance verifies the budget account and supplies an exact ResourceConstraintSet, reservation evidence when required, and effective-cost evidence using price, expected usage, retries, failure rate, and verification cost.
+5. Filter profiles by capability fit, modalities, context, tool support, quality threshold, privacy, data location, availability, applicable Finance constraint outcomes, evidence freshness, and operational health.
 6. Rank only eligible profiles using the request's declared priorities across expected quality, historical reliability, latency, effective cost, and M&E confidence.
 7. Persist RoutingDecision and execution intent before dispatch.
 8. Execute through the selected ProviderAdapter. Fallback is a new routing attempt with preserved logical request identity and explicit failure evidence.
@@ -103,7 +103,7 @@ ModelEvaluations contribute to the subject's canonical `PerformanceProfile`; Int
 
 ## Eligibility before optimization
 
-Hard constraints are never converted into weighted preferences. Governance, privacy, capability compatibility, required tool support, quality minimums, budget ceilings, and hard deadlines filter candidates before scoring. A cheaper or higher-scoring model cannot compensate for ineligibility.
+Hard constraints are never converted into weighted preferences. Governance, privacy, capability compatibility, required tool support, quality minimums, and hard Finance ResourceConstraints filter candidates before scoring. A cheaper or higher-scoring model cannot compensate for ineligibility.
 
 Routing weights are versioned policy inputs. Tie-breaking is deterministic for equivalent evidence, while controlled experimentation requires explicit experiment identity, allocation policy, and Governance approval.
 
@@ -113,7 +113,7 @@ Routing weights are versioned policy inputs. Tie-breaking is deterministic for e
 |---|---|---|
 | Research | Discover models/providers, limitations, pricing sources, and capability claims | Activate profiles or make routing decisions |
 | M&E | Own Metric/Evaluation contracts; design benchmarks; publish ModelEvaluations and PerformanceProfiles | Weaken quality requirements or authorize providers |
-| Finance | Define budgets and compute effective cost | Select models or waive Governance/privacy constraints |
+| Finance | Own ResourceConstraints, reservations, reconciliation, budgets, and effective-cost evidence | Select models or waive Governance/privacy constraints |
 | Governance | Determine provider/model eligibility and approval requirements | Optimize quality/cost among eligible profiles |
 | Intelligence Router | Filter and rank using versioned evidence and constraints | Invent evidence, budgets, policies, or direct provider access |
 | Department/Agent | Request an IntelligenceCapability outcome | Name or instantiate providers/models |
@@ -135,6 +135,7 @@ Routing weights are versioned policy inputs. Tie-breaking is deterministic for e
 - Only Governance-eligible profiles can be ranked or executed.
 - `REQUIRE_APPROVAL` never counts as eligible until a fresh Governance evaluation returns `ALLOW`.
 - Hard privacy, quality, tool, budget, and deadline constraints cannot be traded away by scoring.
+- Intelligence consumes ResourceConstraint identities, versions, and Finance outcomes; it cannot create, redefine, relax, compose, reserve, or reconcile them.
 - Provider adapters contain no organizational routing or policy decisions.
 - Model output, provider metadata, and model self-evaluation are not authoritative organizational state.
 - ModelEvaluation and PerformanceProfile evidence conforms to the canonical M&E contracts; Intelligence cannot redefine their confidence, provenance, benchmark, validity, or lifecycle semantics.
@@ -176,5 +177,6 @@ No concrete provider, model, gateway, or routing library is selected.
 - [Governance](governance.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
+- [Resource domain](../domain/resource.md)
 - [Proposed ADR-0003](../adr/ADR-0003-model-independent-intelligence.md)
 - Future capability, agent, event, knowledge, persistence, Research, and Finance specifications

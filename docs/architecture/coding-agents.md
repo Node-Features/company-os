@@ -6,7 +6,7 @@ Status: DRAFT
 
 CompanyOS Engineering turns an approved design into reviewable repository evidence through provider-independent coding-agent contracts. Engineering depends on `CodingAgentRuntime`, `CodingAgentRouter`, `EngineeringWorkspace`, and `WorkspaceProvider`; Codex, Claude Code, Gemini CLI, OpenHands, and Aider are replaceable providers or adapters.
 
-This architecture owns task normalization, provider eligibility and selection, bounded session execution, required result validation, and engineering evidence. It does not own organizational approval, domain legality, durable workflow scheduling, M&E Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider internals, workspace infrastructure, repository hosting, or merge authority.
+This architecture owns task normalization, provider eligibility and selection, bounded session execution, required result validation, and engineering evidence. It does not own organizational approval, domain legality, durable workflow scheduling, Finance ResourceConstraint semantics, M&E Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider internals, workspace infrastructure, repository hosting, or merge authority.
 
 `CodingAgentRuntime` is a specialized execution port coordinated by the CompanyOS [Runtime](runtime.md). It is not a second authoritative workflow runtime.
 
@@ -37,7 +37,7 @@ Every transition that changes authoritative workflow state is performed by an ap
 
 ### EngineeringTask
 
-An immutable, versioned request for one bounded engineering outcome. It records task, organization, objective, design, repository, base-revision, acceptance-criteria, file-scope, allowed-tool, required-validation, risk, deadline, budget, data-classification, and governance references. It also specifies prohibited operations and the required result evidence. It names required capabilities, never a provider.
+An immutable, versioned request for one bounded engineering outcome. It records task, organization, objective, design, repository, base-revision, acceptance-criteria, file-scope, allowed-tool, required-validation, risk, Finance-resolved ResourceConstraintSet reference, data-classification, and governance references. It also specifies prohibited operations and the required result evidence. It names required capabilities, never a provider.
 
 Material scope changes produce a new task version and a new routing decision. An agent may propose a scope change but cannot authorize one.
 
@@ -65,7 +65,7 @@ It does not select itself, provision workspaces, inject unrestricted credentials
 
 ### CodingAgentRouter
 
-An eligibility-first selector. It filters profiles using required task capabilities, language/repository fit, tool support, context needs, sandbox compatibility, privacy, policy, budget, availability, and evidence freshness. It then ranks eligible profiles using quality, historical reliability, recovery behavior, latency, and effective cost.
+An eligibility-first selector. It filters profiles using required task capabilities, language/repository fit, tool support, context needs, sandbox compatibility, privacy, policy, Finance ResourceConstraint outcomes, availability, and evidence freshness. It then ranks eligible profiles using quality, historical reliability, recovery behavior, latency, and effective cost.
 
 The persisted routing decision records candidates, exclusions, evidence versions, selected profile, fallback sequence, estimates, tie-breaking, and router version. A provider override is a governed, expiring constraint with a reason, not a field on `EngineeringTask`.
 
@@ -73,7 +73,7 @@ The persisted routing decision records candidates, exclusions, evidence versions
 
 1. Validate that objective and design approvals, repository identity, immutable base revision, scope, and acceptance criteria exist.
 2. Persist the `EngineeringTask`, governance evidence, and idempotency identity.
-3. Route only among eligible, evidence-backed profiles; persist the routing decision before dispatch.
+3. Obtain the applicable Finance ResourceConstraintSet and required reservation evidence; route only among profiles within every hard constraint and persist the routing decision before dispatch.
 4. Ask `WorkspaceManager` for an isolated `EngineeringWorkspace` rooted at the exact base revision and a task-specific feature branch.
 5. Start a bounded session with least-privilege tools, credentials, network policy, time and cost limits, and a context manifest.
 6. Allow iterative inspection, planning, editing, shell execution, debugging, and validation. Each effect is attributed and captured as evidence.
@@ -121,6 +121,7 @@ An indeterminate external effect, including an uncertain push or PR creation, is
 - Persistence succeeds before dispatch, retry, publication, or workflow advancement.
 - Cancellation or lease expiry revokes execution and credentials; late results cannot advance state.
 - CodingAgentEvaluation and PerformanceProfile evidence conforms to canonical M&E contracts; Engineering and routers cannot redefine evaluation semantics.
+- CodingAgentRouter consumes exact ResourceConstraint versions and Finance outcomes; it cannot create, reinterpret, relax, reserve, or reconcile them.
 
 ## OPEN QUESTIONS
 
@@ -137,3 +138,4 @@ An indeterminate external effect, including an uncertain push or PR creation, is
 - [Governance](governance.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
+- [Resource domain](../domain/resource.md)

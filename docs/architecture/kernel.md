@@ -79,6 +79,5 @@ The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
-- [Application layer](application.md)
 - Future domain definitions under [`docs/domain/`](../domain/README.md)
-- Future governance, persistence, events, departments, and capability specifications
+- Future department and capability domain contracts

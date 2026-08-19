@@ -117,7 +117,5 @@ Names and final stable identifiers remain `OPEN QUESTION` until the organization
 
 ## Dependencies
 
-- [Department Architecture](../architecture/departments.md)
-- [Governance Architecture](../architecture/governance.md)
 - [Policy](policy.md)
 - Future organization, capability, workflow, agent, event, metric, and knowledge domain definitions

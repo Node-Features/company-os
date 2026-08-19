@@ -118,7 +118,4 @@ These are Finance constraint outcomes, not Governance decisions. `APPROVAL_REQUI
 
 ## Dependencies
 
-- [Finance department](../departments/finance.md)
-- [Governance architecture](../architecture/governance.md)
-- [Application layer](../architecture/application.md)
 - Future Budget, PriceProfile, ResourceUsage, and Principal domain definitions

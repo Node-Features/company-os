@@ -106,9 +106,5 @@ Events are immutable. Corrections use a new compensating or superseding event an
 
 ## Dependencies
 
-- [Kernel](kernel.md)
-- [Runtime](runtime.md)
-- [Application layer](application.md)
-- [Governance](governance.md)
-- [Persistence](persistence.md)
-- [Knowledge](knowledge.md)
+- [Top-level architecture](../../ARCHITECTURE.md)
+- Future shared event, workflow, evidence, artifact, metric, and knowledge domain contracts

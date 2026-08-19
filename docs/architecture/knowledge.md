@@ -108,5 +108,6 @@ Contradictory approved items are not silently ranked away. They are returned or 
 - [Events](events.md)
 - [Persistence](persistence.md)
 - [Governance](governance.md)
-- [Departments](departments.md)
-- Future artifact, evidence, metric, and knowledge domain definitions
+- [Metrics](../domain/metric.md)
+- [Evaluations](../domain/evaluation.md)
+- Future shared artifact, evidence, and knowledge domain contracts

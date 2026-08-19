@@ -98,9 +98,6 @@ Execution checkpoints may commit separately from organizational state because th
 
 ## Dependencies
 
-- [Kernel](kernel.md)
-- [Runtime](runtime.md)
-- [Application layer](application.md)
+- [Top-level architecture](../../ARCHITECTURE.md)
 - [Events](events.md)
-- [Knowledge](knowledge.md)
-- [Governance](governance.md)
+- Future shared workflow, execution-state, artifact, evidence, metric, and knowledge domain contracts

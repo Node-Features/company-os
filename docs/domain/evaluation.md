@@ -111,4 +111,3 @@ A specialization must:
 
 - [Metric](metric.md)
 - Future Evidence, Result, Objective, Principal, and Resource domain definitions
-- [M&E department](../departments/monitoring-evaluation.md)

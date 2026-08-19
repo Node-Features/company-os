@@ -109,6 +109,7 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
-- [Kernel](kernel.md)
 - [Application layer](application.md)
-- Future persistence, events, governance, capabilities, and workflow domain specifications
+- [Persistence](persistence.md) execution-state port
+- [Events](events.md)
+- Future shared workflow, execution-intent, and capability contracts

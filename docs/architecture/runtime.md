@@ -111,7 +111,7 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 - [System context](system-context.md)
 - [Application layer](application.md)
 - [Persistence](persistence.md) execution-state port
-- [Events](events.md)
+- [Event domain contract](../domain/event.md)
 - [Workflow and execution-intent contracts](../domain/workflow.md)
 - [Result](../domain/result.md)
 - [Evidence](../domain/evidence.md)

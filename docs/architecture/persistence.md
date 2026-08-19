@@ -99,7 +99,7 @@ Execution checkpoints may commit separately from organizational state because th
 ## Dependencies
 
 - [Top-level architecture](../../ARCHITECTURE.md)
-- [Events](events.md)
+- [Event domain contract](../domain/event.md)
 - [Workflow and execution-intent contracts](../domain/workflow.md)
 - [Artifact](../domain/artifact.md)
 - [Evidence](../domain/evidence.md)

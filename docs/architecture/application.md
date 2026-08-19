@@ -148,5 +148,6 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 - [Kernel](kernel.md)
 - [Governance](governance.md)
 - [Persistence](persistence.md)
-- [Events](events.md)
+- [Event domain contract](../domain/event.md)
 - [Workflow and execution-intent contracts](../domain/workflow.md)
+- Future shared command/proposal domain contract

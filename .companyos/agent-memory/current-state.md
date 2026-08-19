@@ -24,6 +24,5 @@ None.
 
 - OPEN QUESTION: Who may approve canonical documentation and accept ADRs?
 - OPEN QUESTION: What license terms govern reuse from `vierisid/jarvis`?
-- OPEN QUESTION: What license terms govern reuse from `inngest/inngest`?
 - OPEN QUESTION: Should existing workflow, department, security, and testing directories remain as justified extensions to the core layout?
 - OPEN QUESTION: When should obsolete predecessor files be deleted after migration review?

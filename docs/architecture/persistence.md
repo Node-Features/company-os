@@ -46,6 +46,18 @@ Runtime notification also occurs after commit. A failed notification leaves comm
 
 Execution checkpoints may commit separately from organizational state because they recover mechanics. A checkpoint must reference the authoritative state version it assumed; resumption rejects stale, corrupt, incompatible, or cross-execution checkpoints.
 
+## First-slice transaction boundaries
+
+The first aggregate is one Workflow addressed by Organization ID and Workflow ID with an opaque monotonic version. Persistence exposes compare-and-write against the exact expected version; it never merges competing Workflow decisions.
+
+The first slice uses three explicit transaction boundaries:
+
+1. **Pending approval:** atomically persist `GovernanceDecision(REQUIRE_APPROVAL)`, immutable PendingCommand/proposal digest, `Approval(PENDING)`, governance audit record, and idempotency outcome. This transaction does not change the Workflow and creates no ExecutionIntent or DomainEvent for the proposed Workflow transition.
+2. **Accepted Workflow transition:** on current `ALLOW` and successful version comparison, atomically persist Workflow `PLANNED → READY` with its new version, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and exactly one ExecutionIntent. Any failure commits none of them.
+3. **Runtime execution:** claims, leases, attempts, heartbeats, waits, retries, and checkpoints commit through ExecutionRepository transactions after the accepted Workflow transaction. They cannot rewrite Workflow state, Governance evidence, Approval consumption, or the originating ExecutionIntent.
+
+An EventRepository/outbox may publish records after the accepted transaction, but the durable Event records and ExecutionIntent are members of that transaction rather than asynchronously reconstructed. Database schema, transaction API, and outbox mechanism remain adapter choices.
+
 ## Concurrency, identity, and integrity
 
 - Authoritative aggregates use immutable identity and monotonic version tokens; conflicting writes fail rather than merge implicitly.
@@ -90,7 +102,6 @@ Execution checkpoints may commit separately from organizational state because th
 
 ## OPEN QUESTIONS
 
-- What is the first authoritative aggregate and transaction boundary?
 - Will the initial implementation use state-plus-outbox, event sourcing, or another adapter behind the same contract?
 - Which records require append-only tamper evidence beyond ordinary database controls?
 - What recovery point, recovery time, retention, residency, and erasure requirements apply per record class?

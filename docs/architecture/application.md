@@ -53,6 +53,22 @@ An `ApplicationRequest` contains request and idempotency identities; organizatio
 
 Transport headers, UI models, provider payloads, and agent messages are translated and validated at adapters before becoming an ApplicationRequest. They remain untrusted input and cannot supply authority merely by containing an identity or approval claim.
 
+## First vertical slice
+
+The first state-changing slice is `StartWorkflow`: transition one existing `PLANNED` [Workflow](../domain/workflow.md) for an existing approved Objective to `READY` and create exactly one ExecutionIntent for its first Capability step. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, and resource records are referenced by immutable identity/version and are not members of the aggregate.
+
+The request must name the Organization, Workflow, expected Workflow version, Objective/version, WorkflowDefinition/version, command identity, idempotency identity, requesting Principal and authenticated-evidence reference, declared time, correlation/causation identities, bounded input Artifact/Evidence references, and applicable ResourceConstraint versions. Missing or stale references reject the operation rather than being inferred.
+
+## Shared command and decision envelopes
+
+For this slice, Application coordinates three provider-independent envelopes:
+
+- `WorkflowCommandEnvelope`: command/request/idempotency identities; `START_WORKFLOW` type; organization, Workflow and expected version; Objective and WorkflowDefinition versions; Principal/authentication evidence; normalized inputs and referenced constraints; declared time; correlation/causation; classification.
+- `GovernedCommandProposal`: immutable proposal identity and digest; exact WorkflowCommandEnvelope digest; Action `workflow.start`; Resource identifying the Organization and Workflow; expected Workflow, Objective, definition, policy, authority, and constraint versions; normalized argument/context digest; proposed effect class; expiry when applicable. It contains no next state, Event, Approval outcome, or ExecutionIntent.
+- `KernelDecisionEnvelope`: proposal identity/digest; prior and next Workflow versions/state; DomainEvents; optional ExecutionIntent; stable rejection reasons; GovernanceDecision and Approval references consumed by the decision. Only final Kernel validation may produce it.
+
+Every consumer verifies organization, envelope version, proposal digest, expected Workflow version, and correlation identities. An envelope is immutable after hashing; material change requires a new command and proposal identity.
+
 ## State-changing use case
 
 1. Validate envelope shape, organization scope, identity references, command type, idempotency identity, and input classifications.
@@ -98,7 +114,7 @@ Initial `ALLOW` permits persistence of a bounded execution intent only when poli
 
 ## Transaction and notification semantics
 
-- The atomic write contains the authoritative version transition, domain events, and execution intent caused by that transition.
+- For `StartWorkflow`, the accepted atomic write contains the Workflow transition `PLANNED → READY`, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of any applicable single-use Approval, idempotency outcome, and exactly one caused ExecutionIntent.
 - Optimistic-concurrency failure rejects the attempted commit; the use case reloads and re-evaluates rather than merging implicitly.
 - A timeout or lost response is `INDETERMINATE` until reconciled by request/idempotency identity.
 - Retrying the same logical request reuses its idempotency identity and cannot create a second legal transition.
@@ -138,8 +154,6 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 
 ## OPEN QUESTIONS
 
-- What is the exact shared command/decision/intent envelope for the first vertical slice?
-- What aggregate and transaction boundary will the first implementation use?
 - Which notification recovery mechanism is minimal for the first slice?
 
 ## Dependencies
@@ -150,4 +164,3 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 - [Persistence](persistence.md)
 - [Event domain contract](../domain/event.md)
 - [Workflow and execution-intent contracts](../domain/workflow.md)
-- Future shared command/proposal domain contract

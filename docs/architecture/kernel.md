@@ -39,6 +39,16 @@ A Kernel operation consumes a command plus an explicitly loaded authoritative st
 
 Requested effects describe intent; they are not proof that work occurred. Persistence and effect dispatch belong outside the Kernel. A Runtime cannot turn a rejected command into a legal transition by retrying it.
 
+## First aggregate boundary
+
+The first implemented aggregate root is one [Workflow](../domain/workflow.md). Its boundary contains the Workflow identity, Organization, WorkflowDefinition/version, Objective reference, current organizational state, accepted inputs, wait or terminal reason, correlation/causation identities, and opaque monotonic Workflow version.
+
+Objective, Organization, Principal, GovernanceDecision, Approval, CapabilityDefinition, ResourceConstraint, Result, Runtime execution state, checkpoint, Artifact, Evidence, Metric, and Knowledge records remain external aggregates or records referenced by immutable identity/version. The Workflow aggregate cannot mutate them.
+
+For the first `START_WORKFLOW` command, proposal validation requires an existing `PLANNED` Workflow, approved Objective reference, active compatible WorkflowDefinition and CapabilityDefinition references, expected Workflow version, normalized inputs, and exact Action/Resource/context data. It produces the immutable proposal described by [Application](application.md#shared-command-and-decision-envelopes) without state, Events, or intent.
+
+Final validation requires the unchanged proposal, current `ALLOW`, matching authoritative versions, and any applicable Approval evidence. Acceptance produces `PLANNED → READY`, the resulting DomainEvents, and exactly one ExecutionIntent. A version mismatch, changed digest, inactive dependency, illegal state, or stale governance evidence rejects without a decision effect.
+
 ## Identity boundary
 
 - Organizational workflow identity is assigned and interpreted by CompanyOS.
@@ -69,15 +79,15 @@ The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-
 
 ## Open questions
 
-- OPEN QUESTION: What is the exact command/decision/event envelope shared across Kernel and application use cases?
 - OPEN QUESTION: Which policy results are inputs to Kernel legality versus decisions produced by Governance?
-- OPEN QUESTION: What optimistic-concurrency token protects each authoritative aggregate?
 - OPEN QUESTION: Which workflow definition changes are compatible with already-running organizational workflows?
-- OPEN QUESTION: Which concepts form the first aggregate boundary: organization, objective, workflow, approval, or action?
 
 ## Dependencies
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
+- [Workflow](../domain/workflow.md)
+- [Organization](../domain/organization.md)
+- [Capability](../domain/capability.md)
 - Future domain definitions under [`docs/domain/`](../domain/README.md)
-- Future department and capability domain contracts
+- Future department domain extensions

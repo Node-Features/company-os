@@ -1,0 +1,82 @@
+# CompanyOS Kernel
+
+Status: DRAFT
+
+## Responsibility
+
+The Kernel is the provider-independent domain authority for CompanyOS. It defines organizational meaning and decides whether a requested organizational transition is legal. It is usable without a running scheduler, worker, daemon, model, or external workflow engine.
+
+The Kernel owns:
+
+- organization identity, mission, vision, principles, and policy semantics;
+- objective identity, lifecycle, relationships, success criteria, and legal transitions;
+- department identity, responsibilities, authority boundaries, and extension contracts;
+- workflow definitions as organizational processes and the rules for legal workflow transitions;
+- capability identity, required inputs and outputs, evidence requirements, and provider-independent failure semantics;
+- domain commands, decisions, events, and invariant validation;
+- the distinction between proposed, authorized, persisted, executing, completed, failed, and evaluated work.
+
+## Non-responsibilities
+
+The Kernel does not own:
+
+- queues, worker pools, polling, clocks, cron parsing, timers, backoff calculations, or dispatch;
+- process startup, shutdown, restart, leader election, liveness, readiness, or deployment topology;
+- database drivers, transactions, migrations, event brokers, or workflow-engine SDKs;
+- model inference, coding-agent sessions, workspaces, provider APIs, or tool execution;
+- UI, transport protocols, notifications, metrics exporters, or logging infrastructure;
+- automatic approval of actions or alteration of policy because an execution provider requests it.
+
+The Kernel may define information these mechanisms must preserve, but it cannot depend on their concrete implementations.
+
+## Kernel decisions and effects
+
+A Kernel operation consumes a command plus an explicitly loaded authoritative state snapshot. It returns either:
+
+- a rejection with stable domain reasons and no state change; or
+- a decision containing the next authoritative state, domain events, and requested effects.
+
+Requested effects describe intent; they are not proof that work occurred. Persistence and effect dispatch belong outside the Kernel. A Runtime cannot turn a rejected command into a legal transition by retrying it.
+
+## Identity boundary
+
+- Organizational workflow identity is assigned and interpreted by CompanyOS.
+- A workflow execution attempt has a distinct Runtime identity.
+- Provider workflow, run, job, step, thread, and task identifiers are correlation identifiers, not CompanyOS domain identity.
+- Replaying or replacing an execution must not create a second organizational objective, approval, or action unless the Kernel explicitly authorizes one.
+
+## Invariants
+
+- Kernel decisions are deterministic for the same command, authoritative state, policy inputs, and declared time input.
+- Only Kernel operations determine legal organizational state transitions.
+- The Kernel never reads wall-clock time, network state, environment variables, or provider state implicitly.
+- Departments extend CompanyOS through registered contracts; adding one does not require changing Kernel fundamentals.
+- Departments request capabilities, never concrete providers.
+- Agents and providers cannot directly mutate authoritative organizational state.
+- Authorization and approval evidence required by a transition must exist before the transition is permitted.
+- A requested effect is not recorded as completed until validated evidence is accepted through a Kernel operation.
+- Runtime retries never repeat a non-idempotent organizational decision under a new identity.
+- Unknown, stale, or conflicting state versions cause rejection rather than best-effort mutation.
+- Provider-specific error types are translated before reaching Kernel rules.
+- Kernel state contains organizational facts, not worker leases, queue offsets, sockets, or process health.
+
+## Relationship to Runtime and Daemon
+
+The [Runtime](runtime.md) asks the Kernel what transitions and effects are legal, persists accepted transitions through the persistence contract, and coordinates their execution. The [Daemon](daemon.md) keeps Runtime components available but has no path around Kernel decisions.
+
+The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-evidence). Those systems largely illuminate execution mechanics; none is adopted as CompanyOS domain authority.
+
+## Open questions
+
+- OPEN QUESTION: What is the exact command/decision/event envelope shared across Kernel and application use cases?
+- OPEN QUESTION: Which policy results are inputs to Kernel legality versus decisions produced by Governance?
+- OPEN QUESTION: What optimistic-concurrency token protects each authoritative aggregate?
+- OPEN QUESTION: Which workflow definition changes are compatible with already-running organizational workflows?
+- OPEN QUESTION: Which concepts form the first aggregate boundary: organization, objective, workflow, approval, or action?
+
+## Dependencies
+
+- [Top-level architecture](../../ARCHITECTURE.md)
+- [System context](system-context.md)
+- Future domain definitions under [`docs/domain/`](../domain/README.md)
+- Future governance, persistence, events, departments, and capability specifications

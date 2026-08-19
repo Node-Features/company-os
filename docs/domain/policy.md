@@ -10,7 +10,7 @@ A Policy is a versioned organizational rule that contributes to authorization or
 
 ### Principal
 
-An authenticated human, agent, service, or delegated organizational role that requests an Action. A Principal has a stable CompanyOS identity, organization scope, type, and attributable authentication or delegation evidence.
+Policy evaluation uses the canonical [Principal domain contract](principal.md). Policy may reference a Principal and authenticated evidence about it, but it does not redefine Principal identity, type, organization scope, authentication, delegation, membership, or authority.
 
 ### Action
 

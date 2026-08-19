@@ -45,7 +45,7 @@ The first implemented aggregate root is one [Workflow](../domain/workflow.md). I
 
 Objective, Organization, Principal, GovernanceDecision, Approval, CapabilityDefinition, ResourceConstraint, Result, Runtime execution state, checkpoint, Artifact, Evidence, Metric, and Knowledge records remain external aggregates or records referenced by immutable identity/version. The Workflow aggregate cannot mutate them.
 
-For the first `START_WORKFLOW` command, proposal validation requires an existing `PLANNED` Workflow, approved Objective reference, active compatible WorkflowDefinition and CapabilityDefinition references, expected Workflow version, normalized inputs, and exact Action/Resource/context data. It produces the immutable proposal described by [Application](application.md#shared-command-and-decision-envelopes) without state, Events, or intent.
+For the first `START_WORKFLOW` command, proposal validation requires an existing `PLANNED` Workflow, approved Objective reference, active compatible WorkflowDefinition and CapabilityDefinition references, expected Workflow version, normalized inputs, and exact Action/Resource/context data. It produces the immutable [GovernedCommandProposal](../domain/command.md#governedcommandproposal) without state, Events, or intent.
 
 Final validation requires the unchanged proposal, current `ALLOW`, matching authoritative versions, and any applicable Approval evidence. Acceptance produces `PLANNED → READY`, the resulting DomainEvents, and exactly one ExecutionIntent. A version mismatch, changed digest, inactive dependency, illegal state, or stale governance evidence rejects without a decision effect.
 
@@ -89,5 +89,6 @@ The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-
 - [Workflow](../domain/workflow.md)
 - [Organization](../domain/organization.md)
 - [Capability](../domain/capability.md)
+- [Command](../domain/command.md)
 - Future domain definitions under [`docs/domain/`](../domain/README.md)
 - Future department domain extensions

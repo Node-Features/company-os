@@ -12,6 +12,7 @@ Statuses mirror existing document metadata. Rows marked `NOT YET SPECIFIED` are 
 | `workflow.md` | Workflow state and transition invariants | DRAFT | Read when changing workflow semantics. |
 | `agent.md` | Agent definition, participation, and authority boundary | DRAFT | Read when defining agent behavior or lifecycle. |
 | `capability.md` | Provider-independent outcome and dispatch contract | DRAFT | Read when requesting, routing, or implementing capabilities. |
+| `command.md` | Shared command, governed-proposal, Kernel-decision, and pending-command envelopes | DRAFT | Read when coordinating a state-changing request across Application, Kernel, or Governance. |
 | `principal.md` | Durable actor identity and delegation references | DRAFT | Read when identifying human, agent, service, or provider actors. |
 | `policy.md` | Organizational policy semantics | DRAFT | Read when defining governance rules. |
 | `approval.md` | Approval requests and decisions | DRAFT | Read when adding approval gates. |

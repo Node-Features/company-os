@@ -137,5 +137,5 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - [Principal domain](../domain/principal.md)
 - [Policy domain](../domain/policy.md)
 - [Approval domain](../domain/approval.md)
-- Future shared command/proposal domain contract
+- [Command domain](../domain/command.md)
 - Future agent and security contracts

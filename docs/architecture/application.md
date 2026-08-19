@@ -61,13 +61,7 @@ The request must name the Organization, Workflow, expected Workflow version, Obj
 
 ## Shared command and decision envelopes
 
-For this slice, Application coordinates three provider-independent envelopes:
-
-- `WorkflowCommandEnvelope`: command/request/idempotency identities; `START_WORKFLOW` type; organization, Workflow and expected version; Objective and WorkflowDefinition versions; Principal/authentication evidence; normalized inputs and referenced constraints; declared time; correlation/causation; classification.
-- `GovernedCommandProposal`: immutable proposal identity and digest; exact WorkflowCommandEnvelope digest; Action `workflow.start`; Resource identifying the Organization and Workflow; expected Workflow, Objective, definition, policy, authority, and constraint versions; normalized argument/context digest; proposed effect class; expiry when applicable. It contains no next state, Event, Approval outcome, or ExecutionIntent.
-- `KernelDecisionEnvelope`: proposal identity/digest; prior and next Workflow versions/state; DomainEvents; optional ExecutionIntent; stable rejection reasons; GovernanceDecision and Approval references consumed by the decision. Only final Kernel validation may produce it.
-
-Every consumer verifies organization, envelope version, proposal digest, expected Workflow version, and correlation identities. An envelope is immutable after hashing; material change requires a new command and proposal identity.
+The [Command domain contract](../domain/command.md) owns `WorkflowCommandEnvelope`, `GovernedCommandProposal`, `KernelDecisionEnvelope`, and `PendingCommand`. Application validates and coordinates these envelopes but does not define their meaning. The first slice uses `START_WORKFLOW` and the Action `workflow.start` without making those slice-specific values Application contracts.
 
 ## State-changing use case
 
@@ -164,3 +158,4 @@ These application outcomes do not replace domain, Governance, Runtime, or provid
 - [Persistence](persistence.md)
 - [Event domain contract](../domain/event.md)
 - [Workflow and execution-intent contracts](../domain/workflow.md)
+- [Command domain contract](../domain/command.md)

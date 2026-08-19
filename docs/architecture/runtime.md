@@ -4,7 +4,7 @@ Status: DRAFT
 
 ## Responsibility
 
-The Runtime executes CompanyOS workflows without owning their organizational meaning. It converts persisted, Kernel-authorized work into resumable execution and reports evidence back through controlled application and domain operations.
+The Runtime executes CompanyOS workflows without owning their organizational meaning. It converts persisted, Kernel-authorized work into resumable execution and reports evidence back through controlled Application use cases.
 
 The Runtime owns:
 
@@ -28,16 +28,17 @@ The Runtime does not own:
 - continuous process supervision, deployment, or machine lifetime;
 - provider selection policy, agent reasoning, workspace isolation policy, or external-service semantics;
 - treating its checkpoint, event history, queue, or provider run as authoritative organizational state.
+- application request validation, authoritative-state loading, Governance orchestration, Kernel invocation, or atomic business-state commits.
 
 ## Execution model
 
-1. An application use case submits a command to the Kernel against an authoritative state version.
-2. The accepted transition and an execution intent are persisted atomically before dispatch.
-3. Runtime claims the due intent using a bounded lease and creates or resumes an execution attempt.
+1. An [Application use case](application.md) loads authoritative state, obtains Governance evidence, asks the Kernel for a decision, and atomically persists accepted state, domain events, and execution intent.
+2. After commit, the Application layer notifies Runtime; notification is only a wake-up hint because the persisted intent remains discoverable.
+3. Runtime claims the due persisted intent using a bounded lease and creates or resumes an execution attempt.
 4. Runtime dispatches a capability request to an eligible executor through a provider-independent contract.
 5. Results, failures, heartbeats, and provider identifiers are captured as execution evidence.
-6. Runtime asks the application/Kernel boundary to accept the resulting organizational transition.
-7. The authoritative transition is persisted before dependent work is scheduled.
+6. Runtime submits the result and execution evidence through a new Application use case.
+7. The Application layer reloads state, obtains required Governance evidence, asks the Kernel to interpret the result, and persists any authoritative transition before dependent work is scheduled.
 8. Transient failures produce a durable next-attempt time; permanent or exhausted failures produce a terminal execution result for Kernel interpretation.
 
 Waiting is persisted state plus a wake condition, not a sleeping process. Resume reconstructs execution from persisted state and is safe after duplicate wake-ups.
@@ -66,6 +67,7 @@ Waiting is persisted state plus a wake condition, not a sleeping process. Resume
 ## Invariants
 
 - Persistence of accepted state and execution intent succeeds before external execution begins.
+- Runtime notification, queue delivery, or polling never substitutes for persisted execution intent.
 - Runtime cannot create, waive, or reinterpret Kernel legality, policies, capabilities, or approvals.
 - A legal transition is applied once even when dispatch or delivery occurs more than once.
 - Waiting consumes no dedicated worker and survives process restart.
@@ -108,4 +110,5 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
 - [Kernel](kernel.md)
+- [Application layer](application.md)
 - Future persistence, events, governance, capabilities, and workflow domain specifications

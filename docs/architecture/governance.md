@@ -17,7 +17,7 @@ Governance owns:
 - producing durable, attributable decision and approval evidence;
 - re-evaluating governed actions immediately before dispatch.
 
-Governance does not own policy meaning, approval state semantics, identity authentication, workflow legality, execution mechanics, provider behavior, or persistence technology. Domain definitions own meaning; the Kernel owns legal transitions; Runtime executes only persisted, authorized intent.
+Governance does not own policy meaning, approval state semantics, identity authentication, workflow legality, application orchestration, execution mechanics, provider behavior, or persistence technology. Domain definitions own meaning; the Kernel owns legal transitions; the [Application layer](application.md) coordinates use cases; Runtime executes only persisted, authorized intent.
 
 ## Decision request
 
@@ -62,7 +62,9 @@ Absent or unverifiable required input produces `DENY`. Provider names and tool s
 
 An approval binds the approver, requesting principal, action, resource, normalized arguments digest, objective/workflow context, policy and authority versions, expiry, and allowed uses. Approval resolution persists before execution resumes.
 
-At execution, Governance verifies that the approval is approved, unexpired, unrevoked, unconsumed when single-use, issued by an authorized human, and still matches the request. Policy and authority are then evaluated again. Approving a request does not execute it; Runtime receives a new `ALLOW` decision and executes separately.
+At execution, Governance verifies that the approval is approved, unexpired, unrevoked, unconsumed when single-use, issued by an authorized human, and still matches the request. Policy and authority are then evaluated again. Approving a request does not execute it; the Application layer records the new `ALLOW` decision for the exact intent before Runtime executes separately.
+
+The Application layer constructs and submits the Governance request and persists the decision reference with the resulting state or intent. It cannot modify the request after evaluation, reinterpret the outcome, or make an authorization decision. Immediately before a governed external effect, Runtime requests dispatch authorization through an Application use case so Governance evaluates current evidence for the exact persisted intent.
 
 ## Auditability
 
@@ -116,6 +118,7 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - [System context](system-context.md)
 - [Kernel](kernel.md)
 - [Runtime](runtime.md)
+- [Application layer](application.md)
 - [Policy domain](../domain/policy.md)
 - [Approval domain](../domain/approval.md)
 - Future agent, event, persistence, and security specifications

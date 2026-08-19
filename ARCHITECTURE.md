@@ -15,6 +15,7 @@ See [System Context](docs/architecture/system-context.md) for actors, terminolog
 ## Proposed top-level responsibilities
 
 - **Kernel:** organizational semantics and invariants.
+- **Application:** use-case orchestration across Governance, Kernel, Persistence, and Runtime.
 - **Runtime:** workflow execution mechanics.
 - **Daemon:** continuous availability and supervision.
 - **Departments:** pluggable organizational functions using shared contracts.
@@ -33,6 +34,8 @@ These responsibilities require further specification in [detailed architecture d
 - Departments depend on capabilities and shared contracts, not vendor SDKs or department internals.
 - Agents may propose actions but cannot grant themselves authority or directly mutate authoritative workflow state.
 - Domain rules determine legal transitions; governance determines whether external actions are allowed, denied, approval-required, or human-only.
+- The Application layer coordinates requests but owns neither domain legality nor authorization policy.
+- Accepted state, resulting domain events, and caused execution intent are persisted atomically before Runtime is notified.
 - Persistence succeeds before dependent execution continues.
 - Provider, agent, and transport state is not authoritative merely because it exists.
 - No external framework or infrastructure is adopted without a concrete responsibility and documented decision.

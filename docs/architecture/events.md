@@ -30,7 +30,7 @@ Therefore `AgentMessage != WorkflowEvent`, `WorkflowEvent != WorkflowState`, and
 - **Integration event:** a stable, minimized event published for another bounded context or external integration after its source fact is persisted.
 - **Audit event:** append-only evidence of a security- or governance-relevant request, decision, access, or action.
 
-An agent message may cause an application command. Only a successful Kernel decision and persistence operation may produce a domain event. Adapters translate external callbacks into untrusted inputs before validation; they do not relabel callbacks as CompanyOS facts.
+An agent message may cause an application command. Only a successful Kernel decision coordinated by the [Application layer](application.md) and committed through Persistence may produce a domain event. Adapters translate external callbacks into untrusted inputs before validation; they do not relabel callbacks as CompanyOS facts.
 
 ## Required envelope
 
@@ -59,9 +59,9 @@ Timestamps do not define processing order. Per-aggregate versions establish tran
 
 ## Publication and consumption
 
-1. Validate the command against authoritative state and applicable governance evidence.
-2. Persist the accepted state transition and its domain events in one atomic consistency boundary.
-3. Publish integration or workflow notifications from persisted records using an outbox-equivalent mechanism.
+1. The Application use case loads authoritative state, obtains applicable Governance evidence, and asks the Kernel to validate the command.
+2. The Application layer coordinates atomic persistence of the accepted state transition, its domain events, and any caused execution intent.
+3. After commit, publish integration or Runtime notifications from persisted records using an outbox-equivalent mechanism.
 4. Consumers deduplicate by event identity and record their own progress before acknowledging work.
 5. Consumer failure never rolls back an already committed source fact; recovery replays the persisted event.
 
@@ -90,6 +90,7 @@ Events are immutable. Corrections use a new compensating or superseding event an
 - Agent messages, conversations, provider callbacks, logs, and telemetry are not CompanyOS events until validated and recorded through the owning boundary.
 - An event records an occurrence; it is never a substitute for loading current authoritative state.
 - State and its resulting domain events are persisted atomically before dependent execution or publication.
+- Application orchestration may coordinate event persistence and notification but cannot define event meaning or publish an uncommitted domain event.
 - Event identity, organization, correlation, causation, workflow, principal, timestamp, payload, and schema version are explicit when applicable.
 - Consumers assume at-least-once, delayed, and out-of-order delivery.
 - Event schemas are CompanyOS-owned and provider-independent.
@@ -107,6 +108,7 @@ Events are immutable. Corrections use a new compensating or superseding event an
 
 - [Kernel](kernel.md)
 - [Runtime](runtime.md)
+- [Application layer](application.md)
 - [Governance](governance.md)
 - [Persistence](persistence.md)
 - [Knowledge](knowledge.md)

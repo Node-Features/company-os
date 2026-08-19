@@ -38,9 +38,11 @@ Ports express behavior, not one repository class per database table. Transaction
 
 ## Consistency boundaries
 
-The minimum hard boundary is: an accepted authoritative state transition, its domain events, and any execution intent caused by that transition commit atomically. If this commit fails, no external execution or dependent workflow step begins.
+The minimum hard boundary is: an accepted authoritative state transition, its domain events, and any execution intent caused by that transition commit atomically. The [Application layer](application.md) coordinates this unit of work through Persistence ports after Governance and Kernel decisions; Persistence owns the atomicity and concurrency behavior, not the orchestration or domain decision. If this commit fails, no external execution or dependent workflow step begins.
 
 External publication occurs after commit from a durable outbox-equivalent record. External effects cannot share a database transaction; they require idempotency, reconciliation, or compensation and are recorded as requested, dispatched, observed, and accepted phases rather than a single boolean.
+
+Runtime notification also occurs after commit. A failed notification leaves committed execution intent discoverable for recovery and cannot cause the Application layer to repeat the accepted domain transition under a new identity.
 
 Execution checkpoints may commit separately from organizational state because they recover mechanics. A checkpoint must reference the authoritative state version it assumed; resumption rejects stale, corrupt, incompatible, or cross-execution checkpoints.
 
@@ -77,6 +79,7 @@ Execution checkpoints may commit separately from organizational state because th
 
 - Persistence succeeds before execution advances.
 - Only Kernel-authorized state written through the authoritative consistency boundary becomes organizational truth.
+- The Application layer coordinates authoritative writes; Runtime, Daemon, agents, providers, and transport adapters cannot invoke them as shortcuts.
 - Conversation, cache, search index, vector index, provider state, checkpoint, and message history are never authoritative business state.
 - State, resulting domain events, and caused execution intent commit atomically.
 - Every authoritative write is version-checked, attributable, tenant-scoped, auditable, and idempotent where retried.
@@ -97,6 +100,7 @@ Execution checkpoints may commit separately from organizational state because th
 
 - [Kernel](kernel.md)
 - [Runtime](runtime.md)
+- [Application layer](application.md)
 - [Events](events.md)
 - [Knowledge](knowledge.md)
 - [Governance](governance.md)

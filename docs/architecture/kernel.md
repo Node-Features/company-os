@@ -25,6 +25,7 @@ The Kernel does not own:
 - database drivers, transactions, migrations, event brokers, or workflow-engine SDKs;
 - model inference, coding-agent sessions, workspaces, provider APIs, or tool execution;
 - UI, transport protocols, notifications, metrics exporters, or logging infrastructure;
+- application use-case sequencing, authoritative-state loading, transaction coordination, or Runtime notification;
 - automatic approval of actions or alteration of policy because an execution provider requests it.
 
 The Kernel may define information these mechanisms must preserve, but it cannot depend on their concrete implementations.
@@ -60,9 +61,9 @@ Requested effects describe intent; they are not proof that work occurred. Persis
 - Provider-specific error types are translated before reaching Kernel rules.
 - Kernel state contains organizational facts, not worker leases, queue offsets, sockets, or process health.
 
-## Relationship to Runtime and Daemon
+## Relationship to Application, Runtime, and Daemon
 
-The [Runtime](runtime.md) asks the Kernel what transitions and effects are legal, persists accepted transitions through the persistence contract, and coordinates their execution. The [Daemon](daemon.md) keeps Runtime components available but has no path around Kernel decisions.
+The [Application layer](application.md) loads authoritative state, obtains Governance evidence, invokes the Kernel, and coordinates atomic persistence of an accepted state, its domain events, and caused execution intent. The [Runtime](runtime.md) executes only persisted intent and returns evidence through a new Application use case. The [Daemon](daemon.md) keeps Runtime components available but has no path around Application orchestration or Kernel decisions.
 
 The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-evidence). Those systems largely illuminate execution mechanics; none is adopted as CompanyOS domain authority.
 
@@ -78,5 +79,6 @@ The OSS evidence matrix is maintained in [Runtime: OSS evidence](runtime.md#oss-
 
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
+- [Application layer](application.md)
 - Future domain definitions under [`docs/domain/`](../domain/README.md)
 - Future governance, persistence, events, departments, and capability specifications

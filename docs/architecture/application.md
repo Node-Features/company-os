@@ -96,9 +96,9 @@ Read-only use cases still enforce organization, identity, authorization, classif
 
 ## Runtime-result use case
 
-Runtime and provider outputs re-enter CompanyOS as new ApplicationRequests containing attributable execution evidence. The Application layer reloads current authoritative state, obtains any required Governance decision, asks the Kernel whether the result permits a legal transition, and persists the resulting state/events/next intent before Runtime advances.
+Runtime and provider outputs re-enter CompanyOS as new ApplicationRequests containing attributable execution evidence. Application reloads current authoritative state, asks the Kernel to perform preliminary proposal validation, and submits the resulting immutable `GovernedCommandProposal` to Governance. `DENY` and `REQUIRE_APPROVAL` follow the same non-transition and pending-approval paths as initial commands. Only on a current `ALLOW` does Application ask the Kernel for the final decision, then atomically persist any accepted state, events, result/evidence references, and next execution intent before Runtime advances.
 
-Runtime never calls a storage adapter to mark organizational work complete. A provider callback, checkpoint, success message, artifact, or exit code cannot bypass this use case.
+The final Kernel stage revalidates the unchanged proposal digest against current authoritative state; Governance permission cannot make an invalid result transition legal. Runtime never calls a storage adapter to mark organizational work complete. A provider callback, checkpoint, success message, artifact, or exit code cannot bypass either Kernel stage, Governance, or the Application-coordinated commit.
 
 ## Dispatch-time governance
 

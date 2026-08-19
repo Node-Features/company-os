@@ -20,7 +20,7 @@ M&E owns measurement and evaluation of:
 - coding-agent performance by task class, repository, and workspace environment;
 - cost-versus-quality evidence in partnership with Finance, while Finance owns monetary valuation and budget decisions.
 
-M&E owns metric definitions, evaluation designs, baselines, comparison groups where appropriate, evaluator independence, sampling, benchmark/test versions, data-quality assessment, confidence, validity windows, and evaluation provenance.
+M&E owns the lifecycle and quality of the canonical [Metric](../domain/metric.md) and [Evaluation](../domain/evaluation.md) contracts, including evaluation designs, baselines, comparison groups, evaluator independence, sampling, benchmark/test versions, data-quality assessment, confidence interpretation, validity, and provenance.
 
 ## Core contracts
 
@@ -30,19 +30,19 @@ A normalized output or outcome record from department, workflow, capability, pro
 
 ### MetricDefinition
 
-A versioned specification of what is measured, why, population/scope, unit, direction, source evidence, inclusion/exclusion rules, computation, aggregation, window, baseline, target, uncertainty method, owner, and known limitations.
+The canonical versioned measurement specification defined by the [Metric domain](../domain/metric.md). M&E creates, reviews, activates, and supersedes definitions; evaluated departments and providers cannot redefine them.
 
 ### Metric
 
-A measurement produced under an exact MetricDefinition version. It records subject/scope, value and unit, window, source evidence, computation provenance, sample size, confidence or error bounds, quality flags, and timestamp. A metric does not interpret causality by itself.
+An immutable measurement conforming to one exact MetricDefinition version, as defined by the [Metric domain](../domain/metric.md).
 
 ### Evaluation
 
-An attributable assessment comparing Results and Metrics with objective success criteria, baselines, controls or alternatives. It records evaluation question, method, evaluator, independence, evidence and metric versions, findings, uncertainty, limitations, outcome classification, reliability findings, unintended effects, and recommended follow-up questions.
+The canonical attributable assessment defined by the [Evaluation domain](../domain/evaluation.md). M&E owns its design, execution, review, validity, and lifecycle.
 
 ### PerformanceProfile
 
-A time-bounded synthesis of evaluations for an agent, model, coding agent, provider adapter, capability implementation, workflow, or department. It supports router eligibility and ranking but does not select a provider or grant authority.
+The canonical M&E-owned projection over compatible Evaluations defined by the [Evaluation domain](../domain/evaluation.md). Provider and routing architectures consume it without redefining it.
 
 ## Evaluation flow
 
@@ -103,6 +103,8 @@ M&E itself is accountable for evaluation coverage, evidence completeness, detect
 - [Department architecture](../architecture/departments.md)
 - [Events](../architecture/events.md)
 - [Persistence](../architecture/persistence.md)
+- [Metric domain](../domain/metric.md)
+- [Evaluation domain](../domain/evaluation.md)
 - [Intelligence](../architecture/intelligence.md)
 - [Coding agents](../architecture/coding-agents.md)
 - [Research](research.md)

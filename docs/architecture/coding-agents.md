@@ -6,7 +6,7 @@ Status: DRAFT
 
 CompanyOS Engineering turns an approved design into reviewable repository evidence through provider-independent coding-agent contracts. Engineering depends on `CodingAgentRuntime`, `CodingAgentRouter`, `EngineeringWorkspace`, and `WorkspaceProvider`; Codex, Claude Code, Gemini CLI, OpenHands, and Aider are replaceable providers or adapters.
 
-This architecture owns task normalization, provider eligibility and selection, bounded session execution, independent result validation, and engineering evidence. It does not own organizational approval, domain legality, durable workflow scheduling, provider internals, workspace infrastructure, repository hosting, or merge authority.
+This architecture owns task normalization, provider eligibility and selection, bounded session execution, required result validation, and engineering evidence. It does not own organizational approval, domain legality, durable workflow scheduling, M&E Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider internals, workspace infrastructure, repository hosting, or merge authority.
 
 `CodingAgentRuntime` is a specialized execution port coordinated by the CompanyOS [Runtime](runtime.md). It is not a second authoritative workflow runtime.
 
@@ -53,7 +53,9 @@ A versioned description of a provider runtime: adapter and provider identifiers,
 
 ### CodingAgentEvaluation
 
-M&E-owned evidence relating a profile to a task class and environment. It records evaluation suite and repository fixture versions, quality and completion measures, regression and unsafe-action rates, test validity, latency, cost, recovery behavior, sample size, confidence, provenance, and validity window. Agent self-report is not evaluation evidence.
+An M&E-owned specialization of the canonical [Evaluation](../domain/evaluation.md) contract with subject type `CODING_AGENT_PROFILE`. It adds CodingAgentProfile, engineering-task class, repository fixture, toolchain/workspace environment, patch/test/build behavior, unsafe-action and recovery observations, and engineering-specific applicability constraints. It inherits Metric, benchmark, confidence, provenance, independence, validity, and lifecycle semantics without redefining them.
+
+CodingAgentEvaluations contribute to the subject's canonical `PerformanceProfile`; the CodingAgentRouter consumes that profile and its source Evaluation identities as routing evidence. Agent self-report and provider claims remain labelled source evidence and cannot satisfy an independent design by themselves.
 
 ### CodingAgentRuntime
 
@@ -118,6 +120,7 @@ An indeterminate external effect, including an uncertain push or PR creation, is
 - The implementation agent cannot satisfy the independent-review requirement for its own result.
 - Persistence succeeds before dispatch, retry, publication, or workflow advancement.
 - Cancellation or lease expiry revokes execution and credentials; late results cannot advance state.
+- CodingAgentEvaluation and PerformanceProfile evidence conforms to canonical M&E contracts; Engineering and routers cannot redefine evaluation semantics.
 
 ## OPEN QUESTIONS
 
@@ -126,3 +129,11 @@ An indeterminate external effect, including an uncertain push or PR creation, is
 - Which Git actions may be automatic at each autonomy level?
 - Which provider session checkpoints are portable enough to resume safely?
 - What evidence-retention and redaction periods apply to prompts, patches, and command output?
+
+## Dependencies
+
+- [Runtime](runtime.md)
+- [Workspaces](workspaces.md)
+- [Governance](governance.md)
+- [Metric domain](../domain/metric.md)
+- [Evaluation domain](../domain/evaluation.md)

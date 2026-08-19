@@ -13,10 +13,10 @@ Intelligence owns:
 - model/provider profile registration and evidence freshness;
 - eligibility filtering and multi-factor routing;
 - provider adapter contracts and normalized execution results;
-- routing, usage, failure, evaluation, and provenance evidence;
+- routing, usage, failure, and execution evidence for M&E evaluation;
 - feedback flow from Research, Monitoring & Evaluation (M&E), Finance, and Governance.
 
-It does not own organizational objectives, department semantics, policy meaning, budgets, benchmark ownership, provider credentials, workflow execution, or acceptance of model output as authoritative truth.
+It does not own organizational objectives, department semantics, policy meaning, budgets, Metrics, Evaluation or PerformanceProfile semantics, benchmarks, confidence/provenance/validity rules, provider credentials, workflow execution, or acceptance of model output as authoritative truth.
 
 ## Required flow
 
@@ -84,7 +84,9 @@ An immutable explanation of one selection attempt. It records request and analyz
 
 ### ModelEvaluation
 
-An M&E-owned observation connecting a model profile and capability/task family to a versioned benchmark or production outcome. It records dataset/evaluator versions, quality dimensions, sample size, confidence, latency, usage, effective cost, failure class, privacy or tool-compliance findings, provenance, and validity window. Individual user preference or agent self-report is not sufficient evaluation evidence.
+An M&E-owned specialization of the canonical [Evaluation](../domain/evaluation.md) contract with subject type `MODEL_PROFILE`. It adds model-profile/deployment identity, IntelligenceCapability and task-family references, modality and tool-use dimensions, model-specific finish/safety observations, and inference-environment applicability. It inherits Metric, benchmark, confidence, provenance, independence, validity, and lifecycle semantics without redefining them.
+
+ModelEvaluations contribute to the subject's canonical `PerformanceProfile`; Intelligence consumes that profile and its source Evaluation identities as routing evidence. Individual preference, model self-evaluation, or provider claims remain labelled source evidence and cannot satisfy an independent design by themselves.
 
 ## Routing pipeline
 
@@ -110,7 +112,7 @@ Routing weights are versioned policy inputs. Tie-breaking is deterministic for e
 | Owner | Responsibility | Cannot do |
 |---|---|---|
 | Research | Discover models/providers, limitations, pricing sources, and capability claims | Activate profiles or make routing decisions |
-| M&E | Design benchmarks; publish ModelEvaluations and reliability evidence | Weaken quality requirements or authorize providers |
+| M&E | Own Metric/Evaluation contracts; design benchmarks; publish ModelEvaluations and PerformanceProfiles | Weaken quality requirements or authorize providers |
 | Finance | Define budgets and compute effective cost | Select models or waive Governance/privacy constraints |
 | Governance | Determine provider/model eligibility and approval requirements | Optimize quality/cost among eligible profiles |
 | Intelligence Router | Filter and rank using versioned evidence and constraints | Invent evidence, budgets, policies, or direct provider access |
@@ -135,7 +137,7 @@ Routing weights are versioned policy inputs. Tie-breaking is deterministic for e
 - Hard privacy, quality, tool, budget, and deadline constraints cannot be traded away by scoring.
 - Provider adapters contain no organizational routing or policy decisions.
 - Model output, provider metadata, and model self-evaluation are not authoritative organizational state.
-- ModelProfile claims and ModelEvaluations carry provenance, version, freshness, and confidence.
+- ModelEvaluation and PerformanceProfile evidence conforms to the canonical M&E contracts; Intelligence cannot redefine their confidence, provenance, benchmark, validity, or lifecycle semantics.
 - Routing is reproducible from the recorded request, profiles, evidence, constraints, router version, and tie-break rule.
 - Finance cost evidence includes expected failure, retry, fallback, and verification costs—not token price alone.
 - M&E evidence informs future routing but cannot retroactively alter completed decisions.
@@ -172,5 +174,7 @@ No concrete provider, model, gateway, or routing library is selected.
 - [Runtime](runtime.md)
 - [Departments](departments.md)
 - [Governance](governance.md)
+- [Metric domain](../domain/metric.md)
+- [Evaluation domain](../domain/evaluation.md)
 - [Proposed ADR-0003](../adr/ADR-0003-model-independent-intelligence.md)
-- Future capability, agent, metric, event, knowledge, persistence, M&E, Research, and Finance specifications
+- Future capability, agent, event, knowledge, persistence, Research, and Finance specifications

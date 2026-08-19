@@ -2,6 +2,8 @@
 
 This directory owns canonical definitions, identities, lifecycles, relationships, and invariants for CompanyOS concepts.
 
+Statuses mirror existing document metadata. Rows marked `NOT YET SPECIFIED` are planned contracts and may not have a file yet.
+
 | Document | Purpose | Status | Read when |
 |---|---|---|---|
 | `organization.md` | Organization identity and lifecycle | NOT YET SPECIFIED | Read when working with company-level state. |

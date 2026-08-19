@@ -19,7 +19,9 @@ Approval applies to the reviewed version. A material boundary or invariant chang
 | Document | Purpose | Status | Read when |
 |---|---|---|---|
 | `system-context.md` | System actors, boundaries, and external relationships | DRAFT | Read when establishing system scope. |
+| `identity.md` | Authentication, durable Principal identity, delegation, and trusted claims | DRAFT | Read when establishing actor identity or authentication evidence. |
 | `kernel.md` | Kernel ownership and non-responsibilities | DRAFT | Read when changing organizational semantics. |
+| `application.md` | Governed use-case orchestration and atomic transition coordination | DRAFT | Read when changing request-to-persistence orchestration. |
 | `runtime.md` | Execution mechanics and lifecycle | DRAFT | Read when changing workflow execution. |
 | `daemon.md` | Continuous availability and supervision | DRAFT | Read when changing background operation. |
 | `departments.md` | Department extension architecture | DRAFT | Read when designing department contracts. |

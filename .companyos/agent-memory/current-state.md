@@ -3,7 +3,7 @@
 - **Last updated:** 2026-08-19
 - **Current phase:** Architecture audit correction
 - **Architecture approver:** Project owner (`Node-Features`)
-- **Next task:** Define the Application Use Case boundary and resolve the remaining major architecture-audit findings
+- **Next task:** Remove the duplicate Principal definition from `docs/domain/policy.md`, then run a fresh read-only architecture audit
 
 ## Approved material
 
@@ -11,25 +11,27 @@ None.
 
 ## Draft material
 
-- `ARCHITECTURE.md` and all completed `docs/architecture/*.md` documents are drafts awaiting correction and review.
+- `ARCHITECTURE.md` and all completed `docs/architecture/*.md` documents are drafts awaiting final audit and explicit owner approval.
+- Application orchestration now uses two-stage Kernel validation, exact Governance evaluation, atomic pending approval, and post-commit Runtime notification.
+- Identity, Principal, Evaluation, Metric, Resource, Event, Evidence, Artifact, Objective, Workflow, Result, and Knowledge contracts are drafts.
+- The Events/Persistence/Knowledge dependency direction and adaptive-department boundaries have been normalized.
 - `docs/adr/ADR-0003-model-independent-intelligence.md` is proposed and not accepted.
-- Research, Monitoring & Evaluation, and Finance department documents are drafts awaiting correction and review.
-
-- `AGENTS.md` — working agent entry point, awaiting approval.
-- `docs/INDEX.md` — context-routing map, awaiting approval.
-- `.companyos/agent-memory/` — operational summaries, awaiting approval.
-- Existing documentation directory indexes — awaiting review and migration decisions.
-- `docs/references/feature-provenance.md` — proposed borrowing map, awaiting source analysis and architecture review.
+- Research, Monitoring & Evaluation, and Finance department documents are drafts awaiting review.
+- `AGENTS.md`, `docs/INDEX.md`, `.companyos/agent-memory/`, and directory indexes await approval.
+- `docs/references/feature-provenance.md` is proposed pending source analysis and architecture review.
 
 ## Blockers
 
 - Architecture documents cannot be approved until applicable `CRITICAL` and `MAJOR` audit findings are resolved.
-- The Application Use Case orchestration boundary is not yet defined.
-- Evaluation and performance contracts overlap across M&E, Intelligence, and Coding Agents.
-- Finance resource-constraint terminology is not yet canonical.
-- Adaptive department documents declare cyclic document dependencies that could imply implementation coupling.
-- Trusted Principal identity and authentication authority are not yet defined.
-- Adaptive-loop failure semantics and Knowledge approval authority remain incomplete.
+- `docs/domain/policy.md` still duplicates part of the canonical Principal definition instead of linking to `docs/domain/principal.md`.
+- A fresh read-only architecture audit is required after that correction before document approval or implementation.
+
+## Unresolved implementation choices
+
+- The first authoritative aggregate and transaction boundary are not selected.
+- The initial Runtime implementation or adapter is not selected.
+- The minimal post-commit notification recovery mechanism is not selected.
+- Organization, Agent, and Capability domain contracts are not yet specified.
 
 ## Open questions
 

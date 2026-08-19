@@ -11,9 +11,9 @@ The Kernel owns:
 - organization identity, mission, vision, principles, and policy semantics;
 - objective identity, lifecycle, relationships, success criteria, and legal transitions;
 - department identity, responsibilities, authority boundaries, and extension contracts;
-- workflow definitions as organizational processes and the rules for legal workflow transitions;
+- enforcement of the canonical Workflow definitions, command preconditions, and legal transitions owned by the Workflow domain;
 - capability identity, required inputs and outputs, evidence requirements, and provider-independent failure semantics;
-- domain commands, decisions, events, and invariant validation;
+- validation of canonical domain commands, production of Kernel decisions and events, and invariant enforcement;
 - the distinction between proposed, authorized, persisted, executing, completed, failed, and evaluated work.
 
 ## Non-responsibilities
@@ -32,7 +32,7 @@ The Kernel may define information these mechanisms must preserve, but it cannot 
 
 ## Kernel decisions and effects
 
-A Kernel operation consumes a command plus an explicitly loaded authoritative state snapshot. It returns either:
+A Kernel operation consumes a command plus an explicitly loaded authoritative state snapshot or an explicit absent-aggregate expectation for creation. It returns either:
 
 - a rejection with stable domain reasons and no state change; or
 - a decision containing the next authoritative state, domain events, and requested effects.
@@ -45,7 +45,7 @@ The first implemented aggregate root is one [Workflow](../domain/workflow.md). I
 
 Objective, Organization, Principal, GovernanceDecision, Approval, CapabilityDefinition, ResourceConstraint, Result, Runtime execution state, checkpoint, Artifact, Evidence, Metric, and Knowledge records remain external aggregates or records referenced by immutable identity/version. The Workflow aggregate cannot mutate them.
 
-For the first `START_WORKFLOW` command, proposal validation enforces the preconditions owned by the canonical [Workflow first-slice lifecycle](../domain/workflow.md#first-slice-lifecycle). It produces the immutable [GovernedCommandProposal](../domain/command.md#governedcommandproposal) without state, Events, or intent.
+For first-slice Workflow commands, proposal validation enforces the preconditions owned by the canonical [Workflow lifecycle](../domain/workflow.md#first-slice-commands-and-legal-transitions). It produces the immutable [GovernedCommandProposal](../domain/command.md#governedcommandproposal) without state, Events, or intent.
 
 Final validation requires the unchanged proposal, current `ALLOW`, matching authoritative versions, and any applicable Approval evidence. Acceptance produces the transition and effects defined by the Workflow contract. A version mismatch, changed digest, inactive dependency, illegal state, or stale governance evidence rejects without a decision effect.
 

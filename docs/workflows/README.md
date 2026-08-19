@@ -1,6 +1,6 @@
 # Workflow Documentation
 
-This directory owns vertical workflow behavior, including transitions, approvals, persistence, failure, and recovery.
+This directory documents end-to-end workflow use cases. Canonical Workflow states and legal transitions belong to the [Workflow domain](../domain/workflow.md); these documents reference rather than redefine them.
 
 | Document | Purpose | Status | Read when |
 |---|---|---|---|

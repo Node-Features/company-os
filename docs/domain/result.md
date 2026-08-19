@@ -20,7 +20,7 @@ A Result contains:
 - error classification, retryability claim, and reconciliation reference when applicable;
 - integrity, provenance, and security classification.
 
-Result acceptance is a separate Kernel decision. Acceptance may advance a Workflow, reject the Result, request more evidence, or create further intent.
+Result acceptance is a separate Kernel decision. The first slice submits [`ACCEPT_WORKFLOW_RESULT`](command.md#first-slice-command-vocabulary) and uses the legal transition owned by the [Workflow domain](workflow.md#first-slice-commands-and-legal-transitions). Other slices may reject a Result, request more evidence, or create further intent only after their owning domain defines those semantics.
 
 ## Invariants
 

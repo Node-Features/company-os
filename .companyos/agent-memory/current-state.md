@@ -3,7 +3,7 @@
 - **Last updated:** 2026-08-19
 - **Current phase:** Architecture audit correction
 - **Architecture approver:** Project owner (`Node-Features`)
-- **Next task:** Resolve whether Department validation is lifecycle state or validation evidence, then specify the first Runtime-result command/Workflow transition and minimum Runtime execution-state contract
+- **Next task:** Perform Reconciliation B for Governance and Approval, preserving the canonical Workflow and command contracts
 
 ## Approved material
 
@@ -15,7 +15,7 @@ None.
 - Application orchestration now uses two-stage Kernel validation, exact Governance evaluation, atomic pending approval, and post-commit Runtime notification.
 - Organization, Identity, Principal, Agent, Capability, Command, Evaluation, Metric, Resource, Event, Evidence, Artifact, Objective, Workflow, Result, Workspace, and Knowledge contracts are drafts.
 - The Events/Persistence/Knowledge dependency direction and adaptive-department boundaries have been normalized.
-- Workflow is the first aggregate; `StartWorkflow` and the pending-approval, accepted-transition, and Runtime execution transaction boundaries are specified as drafts.
+- Workflow is the first aggregate; `CREATE_WORKFLOW`, `START_WORKFLOW`, Runtime execution, `ACCEPT_WORKFLOW_RESULT`, and their transaction boundaries are specified as drafts.
 - Approval evaluation, lifecycle meaning, and persistence coordination now have distinct Governance, Domain, and Application owners.
 - Intelligence contracts specialize canonical Capability contracts; specialized components cannot persist authoritative mutations directly.
 - `docs/adr/ADR-0003-model-independent-intelligence.md` is proposed and not accepted.
@@ -26,7 +26,6 @@ None.
 ## Blockers
 
 - Architecture documents cannot be approved until applicable `CRITICAL` and `MAJOR` audit findings are resolved.
-- Runtime-result acceptance lacks a canonical command type and legal post-result Workflow transition.
 - Runtime attempts, leases, checkpoints, waits, retries, and resume lack a minimum canonical execution-state contract.
 - Department lifecycle conflicts: the domain transitions directly from `REGISTERED` to `ACTIVE`, while Department architecture introduces `VALIDATED` as a state.
 - A fresh read-only architecture audit is required after the remaining corrections before document approval or implementation.

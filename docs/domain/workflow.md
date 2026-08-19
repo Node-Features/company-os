@@ -20,14 +20,25 @@ A command plus authoritative Workflow snapshot produces either stable rejection 
 
 ## First-slice lifecycle
 
-The first slice defines only these Workflow states:
+The first vertical slice defines exactly three authoritative Workflow states:
 
-- `PLANNED`: the Workflow exists with an approved Objective and resolved definition references, but execution is not yet eligible for dispatch;
-- `READY`: the `START_WORKFLOW` transition has been accepted and exactly one ExecutionIntent for the first Capability step was committed with the new Workflow version and resulting DomainEvents.
+- `PLANNED`: the Workflow has been created with an approved Objective, an active WorkflowDefinition, resolved first-step CapabilityDefinition, and accepted inputs, but no execution is authorized;
+- `READY`: `START_WORKFLOW` was accepted and exactly one ExecutionIntent for the first Capability step committed with the new Workflow version and resulting DomainEvents;
+- `COMPLETED`: the successful Result for that ExecutionIntent was accepted through `ACCEPT_WORKFLOW_RESULT` and committed with the final Workflow version and resulting DomainEvents.
 
-`START_WORKFLOW` has one legal transition: `PLANNED -> READY`. It requires the expected Workflow version; an approved Objective reference; active compatible WorkflowDefinition and CapabilityDefinition references; normalized inputs; and current Governance evidence for the exact proposal. The Kernel enforces these preconditions and decides the transition. Application coordinates atomic persistence of the new Workflow version, DomainEvents, and ExecutionIntent before Runtime is notified.
+Runtime attempts, leases, dispatch, provider execution, checkpoints, retries, waits, and returned-but-unaccepted Results do not create Workflow states. A Workflow remains `READY` while Runtime executes its persisted intent. Runtime execution state is never inferred as authoritative Workflow state.
 
-No other Workflow state or transition is established by this first-slice contract.
+## First-slice commands and legal transitions
+
+| Command | Required prior state | Accepted transition | Minimum legality |
+|---|---|---|---|
+| `CREATE_WORKFLOW` | No Workflow exists for the proposed identity | absent → `PLANNED` | Organization is active; Objective is `APPROVED`; WorkflowDefinition and first CapabilityDefinition are active and compatible; identities, versions, inputs, and Governance evidence match the exact proposal. |
+| `START_WORKFLOW` | `PLANNED` at the expected version | `PLANNED` → `READY` | Referenced Objective and definitions remain eligible; accepted inputs remain valid; current Governance evidence matches the proposal; exactly one first-step ExecutionIntent is produced. |
+| `ACCEPT_WORKFLOW_RESULT` | `READY` at the expected version | `READY` → `COMPLETED` | Result is immutable, organization-matched, successful, not previously accepted, and bound to the exact Workflow version, ExecutionIntent, CapabilityRequest, and execution attempt; required Artifact/Evidence and capability acceptance criteria are satisfied; current Governance evidence matches the proposal. |
+
+Any failed precondition produces stable rejection reasons and no Workflow transition, DomainEvent, or ExecutionIntent. A failed, cancelled, timed-out, partial, indeterminate, stale, duplicate, mismatched, or insufficiently evidenced Result cannot complete the Workflow in this slice. Its future recovery or terminal semantics remain outside this minimum lifecycle.
+
+The Kernel performs preliminary proposal validation and final legality validation for every command. Governance decides `ALLOW`, `DENY`, or `REQUIRE_APPROVAL` for the exact immutable proposal. Application coordinates loading, invocation order, and atomic persistence. Runtime may submit execution evidence and a Result through Application, but cannot issue an authoritative transition or persist Workflow state directly.
 
 ## Invariants
 
@@ -40,7 +51,7 @@ No other Workflow state or transition is established by this first-slice contrac
 
 ## OPEN QUESTIONS
 
-- What additional states and transitions are required after the first `READY` execution intent completes?
+- What states and commands represent failed, cancelled, timed-out, partial, or indeterminate execution after this successful-path slice?
 - Which definition changes are compatible with running Workflows?
 - Which failure outcomes require compensation rather than retry?
 

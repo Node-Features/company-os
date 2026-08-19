@@ -50,11 +50,15 @@ Execution checkpoints may commit separately from organizational state because th
 
 The first aggregate is one Workflow addressed by Organization ID and Workflow ID with an opaque monotonic version. Persistence exposes compare-and-write against the exact expected version; it never merges competing Workflow decisions.
 
-The first slice uses three explicit transaction boundaries:
+The first slice uses these explicit transaction boundaries:
 
 1. **Pending approval:** atomically persist `GovernanceDecision(REQUIRE_APPROVAL)`, immutable PendingCommand/proposal digest, `Approval(PENDING)`, governance audit record, and idempotency outcome. This transaction does not change the Workflow and creates no ExecutionIntent or DomainEvent for the proposed Workflow transition.
-2. **Accepted Workflow transition:** on current `ALLOW` and successful version comparison, atomically persist the canonical [first-slice Workflow transition](../domain/workflow.md#first-slice-lifecycle) with its new version, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and caused ExecutionIntent. Any failure commits none of them.
-3. **Runtime execution:** claims, leases, attempts, heartbeats, waits, retries, and checkpoints commit through ExecutionRepository transactions after the accepted Workflow transaction. They cannot rewrite Workflow state, Governance evidence, Approval consumption, or the originating ExecutionIntent.
+2. **Workflow creation:** atomically persist the KernelDecisionEnvelope for accepted `CREATE_WORKFLOW`, resulting DomainEvents, GovernanceDecision reference, idempotency outcome, and initial Workflow version. It creates no ExecutionIntent.
+3. **Workflow start:** atomically persist the KernelDecisionEnvelope for accepted `START_WORKFLOW`, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and its ExecutionIntent.
+4. **Runtime execution and result reporting:** claims, leases, attempts, heartbeats, waits, retries, and checkpoints commit through ExecutionRepository. Runtime submits execution Evidence and a proposed immutable Result through Application, which coordinates their persistence through the applicable ports without changing Workflow state. These records cannot rewrite Governance evidence, Approval consumption, or the originating ExecutionIntent.
+5. **Result acceptance:** atomically persist the KernelDecisionEnvelope for accepted `ACCEPT_WORKFLOW_RESULT`, accepted immutable Result reference, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and final Workflow version. It creates no further ExecutionIntent in this slice.
+
+The domain-owned [first-slice command/transition table](../domain/workflow.md#first-slice-commands-and-legal-transitions) defines legality; this document defines only the required atomic storage boundaries. Any failure of a listed atomic write commits none of that boundary.
 
 An EventRepository/outbox may publish records after the accepted transaction, but the durable Event records and ExecutionIntent are members of that transaction rather than asynchronously reconstructed. Database schema, transaction API, and outbox mechanism remain adapter choices.
 

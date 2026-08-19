@@ -12,13 +12,23 @@ The command contract is the neutral, provider-independent handoff among Applicat
 
 - envelope schema version; command, request, and idempotency identities;
 - command type and organization identity;
-- Workflow identity and expected version;
+- Workflow identity plus expected version, or an explicit absent-aggregate expectation for creation;
 - referenced Objective, WorkflowDefinition, and required contract identities/versions;
 - requesting Principal and authenticated-evidence reference;
 - normalized inputs plus Artifact, Evidence, and ResourceConstraint references;
 - declared time, correlation and causation identities, and security classification.
 
-The first slice permits `START_WORKFLOW`; adding command types requires their owning domain rules rather than changing this envelope's ownership.
+## First-slice command vocabulary
+
+The first slice permits exactly these Workflow command types:
+
+| Command | Intent | Type-specific payload |
+|---|---|---|
+| `CREATE_WORKFLOW` | Request creation of one Workflow in its canonical initial state | Proposed Workflow identity; Objective, WorkflowDefinition, and first CapabilityDefinition identities/versions; initiating Principal; accepted input Artifact/Evidence references; applicable constraints. |
+| `START_WORKFLOW` | Request that one existing Workflow become executable | Workflow identity and expected version plus the exact referenced versions and inputs required by the canonical transition. |
+| `ACCEPT_WORKFLOW_RESULT` | Request authoritative acceptance of one Runtime-returned Result | Workflow identity and expected version; immutable Result identity/version/digest; ExecutionIntent, CapabilityRequest, and execution-attempt identities; Artifact/Evidence references required for acceptance. |
+
+The canonical [Workflow lifecycle](workflow.md#first-slice-commands-and-legal-transitions) owns the prior states, legal transitions, and preconditions for these commands. A command expresses requested intent; its name never proves that the transition was accepted. Adding another command type requires its legal semantics to be defined by the owning domain first.
 
 ## GovernedCommandProposal
 
@@ -34,13 +44,19 @@ The first slice permits `START_WORKFLOW`; adding command types requires their ow
 
 It contains no next state, DomainEvent, Approval outcome, or ExecutionIntent. Governance evaluates the proposal without rewriting it.
 
+For the first slice, proposal validation maps commands to stable Actions without changing their domain meaning:
+
+- `CREATE_WORKFLOW` → `workflow.create` on the proposed organization-scoped Workflow Resource;
+- `START_WORKFLOW` → `workflow.start` on the existing Workflow Resource;
+- `ACCEPT_WORKFLOW_RESULT` → `workflow.result.accept` on the existing Workflow and referenced Result Resource.
+
 ## KernelDecisionEnvelope
 
 `KernelDecisionEnvelope` is the immutable result of final Kernel validation. It contains:
 
 - decision identity and schema version;
 - proposal identity and digest;
-- organization, aggregate identity, and prior authoritative version;
+- organization, aggregate identity, and prior authoritative version or explicit prior absence for creation;
 - either stable rejection reasons, or the next aggregate state/version, DomainEvents, and optional ExecutionIntent;
 - Governance Decision and Approval references consumed by final validation;
 - declared decision time and correlation/causation identities.

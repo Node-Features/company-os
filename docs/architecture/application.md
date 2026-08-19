@@ -55,18 +55,18 @@ Transport headers, UI models, provider payloads, and agent messages are translat
 
 ## First vertical slice
 
-The first state-changing slice is `StartWorkflow`. The [Workflow domain](../domain/workflow.md#first-slice-lifecycle) owns its states, legal transition, and preconditions; Application owns only the use-case sequence and transaction coordination. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, and resource records are referenced by immutable identity/version and are not members of the aggregate.
+The first vertical slice coordinates `CREATE_WORKFLOW`, `START_WORKFLOW`, Runtime execution, and `ACCEPT_WORKFLOW_RESULT`. The [Workflow domain](../domain/workflow.md#first-slice-commands-and-legal-transitions) owns states, legal transitions, and preconditions; the [Command domain](../domain/command.md#first-slice-command-vocabulary) owns command meaning. Application owns only use-case sequencing and transaction coordination. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, resource, Result, and Runtime execution records remain external records referenced by immutable identity/version.
 
 The request uses the canonical [WorkflowCommandEnvelope](../domain/command.md#workflowcommandenvelope). Application validates its shape and loads its referenced authoritative versions; it does not redefine or infer missing command fields.
 
 ## Shared command and decision envelopes
 
-The [Command domain contract](../domain/command.md) owns `WorkflowCommandEnvelope`, `GovernedCommandProposal`, `KernelDecisionEnvelope`, and `PendingCommand`. Application validates and coordinates these envelopes but does not define their meaning. The first slice uses `START_WORKFLOW` and the Action `workflow.start` without making those slice-specific values Application contracts.
+The [Command domain contract](../domain/command.md) owns `WorkflowCommandEnvelope`, `GovernedCommandProposal`, `KernelDecisionEnvelope`, and `PendingCommand`. Application validates and coordinates these envelopes but does not define their meaning. First-slice command types and Action mappings remain domain contracts; Application selects the corresponding use case but does not redefine them.
 
 ## State-changing use case
 
 1. Validate envelope shape, organization scope, identity references, command type, idempotency identity, and input classifications.
-2. Load the minimum authoritative state and exact versions required by the use case.
+2. Load the minimum authoritative state and exact versions required by the use case, or verify the explicit aggregate absence required by a creation command.
 3. Ask the Kernel to perform **proposal validation**. This pure stage validates domain shape and state-independent or currently knowable invariants and returns either stable rejection reasons or an immutable `GovernedCommandProposal` containing the exact command, Action, Resource, normalized-arguments digest, authoritative-state version, and proposed effect classification. It returns no next state, domain events, or executable intent.
 4. Submit that exact proposal plus authenticated context to Governance. Governance evaluates the proposal without changing it.
 5. On `DENY`, return denial without a domain transition or execution intent.
@@ -96,7 +96,7 @@ Read-only use cases still enforce organization, identity, authorization, classif
 
 ## Runtime-result use case
 
-Runtime and provider outputs re-enter CompanyOS as new ApplicationRequests containing attributable execution evidence. Application reloads current authoritative state, asks the Kernel to perform preliminary proposal validation, and submits the resulting immutable `GovernedCommandProposal` to Governance. `DENY` and `REQUIRE_APPROVAL` follow the same non-transition and pending-approval paths as initial commands. Only on a current `ALLOW` does Application ask the Kernel for the final decision, then atomically persist any accepted state, events, result/evidence references, and next execution intent before Runtime advances.
+Runtime returns execution evidence and a proposed immutable Result through a new Application request. Application validates and coordinates persistence of those observations without changing Workflow state, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command referencing the persisted Result. Application reloads current authoritative state, asks the Kernel to perform preliminary proposal validation, and submits the resulting immutable `GovernedCommandProposal` to Governance. `DENY` and `REQUIRE_APPROVAL` follow the same non-transition and pending-approval paths as other commands. Only on a current `ALLOW` does Application ask the Kernel for the final decision, then atomically persist the accepted Result reference, state, and events before Runtime advances.
 
 The final Kernel stage revalidates the unchanged proposal digest against current authoritative state; Governance permission cannot make an invalid result transition legal. Runtime never calls a storage adapter to mark organizational work complete. A provider callback, checkpoint, success message, artifact, or exit code cannot bypass either Kernel stage, Governance, or the Application-coordinated commit.
 
@@ -108,7 +108,7 @@ Initial `ALLOW` permits persistence of a bounded execution intent only when poli
 
 ## Transaction and notification semantics
 
-- For `StartWorkflow`, the accepted atomic write contains the canonical [Workflow transition](../domain/workflow.md#first-slice-lifecycle), resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of any applicable single-use Approval, idempotency outcome, and its caused ExecutionIntent.
+- Each accepted first-slice command persists the canonical [Workflow transition and effects](../domain/workflow.md#first-slice-commands-and-legal-transitions), resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, and idempotency outcome atomically. Only `START_WORKFLOW` causes an ExecutionIntent in this slice.
 - Optimistic-concurrency failure rejects the attempted commit; the use case reloads and re-evaluates rather than merging implicitly.
 - A timeout or lost response is `INDETERMINATE` until reconciled by request/idempotency identity.
 - Retrying the same logical request reuses its idempotency identity and cannot create a second legal transition.

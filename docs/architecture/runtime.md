@@ -37,9 +37,9 @@ The Runtime does not own:
 3. Runtime claims the due persisted intent using a bounded lease and creates or resumes an execution attempt.
 4. Runtime dispatches a capability request to an eligible executor through a provider-independent contract.
 5. Results, failures, heartbeats, and provider identifiers are captured as execution evidence.
-6. Runtime submits the result and execution evidence through a new Application use case.
-7. The Application layer reloads state, obtains a Kernel-validated proposal for interpreting the result, submits that exact proposal to Governance, and only on current `ALLOW` asks the Kernel for its final decision and persists any authoritative transition before dependent work is scheduled.
-8. Transient failures produce a durable next-attempt time; permanent or exhausted failures produce a terminal execution result for Kernel interpretation.
+6. Runtime submits the proposed immutable Result and execution evidence through a new Application use case. Application validates and coordinates persistence of those observations, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command referencing the persisted Result.
+7. The Application layer reloads state, obtains a Kernel-validated proposal for that command, submits the exact proposal to Governance, and only on current `ALLOW` asks the Kernel for its final decision and coordinates any authoritative transition before dependent work is scheduled.
+8. Transient failures produce a durable next-attempt time; permanent or exhausted failures produce terminal execution Result evidence. The first-slice Workflow contract defines no authoritative transition for those outcomes, so Runtime cannot infer one.
 
 Waiting is persisted state plus a wake condition, not a sleeping process. Resume reconstructs execution from persisted state and is safe after duplicate wake-ups.
 
@@ -68,6 +68,7 @@ Waiting is persisted state plus a wake condition, not a sleeping process. Resume
 
 - Persistence of accepted state and execution intent succeeds before external execution begins.
 - Runtime notification, queue delivery, or polling never substitutes for persisted execution intent.
+- Runtime execution does not add a state to the canonical [Workflow vocabulary](../domain/workflow.md#first-slice-lifecycle); only acceptance through Application and Kernel may advance it.
 - Runtime cannot create, waive, or reinterpret Kernel legality, policies, capabilities, or approvals.
 - A legal transition is applied once even when dispatch or delivery occurs more than once.
 - Waiting consumes no dedicated worker and survives process restart.

@@ -61,6 +61,22 @@ flowchart LR
 
 Research persists each accepted contract before dependent work advances. Material scope or method changes create a new question or plan version. Findings and recommendations retain source lineage when transformed into artifacts or proposed knowledge.
 
+## Failure semantics
+
+Research follows the shared [adaptive-loop failure semantics](../architecture/departments.md#adaptive-loop-failure-semantics):
+
+- unavailable sources, rate limits, or temporary collection failures are `RETRYABLE` only within the ResearchQuestion's time, cost, source, and attempt bounds;
+- stale evidence must be refreshed or excluded; if remaining evidence is insufficient, the Finding is `INCONCLUSIVE` rather than inferred;
+- insufficient source quality, independence, provenance, or coverage produces an explicit evidence gap and may trigger human review;
+- ResearchQuestion deduplication uses the normalized question, organization, scope, decision context, active validity window, and source Evaluation/ResourceEvaluation versions;
+- duplicate signals or deliveries attach evidence to the existing question when compatible and never create duplicate Findings or Recommendations;
+- a Recommendation has an expiry/review condition and cannot progress after expiry without a new validated version;
+- Governance `DENY` closes the exact recommendation/action version; `REQUIRE_APPROVAL` persists an escalation and waits for human resolution;
+- source prohibition, invalid scope, exhausted bounds, or an irreparable provenance failure is `TERMINAL`; collection failures that can succeed unchanged may be `RETRYABLE`;
+- repeated transient failure, material source contradiction, high-impact security findings, or exhausted loop depth escalates to attributable human review.
+
+A Finding or Recommendation may propose an Objective through a distinct Application use case. It cannot create, authorize, schedule, or mutate an Objective directly.
+
 ## Interfaces
 
 - **Inputs:** governed questions, public and licensed sources, customer evidence, security signals, provider/repository changes, department results, M&E evaluations, and Finance resource evaluations.
@@ -86,6 +102,8 @@ When Research identifies a cheaper model or coding agent, it produces a finding 
 - Contrary evidence, source conflicts, licensing constraints, and security concerns remain visible.
 - Customer and external data collection passes Governance, privacy, and authority checks.
 - Results become approved knowledge only through the knowledge-review lifecycle.
+- Questions, Findings, and Recommendations retain explicit retryable, terminal, inconclusive, or escalated disposition and stable deduplication identity.
+- Expired, denied, duplicate, stale, or insufficiently supported Recommendations cannot create Objectives.
 
 ## Metrics and accountability
 

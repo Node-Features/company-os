@@ -127,8 +127,13 @@ flowchart LR
     RQ --> Evidence[Evidence]
     Evidence --> Finding[Research Finding]
     Finding --> Recommendation[Recommendation]
-    Recommendation --> Governance[Governance decision]
-    Governance --> Objective[Objective]
+    Recommendation --> Proposal[Objective proposal]
+    Proposal --> Governance{Governance decision}
+    Governance -->|ALLOW| Kernel[Kernel legality]
+    Governance -->|DENY| Closed[Closed or revised feedback]
+    Governance -->|REQUIRE_APPROVAL| Review[Human approval workflow]
+    Review --> Governance
+    Kernel -->|accepted and persisted| Objective[Objective]
     Objective --> Execution[Department execution]
     Execution --> Result[Result]
     Result --> Metric[Metric]
@@ -143,6 +148,39 @@ flowchart LR
 - [Finance](../departments/finance.md) asks **was the outcome worth the resources consumed?** and owns budgets, normalized cost evidence, resource limits, and resource evaluations.
 
 The loop carries persisted shared-contract records through Application use cases, workflows, and events—not direct department calls. Producers publish contract identities and versions; consumers resolve them through shared ports. A recommendation is not an objective, an evaluation is not a governance decision, and a resource evaluation cannot retroactively redefine outcome quality. Governance gates proposals; the Kernel owns objective legality; executing departments own their results.
+
+## Adaptive-loop failure semantics
+
+Every adaptive-loop operation records a `FeedbackDisposition` independently from its domain status:
+
+| Disposition | Meaning | Progression |
+|---|---|---|
+| `SUCCEEDED` | Required contract and evidence were produced and persisted | May emit the next shared-contract event |
+| `RETRYABLE` | A transient failure may succeed without changing the question, method, policy, or intended meaning | Runtime may retry under the same logical-operation identity and bounded policy |
+| `INCONCLUSIVE` | Available evidence cannot support the requested conclusion | Persist uncertainty; do not convert to success or Objective |
+| `TERMINAL` | The operation is invalid, expired, denied, contradicted beyond its method, or permanently unable to satisfy its contract | Stop this operation version; revision requires a new version or question |
+| `ESCALATED` | Human judgment or authority is required | Persist escalation and wait; silence is not approval |
+
+Provider errors remain evidence and are translated before disposition. Runtime owns retry mechanics; the owning department classifies its contract outcome; Governance owns authorization; the Kernel owns legal transitions.
+
+### Shared failure rules
+
+- **Stale evidence:** evidence outside its declared validity cannot support progression. Refresh is `RETRYABLE` only while source, time, and attempt limits permit; otherwise the result is `INCONCLUSIVE` or `TERMINAL` according to the contract.
+- **Insufficient evidence:** missing coverage, provenance, independence, sample, or quality yields `INCONCLUSIVE`. It never defaults to a positive Finding, Evaluation, ResourceEvaluation, or recommendation.
+- **Inconclusive evaluation:** remains an explicit persisted outcome and may propose a bounded ResearchQuestion or human review. It cannot be scored as failure, success, or absence of risk without a declared metric rule.
+- **Missing pricing:** unknown, incompatible, or expired PriceProfile evidence yields `INCONCLUSIVE` or ineligibility; cost is never assumed to be zero or unlimited.
+- **Duplicate feedback:** a feedback record has a stable logical identity and fingerprint over source contract versions, question, scope, method, and loop. Duplicate delivery reuses the existing result or is ignored idempotently; it cannot create another question, recommendation, evaluation, budget action, or Objective.
+- **Governance denial:** `DENY` is terminal for the exact proposed action/version. `REQUIRE_APPROVAL` becomes `ESCALATED`, not retryable. A materially revised proposal receives a new identity and full evaluation.
+- **Expired recommendations:** cannot create or modify an Objective. Revalidation produces a new recommendation version with current evidence, evaluation, resources, and Governance context.
+- **Bounded loop depth:** every chain records a feedback-loop ID, cycle number, causation path, and configured maximum cycles/elapsed time. Reaching a bound stops automatic continuation and escalates or closes the loop.
+- **Question deduplication:** ResearchQuestion creation uses a normalized fingerprint plus organization, scope, decision context, and active validity window. Related questions may link; they are not silently merged when their evidence or authority differs.
+- **Escalation and human review:** required for policy/authority ambiguity, high-impact contradiction, unresolved evidence conflict, repeated transient failure, exhausted loop bounds, or a contract-specific threshold. Review is attributable, time-bounded, and persisted.
+
+### Objective creation gate
+
+A Finding, Recommendation, Evaluation, ResourceEvaluation, Metric, event, escalation, or feedback result can only propose an Objective. It never creates one automatically. Objective creation requires a distinct Application request, current authenticated Principal evidence, Governance `ALLOW`, Kernel legality, and atomic persistence of the Objective, domain events, and any execution intent.
+
+Automatic transport, event handling, retries, or an `automatic` autonomy level cannot bypass this gate. `automatic` means Governance may return `ALLOW` under applicable policy; it does not mean feedback is itself an Objective command.
 
 ## Runtime interaction
 
@@ -168,6 +206,8 @@ The loop carries persisted shared-contract records through Application use cases
 - Deactivation prevents new work while preserving evidence and referential integrity.
 - Core and third-party departments pass the same validation and governance gates.
 - Provider SDK types never appear in DepartmentDefinition or DepartmentCapability contracts.
+- Adaptive feedback is deduplicated, bounded, and persisted; no feedback result directly creates an Objective.
+- Retryable, terminal, inconclusive, and escalated outcomes remain distinct and cannot be relabelled by Runtime or a consuming department.
 
 ## OSS evidence
 

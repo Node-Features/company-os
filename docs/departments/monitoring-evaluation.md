@@ -62,6 +62,22 @@ Evaluation criteria and collection plans should be fixed before execution when f
 
 Results, Evidence, Metrics, Evaluations, and follow-up questions cross the department boundary only through shared Application, event, workflow, artifact, evidence, and persistence contracts. M&E never calls an evaluated department or Finance implementation to obtain or publish them.
 
+## Failure semantics
+
+M&E follows the shared [adaptive-loop failure semantics](../architecture/departments.md#adaptive-loop-failure-semantics):
+
+- stale Results, Evidence, MetricDefinitions, benchmarks, evaluator calibration, or environment evidence is excluded or refreshed before evaluation;
+- insufficient samples, independence, coverage, data quality, or compatible Metrics produce `INCONCLUSIVE`, with the precise evidence gap preserved;
+- `INCONCLUSIVE` is a valid Evaluation outcome, not a failed check to be automatically retried until it passes;
+- transient benchmark infrastructure or evidence-access failure may be `RETRYABLE` without changing the frozen EvaluationDesign; a changed design creates a new version;
+- Evaluation deduplication fingerprints subject/version, question, design, benchmark, evidence set, environment, and observation window;
+- duplicate Result or event delivery cannot create another Metric, Evaluation, PerformanceProfile update, follow-up question, or Objective;
+- Governance `DENY` is terminal for a governed evaluation action; `REQUIRE_APPROVAL` is an escalation and never authorizes data access or publication;
+- incompatible evidence, invalidated benchmark, prohibited evaluation, expired design, or exhausted attempts is `TERMINAL` for that evaluation version;
+- conflicting high-impact evidence, evaluator-independence failure, repeated inconclusive outcomes, or exhausted feedback-loop bounds requires attributable human review.
+
+An Evaluation may recommend a follow-up ResearchQuestion or Objective proposal. It cannot create an Objective, change success criteria, or advance an objective workflow automatically.
+
 ## Independence and anti-gaming
 
 - The evaluated department cannot unilaterally define acceptance, select only favorable evidence, or edit the final evaluation.
@@ -87,6 +103,8 @@ M&E owns quality and outcome measurements, including cost-versus-quality curves.
 - Negative, inconclusive, and failed outcomes remain visible and affect performance evidence.
 - Comparisons use compatible task, environment, policy, and time contexts or disclose incompatibility.
 - Evaluation and performance evidence are persisted before dependent routing or objective decisions advance.
+- Inconclusive, duplicate, stale, denied, terminal, retryable, and escalated evaluations remain distinguishable in PerformanceProfile projections.
+- No Evaluation, Metric, or PerformanceProfile directly creates an Objective.
 
 ## Metrics and accountability
 

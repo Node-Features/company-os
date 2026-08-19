@@ -67,6 +67,23 @@ Reservations and estimates are persisted before execution where a hard limit app
 
 Budgets, constraints, reservations, usage, Metrics, Evaluations, and ResourceEvaluations cross the department boundary only through shared Application, event, workflow, evidence, and persistence contracts. Finance never calls M&E, Research, Intelligence, or Coding Agent implementations to obtain or publish them.
 
+## Failure semantics
+
+Finance follows the shared [adaptive-loop failure semantics](../architecture/departments.md#adaptive-loop-failure-semantics):
+
+- missing, stale, incompatible, or unverifiable pricing never defaults to zero, free, unlimited, or the last known price without an explicit validity rule;
+- a PriceProfile refresh may be `RETRYABLE` within source and time bounds; otherwise the cost or ResourceEvaluation is `INCONCLUSIVE` or the candidate is ineligible;
+- missing or indeterminate usage holds the applicable reservation and enters reconciliation; it cannot be silently released or recorded as zero;
+- insufficient allocation, outcome, Metric, Evaluation, currency, tax, or shared-cost evidence produces an explicit `INCONCLUSIVE` ResourceEvaluation;
+- ResourceEvaluation deduplication fingerprints the result/evaluation versions, usage records, PriceProfiles, allocation method, budget period, and comparison set;
+- duplicate billing, usage, event, or evaluation delivery cannot double-count cost, reserve resources twice, change a budget twice, or create duplicate feedback;
+- Governance `DENY` is terminal for the exact spend, exception, or budget-change proposal; `REQUIRE_APPROVAL` is an escalation and not available budget;
+- expired PriceProfiles, ResourceEvaluations, savings recommendations, or budget proposals cannot support new execution or Objective creation without revalidation;
+- invalid currency/unit conversion, forbidden spend, exhausted reconciliation, closed accounting period, or an irreparable attribution conflict is `TERMINAL` for that record version;
+- material unexplained variance, repeated missing pricing, indeterminate external charges, exhausted loop bounds, or a high-impact budget exception escalates to attributable human review.
+
+A ResourceEvaluation or budget recommendation may propose an Objective through a distinct Application use case. It cannot create an Objective, authorize spending, or alter a Budget automatically.
+
 ## Boundary with Research and M&E
 
 Research answers whether a cheaper/free alternative or market change exists and provides source evidence. Finance owns validated effective pricing, total resource implications, and budget fit. M&E owns measured quality, correctness, reliability, and outcomes.
@@ -87,6 +104,8 @@ Finance supplies exact ResourceConstraint versions, reservations, usage evidence
 - Failed, retried, rejected, and evaluation work is included in effective-cost analysis.
 - Missing or stale pricing and usage evidence produces explicit uncertainty or ineligibility according to policy.
 - Resource-limit and budget transitions are governed, versioned, persisted, and auditable.
+- Missing pricing, indeterminate usage, duplicate feedback, and inconclusive ResourceEvaluations fail closed and retain explicit dispositions.
+- No ResourceEvaluation, price signal, variance, or budget recommendation directly creates an Objective.
 
 ## Metrics and accountability
 

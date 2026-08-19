@@ -6,12 +6,12 @@ Statuses mirror existing document metadata. Rows marked `NOT YET SPECIFIED` are 
 
 | Document | Purpose | Status | Read when |
 |---|---|---|---|
-| `organization.md` | Organization identity and lifecycle | NOT YET SPECIFIED | Read when working with company-level state. |
+| `organization.md` | Organization identity, lifecycle, and isolation boundary | DRAFT | Read when working with company-level state or tenant scope. |
 | `objective.md` | Objective meaning and lifecycle | DRAFT | Read when creating or evaluating objectives. |
 | `department.md` | Department identity and contracts | DRAFT | Read when changing department semantics. |
 | `workflow.md` | Workflow state and transition invariants | DRAFT | Read when changing workflow semantics. |
-| `agent.md` | Agent identity, authority, and lifecycle | NOT YET SPECIFIED | Read when defining agent behavior. |
-| `capability.md` | Provider-independent capability semantics | NOT YET SPECIFIED | Read when requesting or implementing capabilities. |
+| `agent.md` | Agent definition, participation, and authority boundary | DRAFT | Read when defining agent behavior or lifecycle. |
+| `capability.md` | Provider-independent outcome and dispatch contract | DRAFT | Read when requesting, routing, or implementing capabilities. |
 | `principal.md` | Durable actor identity and delegation references | DRAFT | Read when identifying human, agent, service, or provider actors. |
 | `policy.md` | Organizational policy semantics | DRAFT | Read when defining governance rules. |
 | `approval.md` | Approval requests and decisions | DRAFT | Read when adding approval gates. |

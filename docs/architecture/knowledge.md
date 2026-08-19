@@ -6,38 +6,11 @@ Status: DRAFT
 
 CompanyOS Knowledge makes provenance-bearing organizational claims and syntheses discoverable without confusing retrieval output, model memory, conversation, evidence, or drafts with approved organizational truth.
 
-Knowledge owns claim/synthesis lifecycle, provenance and lineage, review status, validity and supersession, retrieval contracts, access policy inputs, and links to source artifacts and evidence. It does not own authoritative workflow state, raw artifact production, metric definitions, policy decisions, model inference, or storage technology.
+The canonical [Knowledge domain contract](../domain/knowledge.md) owns KnowledgeItem identity, fields, lifecycle, provenance semantics, and domain invariants. This architecture owns ingestion and curation flow, approval orchestration, retrieval ports and projections, source-impact processing, and persistence boundaries. It does not own authoritative workflow state, raw artifact production, metric definitions, policy decisions, model inference, or storage technology.
 
-## Knowledge model
+## Domain contracts
 
-| Concept | Definition |
-|---|---|
-| `KnowledgeItem` | A versioned atomic claim or bounded synthesis with stable identity, content, scope, provenance, status, validity and supersession links |
-| `SourceReference` | Immutable reference to an artifact, event, evidence record, approved document, external source, or human attestation, with digest/version when possible |
-| `Provenance` | Who or what produced the item, from which sources, by what method/model/tool/version, when, and under which organization and workflow context |
-| `KnowledgeReview` | Attributable human review of a specific immutable item version, linked to the Governance decision authorizing that reviewer and action |
-| `KnowledgeProjection` | Search, graph, embedding, summary, cache, or index derived from stored items; reproducible and disposable |
-
-An artifact is an output object. Evidence is an observation used to support a claim or decision. Knowledge is a curated, reusable claim or synthesis derived from sources. A metric is a versioned measurement derived under a definition. None becomes another merely by being indexed together.
-
-## Lifecycle and status
-
-Knowledge uses explicit lifecycle states:
-
-- `DRAFT`: captured or generated but not reviewed; returned only when the caller permits draft material.
-- `IN_REVIEW`: frozen candidate version awaiting accountable review.
-- `APPROVED`: accepted for its declared scope and validity period by a Governance-authorized human reviewer acting on the exact immutable item version.
-- `REJECTED`: reviewed and not accepted; retained as evidence subject to policy.
-- `SUPERSEDED`: replaced by a linked later approved version.
-- `EXPIRED`: no longer valid because its validity condition or review period ended.
-
-These are knowledge-record lifecycle states, not the documentation status vocabulary. Only `APPROVED` knowledge may be presented as canonical organizational knowledge, and even then only within its declared scope and validity. Drafts remain visually and structurally distinguishable in every retrieval result.
-
-## Required item fields
-
-Each version records item and version identity; organization and knowledge-scope identity; claim type; normalized content or artifact reference; status; authoring principal; creating workflow/department; source references; provenance method and tool/model versions; evidence links; confidence with interpretation; effective/expiry times; security classification; KnowledgeReview identity, reviewer Principal and authentication-evidence references, Governance decision and Authority versions, rationale reference and timestamp; supersedes/superseded-by links; and created/recorded timestamps.
-
-Confidence never substitutes for approval. A high-confidence generated statement remains `DRAFT`; an approved item may still express uncertainty.
+Knowledge architecture consumes the canonical [Knowledge](../domain/knowledge.md), [Artifact](../domain/artifact.md), [Evidence](../domain/evidence.md), [Event](../domain/event.md), [Metric](../domain/metric.md), and [Evaluation](../domain/evaluation.md) contracts. Their definitions, lifecycle states, fields, provenance, confidence, validity, and invariants are not restated here. Architecture coordinates their references and ports without changing their types or authority.
 
 ## Ingestion and curation
 
@@ -80,20 +53,15 @@ Contradictory approved items are not silently ranked away. They are returned or 
 | [Temporal workflow history](https://github.com/temporalio/temporal/tree/fb8894cfcc0a511b06146d291f673f715df3b51a/api/history/v1) | Execution history is optimized for deterministic recovery and audit of workflow mechanics | Reference history as provenance when relevant; reject replay history as a knowledge base |
 | [Inngest event model](https://github.com/inngest/inngest/blob/1f91829a35cccf2372768fef4aa275f56fbd4843/pkg/event/event.go) | Events preserve triggering data, identity, timestamp and version for function execution | Use persisted events as possible sources; reject event payloads as curated knowledge without review |
 
-## Invariants
+## Architectural invariants
 
-- Organizational knowledge has attributable provenance and source references.
-- Approved knowledge is structurally distinguishable from drafts, rejected, superseded, and expired versions.
-- Conversation, model output, agent memory, retrieved text, external content, and raw observations are not approved knowledge.
-- Every approved item identifies the Governance-authorized human reviewer, authenticated Principal evidence, Authority/policy versions, Governance decision, and exact reviewed version/content digest.
-- Knowledge approval cannot legalize a workflow transition, grant authority, or replace Governance.
-- Only an Application/Kernel transition backed by a current Governance `ALLOW` for `knowledge.approve` can set `APPROVED`.
-- Deterministic automatic knowledge approval is prohibited until a dedicated accepted ADR and governing policy explicitly enable narrowly defined cases.
-- Source retraction, expiry, or supersession triggers impact review; prior provenance is never erased by editing a projection.
-- Retrieval respects organization, security classification, purpose, status, and validity before relevance ranking.
-- Vector/search indexes and generated summaries are disposable projections, not canonical records.
-- Metrics and evidence retain their original identity when referenced by knowledge.
-- A department may own a knowledge scope but cannot read or publish outside its authority.
+- Ingestion, retrieval, indexing, and storage adapters cannot change KnowledgeItem lifecycle status.
+- Approval orchestration always passes through Application, Governance, Kernel, and atomic Persistence boundaries.
+- Approved retrieval projections update only after the authoritative transition commits and remain rebuildable from canonical records.
+- Retrieval applies organization, authority, classification, purpose, status, and validity filters before relevance ranking.
+- Projection failure or staleness cannot promote draft material, erase provenance, or make a projection authoritative.
+- Source expiry, retraction, supersession, or contradiction creates persisted impact-review work rather than silent projection edits.
+- Departments and providers access Knowledge only through governed contracts and cannot bypass knowledge-scope authority.
 
 ## OPEN QUESTIONS
 

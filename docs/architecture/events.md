@@ -4,58 +4,25 @@ Status: DRAFT
 
 ## Responsibility
 
-CompanyOS events are immutable, versioned records that something relevant occurred. Events support workflow coordination, audit, projections, metrics, and knowledge derivation without transferring ownership of organizational state to a transport or agent conversation.
+This architecture defines how CompanyOS events are transactionally recorded, published, routed, consumed, replayed, and evolved without transferring ownership of organizational state to a transport or agent conversation.
 
-This architecture owns event meaning, envelopes, identity, ordering expectations, publication guarantees, consumption rules, and the boundary between domain, workflow, integration, and communication records. It does not select a broker, define database tables, or make event delivery itself authoritative.
+The canonical [Event domain contract](../domain/event.md) owns event meaning, identity, envelope fields, and domain invariants. This architecture owns delivery boundaries, ordering expectations, publication guarantees, consumption rules, and integration projections. It does not select a broker, define database tables, or make event delivery itself authoritative.
 
-## Distinct records
+## Domain contracts
 
-| Concept | Meaning | Authority |
-|---|---|---|
-| `AgentMessage` | Communication content exchanged by a human, agent, provider, or tool within a session or channel | Non-authoritative input or evidence until validated by a domain operation |
-| `WorkflowEvent` | Immutable fact emitted by CompanyOS about a workflow or execution occurrence | Authoritative evidence of the recorded occurrence, but not the current workflow state |
-| `WorkflowState` | Current legal organizational workflow state at a specific version | Authoritative only when produced by Kernel rules and durably persisted |
-| `Checkpoint` | Versioned recovery material sufficient to resume execution mechanics | Runtime recovery evidence; never organizational truth by itself |
-| `Artifact` | Addressable output such as a report, patch, design, dataset, or deployment manifest | Content plus provenance; acceptance status determines organizational standing |
-| `Evidence` | Attributed observation used to justify a decision, evaluation, transition, or claim | Supports authority but does not grant it |
-| `Metric` | Versioned measurement derived from defined evidence over a scope and time window | Analytical result, not a state transition or policy decision |
-| `Knowledge` | Provenance-bearing organizational claim or synthesis curated for retrieval and reuse | Draft unless explicitly reviewed or derived under an approved rule |
+Event architecture consumes the canonical [Event](../domain/event.md), [Workflow](../domain/workflow.md), [Evidence](../domain/evidence.md), [Artifact](../domain/artifact.md), [Metric](../domain/metric.md), and [Knowledge](../domain/knowledge.md) contracts. Those documents own their definitions and invariants. Architecture preserves their distinct identities while routing references among them; it never converts conversation, delivery, checkpoint, artifact, evidence, metric, or knowledge records into events implicitly.
 
-Therefore `AgentMessage != WorkflowEvent`, `WorkflowEvent != WorkflowState`, and conversation history is never authoritative state.
+## Event routing
 
-## Event classes
-
-- **Domain event:** emitted with a persisted Kernel transition; states an organizational fact such as an objective transition or approval resolution.
-- **Workflow event:** records execution lifecycle facts such as intent scheduled, attempt started, wait entered, checkpoint created, capability returned, or attempt failed.
-- **Integration event:** a stable, minimized event published for another bounded context or external integration after its source fact is persisted.
-- **Audit event:** append-only evidence of a security- or governance-relevant request, decision, access, or action.
+- Domain and Workflow Events conform to the canonical Event contract and enter publication only after their owning transition commits.
+- Integration publication derives a stable, minimized representation for another bounded context or external integration without changing the source Event.
+- Security and governance audit streams retain attributable Event references and evidence while applying their own access and retention policy.
 
 An agent message may cause an application command. Only a successful Kernel decision coordinated by the [Application layer](application.md) and committed through Persistence may produce a domain event. Adapters translate external callbacks into untrusted inputs before validation; they do not relabel callbacks as CompanyOS facts.
 
-## Required envelope
+## Envelope use
 
-Every `WorkflowEvent` contains:
-
-| Field | Requirement |
-|---|---|
-| `eventId` | Globally unique, stable event identity used for deduplication |
-| `eventType` | Stable CompanyOS-owned semantic name |
-| `occurredAt` | Declared occurrence timestamp |
-| `recordedAt` | Persistence timestamp assigned by CompanyOS |
-| `correlationId` | Identity joining one objective/request flow across components |
-| `causationId` | Command or prior event that directly caused this event |
-| `workflowId` | Organizational workflow identity; required for workflow events |
-| `executionId` / `attemptId` | Runtime identities when applicable |
-| `organizationId` | Tenant boundary |
-| `departmentId` | Responsible or emitting department when applicable |
-| `principal` | Authenticated human, agent, or service attribution |
-| `payload` | Schema-validated, minimally sufficient event-specific facts |
-| `schemaVersion` | Payload/envelope compatibility version |
-| `aggregateVersion` | Resulting authoritative aggregate version when applicable |
-| `classification` | Security, privacy, retention, and redaction class |
-| `provenance` | Producing component, source references, and adapter/provider IDs where applicable |
-
-Timestamps do not define processing order. Per-aggregate versions establish transition order; consumers must tolerate delayed, duplicate, and cross-stream out-of-order delivery.
+Publishers and consumers use the canonical [Event minimum contract](../domain/event.md#minimum-contract) without extending its meaning locally. Transport delivery identity, queue position, publication attempt, acknowledgement, and consumer checkpoint remain execution metadata outside the domain envelope. Ordering decisions use the subject version defined by the domain contract rather than timestamps or broker position.
 
 ## Publication and consumption
 
@@ -85,17 +52,14 @@ Events are immutable. Corrections use a new compensating or superseding event an
 | [Inngest event model](https://github.com/inngest/inngest/blob/1f91829a35cccf2372768fef4aa275f56fbd4843/pkg/event/event.go) and [execution state](https://github.com/inngest/inngest/blob/1f91829a35cccf2372768fef4aa275f56fbd4843/pkg/execution/state/state.go) | Events have identity, timestamp, version, data, user/meta fields; runs separately track workflow/run/event identities and state | Borrow validated envelopes, deduplication, and identity correlation; reject an incoming event as trusted or sufficient authority |
 | [JARVIS event taxonomy](https://github.com/vierisid/jarvis/blob/6e144520c747a6e0b8673ba9b75769d5d5f10a9c/src/workflows/runtime/event-types.ts) and [event bus](https://github.com/vierisid/jarvis/blob/6e144520c747a6e0b8673ba9b75769d5d5f10a9c/src/workflows/runtime/event-bus.ts) | Central event names reduce publisher/subscriber drift; payload examples aid workflow composition | Borrow a governed catalog and typed payload contracts; reject in-process bus delivery or free-form observational events as durable organizational records |
 
-## Invariants
+## Architectural invariants
 
-- Agent messages, conversations, provider callbacks, logs, and telemetry are not CompanyOS events until validated and recorded through the owning boundary.
-- An event records an occurrence; it is never a substitute for loading current authoritative state.
-- State and its resulting domain events are persisted atomically before dependent execution or publication.
-- Application orchestration may coordinate event persistence and notification but cannot define event meaning or publish an uncommitted domain event.
-- Event identity, organization, correlation, causation, workflow, principal, timestamp, payload, and schema version are explicit when applicable.
-- Consumers assume at-least-once, delayed, and out-of-order delivery.
-- Event schemas are CompanyOS-owned and provider-independent.
-- Events cannot grant authority, approve themselves, or bypass Kernel legality.
-- Sensitive or large content is referenced with integrity and access metadata rather than copied into payloads.
+- Publication begins only from a persisted Event conforming to the canonical domain contract.
+- Application coordinates atomic recording but cannot redefine Event meaning or publish an uncommitted Event.
+- Delivery is treated as at-least-once, delayed, and potentially out of order; consumers persist deduplication and progress independently.
+- Consumer processing cannot rewrite the source Event or roll back its committed authoritative transition.
+- Transport acknowledgements, broker order, retries, and checkpoints remain delivery mechanics rather than organizational facts.
+- External callbacks and messages enter through adapters as untrusted input, never directly as publishable CompanyOS Events.
 
 ## OPEN QUESTIONS
 

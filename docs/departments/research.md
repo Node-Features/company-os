@@ -68,6 +68,8 @@ Research persists each accepted contract before dependent work advances. Materia
 - **Events:** may subscribe to persisted signals and evaluation/resource-evaluation events; emits only persisted research lifecycle facts.
 - **Knowledge:** proposes items with provenance. Approval follows the [Knowledge architecture](../architecture/knowledge.md).
 
+All inputs and outputs cross the department boundary as persisted shared contracts. A source department may be recorded as provenance, but Research resolves the contract through Application, event, workflow, artifact, evidence, or knowledge ports rather than invoking that department.
+
 ## Boundary with M&E and Finance
 
 Research may discover benchmark methods, provider claims, and prices. M&E owns measured performance and outcome evaluation. Finance owns normalized prices, budgets, cost allocation, and value/resource evaluation. Research does not rank providers for production use, certify quality, approve spending, or decide cost-effectiveness.
@@ -99,8 +101,12 @@ Research is accountable for question cycle time, source diversity and quality, p
 ## Dependencies
 
 - [Department architecture](../architecture/departments.md)
+- [Application layer](../architecture/application.md)
 - [Knowledge](../architecture/knowledge.md)
 - [Events](../architecture/events.md)
+- [Persistence](../architecture/persistence.md)
 - [Governance](../architecture/governance.md)
-- [Monitoring & Evaluation](monitoring-evaluation.md)
-- [Finance](finance.md)
+- [Metric domain](../domain/metric.md)
+- [Evaluation domain](../domain/evaluation.md)
+- [Resource domain](../domain/resource.md)
+- Future shared workflow, artifact, evidence, finding, recommendation, and resource-evaluation contracts

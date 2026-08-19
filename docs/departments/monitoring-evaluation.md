@@ -55,10 +55,12 @@ flowchart LR
     Metric --> Evaluation[Evaluation]
     Evaluation --> Profile[Performance evidence]
     Evaluation --> Question[New ResearchQuestion]
-    Evaluation --> Finance[Resource-evaluation input]
+    Evaluation --> Published[Persisted Evaluation contract]
 ```
 
 Evaluation criteria and collection plans should be fixed before execution when feasible. Post-hoc changes are versioned and disclosed. M&E preserves failures and negative results; missing evidence yields uncertainty, not invented success.
+
+Results, Evidence, Metrics, Evaluations, and follow-up questions cross the department boundary only through shared Application, event, workflow, artifact, evidence, and persistence contracts. M&E never calls an evaluated department or Finance implementation to obtain or publish them.
 
 ## Independence and anti-gaming
 
@@ -101,11 +103,10 @@ M&E itself is accountable for evaluation coverage, evidence completeness, detect
 ## Dependencies
 
 - [Department architecture](../architecture/departments.md)
+- [Application layer](../architecture/application.md)
 - [Events](../architecture/events.md)
 - [Persistence](../architecture/persistence.md)
 - [Metric domain](../domain/metric.md)
 - [Evaluation domain](../domain/evaluation.md)
-- [Intelligence](../architecture/intelligence.md)
-- [Coding agents](../architecture/coding-agents.md)
-- [Research](research.md)
-- [Finance](finance.md)
+- [Resource domain](../domain/resource.md)
+- Future shared workflow, result, artifact, evidence, research-question, and resource-evaluation contracts

@@ -57,13 +57,15 @@ flowchart LR
     Estimate --> Gate
     Gate --> Usage[ResourceUsage]
     Usage --> Actual[Normalized actual cost]
-    Outcome[M&E Evaluation] --> Value[ResourceEvaluation]
+    Outcome[Evaluation contract] --> Value[ResourceEvaluation]
     Actual --> Value
     Value --> Question[New ResearchQuestion]
     Value --> Budgeting[Forecast and budget update proposal]
 ```
 
 Reservations and estimates are persisted before execution where a hard limit applies. Actual usage is reconciled after execution. Budget changes and exceptional overruns require governed transitions; Finance cannot silently expand a limit to accommodate completed spending.
+
+Budgets, constraints, reservations, usage, Metrics, Evaluations, and ResourceEvaluations cross the department boundary only through shared Application, event, workflow, evidence, and persistence contracts. Finance never calls M&E, Research, Intelligence, or Coding Agent implementations to obtain or publish them.
 
 ## Boundary with Research and M&E
 
@@ -101,10 +103,11 @@ Finance is accountable for budget variance, forecast accuracy, cost attribution 
 ## Dependencies
 
 - [Department architecture](../architecture/departments.md)
+- [Application layer](../architecture/application.md)
 - [Governance](../architecture/governance.md)
+- [Events](../architecture/events.md)
 - [Persistence](../architecture/persistence.md)
 - [Resource domain](../domain/resource.md)
-- [Intelligence](../architecture/intelligence.md)
-- [Coding agents](../architecture/coding-agents.md)
-- [Research](research.md)
-- [Monitoring & Evaluation](monitoring-evaluation.md)
+- [Metric domain](../domain/metric.md)
+- [Evaluation domain](../domain/evaluation.md)
+- Future shared workflow, artifact, evidence, price, usage, budget, research-question, and resource-evaluation contracts

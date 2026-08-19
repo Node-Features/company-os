@@ -30,9 +30,25 @@ Departments coordinate only through:
 - versioned events for facts already accepted into authoritative state;
 - workflow contracts for governed multi-step collaboration;
 - capability requests for provider-independent outcomes;
+- artifact and evidence references with provenance and access policy;
+- canonical Evaluation, Metric, and ResourceConstraint contracts;
 - minimal shared Kernel abstractions for identities, commands, decisions, and invariants.
 
-Reading another department's public artifact through a governed shared contract is permitted. Calling its internal service or database is not.
+```mermaid
+flowchart LR
+    Research[Research implementation] --> Shared[Shared contracts]
+    ME[M&E implementation] --> Shared
+    Finance[Finance implementation] --> Shared
+    Shared --> Events[Events]
+    Shared --> Workflows[Workflows]
+    Shared --> Artifacts[Artifacts]
+    Shared --> Evidence[Evidence]
+    Shared --> Evaluations[Evaluations]
+    Shared --> Metrics[Metrics]
+    Shared --> Resources[Resource constraints]
+```
+
+Arrows mean “depend on,” not “write every contract.” Reading another department's public artifact through a governed shared contract is permitted. Calling its internal service or database is not. A documentation link to another department may explain responsibility but never creates an implementation, package, runtime, or storage dependency.
 
 ## DepartmentDefinition contract
 
@@ -116,8 +132,8 @@ flowchart LR
     Objective --> Execution[Department execution]
     Execution --> Result[Result]
     Result --> Metric[Metric]
-    Metric --> Evaluation[M&E Evaluation]
-    Evaluation --> Resource[Finance ResourceEvaluation]
+    Metric --> Evaluation[Evaluation contract]
+    Evaluation --> Resource[ResourceEvaluation contract]
     Resource --> NewQuestion[New ResearchQuestion]
     Evaluation --> NewQuestion
 ```
@@ -126,7 +142,7 @@ flowchart LR
 - [M&E](../departments/monitoring-evaluation.md) asks **did our actions work?** and owns measurement definitions, evaluations, and comparative performance evidence.
 - [Finance](../departments/finance.md) asks **was the outcome worth the resources consumed?** and owns budgets, normalized cost evidence, resource limits, and resource evaluations.
 
-The loop carries persisted contract records, not direct department calls. A recommendation is not an objective, an evaluation is not a governance decision, and a resource evaluation cannot retroactively redefine outcome quality. Governance gates proposals; the Kernel owns objective legality; executing departments own their results.
+The loop carries persisted shared-contract records through Application use cases, workflows, and events—not direct department calls. Producers publish contract identities and versions; consumers resolve them through shared ports. A recommendation is not an objective, an evaluation is not a governance decision, and a resource evaluation cannot retroactively redefine outcome quality. Governance gates proposals; the Kernel owns objective legality; executing departments own their results.
 
 ## Runtime interaction
 
@@ -142,6 +158,7 @@ The loop carries persisted contract records, not direct department calls. A reco
 - Adding or removing a department does not require changing Kernel fundamentals.
 - Every active department has exactly one active compatible definition version per organization unless migration semantics explicitly permit otherwise.
 - Departments do not import or call one another directly.
+- Department dependency manifests name shared contract IDs and versions, never another department implementation.
 - Department coordination uses registered events, workflows, capabilities, and shared Kernel abstractions.
 - A department cannot register a capability, workflow, event, metric, policy, or knowledge scope it does not have authority to own or use.
 - Required contracts must resolve before activation; optional contracts must declare degraded behavior.

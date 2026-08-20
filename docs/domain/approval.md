@@ -1,6 +1,6 @@
 # Approval Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

@@ -1,6 +1,6 @@
 # Workspace Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 
@@ -75,3 +75,4 @@ The Kernel enforces legal authoritative lifecycle transitions. Application coord
 - [Principal](principal.md)
 - [Resource](resource.md)
 - [Evidence](evidence.md)
+- [Execution](execution.md)

@@ -1,6 +1,6 @@
 # Model-Independent Intelligence Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

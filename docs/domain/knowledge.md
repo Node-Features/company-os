@@ -1,6 +1,6 @@
 # Knowledge Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

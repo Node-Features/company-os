@@ -1,40 +1,41 @@
 # Current State
 
 - **Last updated:** 2026-08-20
-- **Current phase:** Architecture audit correction
+- **Current phase:** All architecture and domain documents approved; first-slice technology stack drafted as `ADR-0004`, pending owner approval
 - **Architecture approver:** Project owner (`Node-Features`)
-- **Next task:** Perform Reconciliation B for Governance and Approval, preserving the canonical Workflow and command contracts
+- **Next task:** Project owner reviews `ADR-0004` (Go `companyd` for Kernel/Application/Governance/Identity/Runtime/Daemon; Next.js for UI and the Application adapter; Supabase/Postgres for persistence, state-plus-outbox, and notification) and, if satisfied, changes `Status: PROPOSED` to `Status: APPROVED`
 
 ## Approved material
 
-None.
+On 2026-08-20 the project owner explicitly approved, document by document following a guided review against the criteria in `docs/architecture/README.md` and `docs/adr/README.md`:
 
-## Draft material
+- `ARCHITECTURE.md`, the canonical top-level document;
+- all 14 `docs/architecture/*.md` documents: `system-context.md`, `identity.md`, `kernel.md`, `application.md`, `runtime.md`, `daemon.md`, `departments.md`, `intelligence.md`, `coding-agents.md`, `workspaces.md`, `governance.md`, `events.md`, `knowledge.md`, `persistence.md`;
+- all 20 `docs/domain/*.md` documents: `organization.md`, `objective.md`, `department.md`, `workflow.md`, `execution.md`, `agent.md`, `capability.md`, `command.md`, `principal.md`, `policy.md`, `approval.md`, `artifact.md`, `evidence.md`, `result.md`, `metric.md`, `evaluation.md`, `resource.md`, `workspace.md`, `event.md`, `knowledge.md`;
+- `docs/adr/ADR-0001-kernel-runtime-daemon.md`, `docs/adr/ADR-0002-pluggable-departments.md`, and `docs/adr/ADR-0003-model-independent-intelligence.md` — all three foundational ADRs.
 
-- `ARCHITECTURE.md` and all completed `docs/architecture/*.md` documents are drafts awaiting final audit and explicit owner approval.
-- Application orchestration now uses two-stage Kernel validation, exact Governance evaluation, atomic pending approval, and post-commit Runtime notification.
-- Organization, Identity, Principal, Agent, Capability, Command, Evaluation, Metric, Resource, Event, Evidence, Artifact, Objective, Workflow, Result, Workspace, and Knowledge contracts are drafts.
-- The Events/Persistence/Knowledge dependency direction and adaptive-department boundaries have been normalized.
-- Workflow is the first aggregate; `CREATE_WORKFLOW`, `START_WORKFLOW`, Runtime execution, `ACCEPT_WORKFLOW_RESULT`, and their transaction boundaries are specified as drafts.
-- Approval evaluation, lifecycle meaning, and persistence coordination now have distinct Governance, Domain, and Application owners.
-- Intelligence contracts specialize canonical Capability contracts; specialized components cannot persist authoritative mutations directly.
-- `docs/adr/ADR-0003-model-independent-intelligence.md` is proposed and not accepted.
+Gaps flagged during review were resolved before approval rather than approved with an asterisk: `docs/domain/workflow.md` now defines `FAILED` and `CANCELLED` terminal states, the `REJECT_WORKFLOW_RESULT` and `CANCEL_WORKFLOW` commands, and explicit `INDETERMINATE`/`PARTIAL` handling (previously only the successful path was specified), rippling into `command.md`, `result.md`, `application.md`, `persistence.md`, and `runtime.md`; `ADR-0003` gained a provider-substitution test plan; `ARCHITECTURE.md` gained an explicit mention of the `execution.md` contract under Runtime and had its stale "remains a draft" framing corrected; `ADR-0001` and `ADR-0002` had their acceptance criteria updated to note their underlying documents are now themselves `APPROVED`, not merely consistent drafts.
+
+## Remaining draft or proposed material
+
 - Research, Monitoring & Evaluation, and Finance department documents are drafts awaiting review.
 - `AGENTS.md`, `docs/INDEX.md`, `.companyos/agent-memory/`, and directory indexes await approval.
 - `docs/references/feature-provenance.md` is proposed pending source analysis and architecture review.
 
 ## Blockers
 
-- Architecture documents cannot be approved until applicable `CRITICAL` and `MAJOR` audit findings are resolved.
-- Runtime attempts, leases, checkpoints, waits, retries, and resume lack a minimum canonical execution-state contract.
-- A fresh read-only architecture audit is required after the remaining corrections before document approval or implementation.
+None currently open. Architecture and domain document approval was gated on applicable `CRITICAL`/`MAJOR` audit findings being resolved; the 2026-08-20 audit found none. This blocker re-activates only if a future audit finds one.
 
 ## Unresolved implementation choices
 
-- The initial Runtime implementation or adapter is not selected.
-- The minimal post-commit notification recovery mechanism is not selected.
-- The persistence adapter and state-plus-outbox versus event-sourcing choice are not selected.
-- The first concrete CapabilityDefinition satisfying `StartWorkflow` is not selected.
+All four are now proposed in `docs/adr/ADR-0004-first-slice-technology-stack.md`, pending project owner approval:
+
+- Runtime implementation: internal, in Go, inside `companyd`.
+- Persistence adapter: Supabase/Postgres, state-plus-outbox (not event sourcing).
+- Notification recovery: Supabase Realtime (`LISTEN`/`NOTIFY`) direct path plus a Runtime polling sweep fallback; no message broker.
+- First `CapabilityDefinition`: a minimal `IntelligenceCapability` for short bounded text generation, one `ModelProfile`/`ProviderAdapter`.
+
+`companyd` hosting is now decided: local development runs `companyd` via `air` (hot-reload) against Supabase; production runs `companyd` on a DigitalOcean VPS supervised by systemd, satisfying `daemon.md`'s external-supervision expectation. Remaining sub-questions (LLM provider, Next.js↔`companyd` transport, Supabase RLS design, first Retry policy defaults) stay tracked as `ADR-0004`'s open questions.
 
 ## Open questions
 

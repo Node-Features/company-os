@@ -1,6 +1,6 @@
 # Identity and Authentication Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

@@ -1,6 +1,6 @@
 # Artifact Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

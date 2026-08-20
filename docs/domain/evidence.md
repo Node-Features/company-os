@@ -1,6 +1,6 @@
 # Evidence Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

@@ -1,6 +1,6 @@
 # CompanyOS Governance Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

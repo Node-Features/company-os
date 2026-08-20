@@ -36,3 +36,13 @@ Only approved canonical documents and accepted ADRs establish project truth.
 ## Validation
 
 Before completion, inspect the diff; check links, terminology, ownership, applicable invariants, and unsupported implementation claims; report open questions without reproducing complete files.
+
+## Audit finding severity
+
+An audit or review classifies each finding so the approval gates in `docs/architecture/README.md` and `docs/adr/README.md` can be checked consistently rather than by unwritten judgment:
+
+- `CRITICAL`: an active contradiction, a bypassable authority/approval boundary, or two documents that could both be treated as authoritative for the same concept. Approval cannot proceed until resolved.
+- `MAJOR`: blocks confident implementation without yet demonstrating an active contradiction — for example a contract used by multiple documents is defined in only one, a load-bearing cross-reference is missing, or a lifecycle/vocabulary mismatch exists between an owning document and its consumers. Approval cannot proceed until resolved.
+- `MINOR`: worth fixing but does not block approval — stale wording, a harmless unresolved `OPEN QUESTION`, or a citation inconsistency that does not change meaning.
+
+State the severity explicitly when reporting audit or review findings rather than leaving it to be inferred.

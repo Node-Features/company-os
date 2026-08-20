@@ -1,6 +1,6 @@
 # Command Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 
@@ -27,6 +27,8 @@ The first slice permits exactly these Workflow command types:
 | `CREATE_WORKFLOW` | Request creation of one Workflow in its canonical initial state | Proposed Workflow identity; Objective, WorkflowDefinition, and first CapabilityDefinition identities/versions; initiating Principal; accepted input Artifact/Evidence references; applicable constraints. |
 | `START_WORKFLOW` | Request that one existing Workflow become executable | Workflow identity and expected version plus the exact referenced versions and inputs required by the canonical transition. |
 | `ACCEPT_WORKFLOW_RESULT` | Request authoritative acceptance of one Runtime-returned Result | Workflow identity and expected version; immutable Result identity/version/digest; ExecutionIntent, CapabilityRequest, and execution-attempt identities; Artifact/Evidence references required for acceptance. |
+| `REJECT_WORKFLOW_RESULT` | Request authoritative rejection of one Runtime-returned unsuccessful Result | Workflow identity and expected version; immutable Result identity/version/digest and its `FAILED`, `TIMED_OUT`, or `PARTIAL` outcome; ExecutionIntent, CapabilityRequest, and execution-attempt identities. |
+| `CANCEL_WORKFLOW` | Request authorized cancellation of one Workflow before it completes or fails | Workflow identity and expected version; requesting Principal; cancellation reason reference. |
 
 The canonical [Workflow lifecycle](workflow.md#first-slice-commands-and-legal-transitions) owns the prior states, legal transitions, and preconditions for these commands. A command expresses requested intent; its name never proves that the transition was accepted. Adding another command type requires its legal semantics to be defined by the owning domain first.
 
@@ -48,7 +50,9 @@ For the first slice, proposal validation maps commands to stable Actions without
 
 - `CREATE_WORKFLOW` → `workflow.create` on the proposed organization-scoped Workflow Resource;
 - `START_WORKFLOW` → `workflow.start` on the existing Workflow Resource;
-- `ACCEPT_WORKFLOW_RESULT` → `workflow.result.accept` on the existing Workflow and referenced Result Resource.
+- `ACCEPT_WORKFLOW_RESULT` → `workflow.result.accept` on the existing Workflow and referenced Result Resource;
+- `REJECT_WORKFLOW_RESULT` → `workflow.result.reject` on the existing Workflow and referenced Result Resource;
+- `CANCEL_WORKFLOW` → `workflow.cancel` on the existing Workflow Resource.
 
 ## KernelDecisionEnvelope
 

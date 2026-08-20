@@ -1,6 +1,6 @@
 # CompanyOS Workflow Runtime
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 
@@ -37,9 +37,9 @@ The Runtime does not own:
 3. Runtime claims the due persisted intent using a bounded lease and creates or resumes an execution attempt.
 4. Runtime dispatches a capability request to an eligible executor through a provider-independent contract.
 5. Results, failures, heartbeats, and provider identifiers are captured as execution evidence.
-6. Runtime submits the proposed immutable Result and execution evidence through a new Application use case. Application validates and coordinates persistence of those observations, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command referencing the persisted Result.
+6. Runtime submits the proposed immutable Result and execution evidence through a new Application use case. Application validates and coordinates persistence of those observations, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command for a `SUCCEEDED` Result or [`REJECT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) for a `FAILED`, `TIMED_OUT`, or `PARTIAL` Result, referencing the persisted Result.
 7. The Application layer reloads state, obtains a Kernel-validated proposal for that command, submits the exact proposal to Governance, and only on current `ALLOW` asks the Kernel for its final decision and coordinates any authoritative transition before dependent work is scheduled.
-8. Transient failures produce a durable next-attempt time; permanent or exhausted failures produce terminal execution Result evidence. The first-slice Workflow contract defines no authoritative transition for those outcomes, so Runtime cannot infer one.
+8. Transient failures produce a durable next-attempt time and no Result is submitted yet; permanent or exhausted failures produce terminal execution Result evidence that Application submits as `REJECT_WORKFLOW_RESULT`, per the [Workflow first-slice lifecycle](../domain/workflow.md#first-slice-lifecycle). An `INDETERMINATE` Result is recorded as execution evidence only; Runtime does not submit either command until reconciliation produces a definitive outcome.
 
 Waiting is persisted state plus a wake condition, not a sleeping process. Resume reconstructs execution from persisted state and is safe after duplicate wake-ups.
 
@@ -117,3 +117,4 @@ No inspected project is selected as a dependency. Temporal offers the strongest 
 - [Result](../domain/result.md)
 - [Evidence](../domain/evidence.md)
 - [Capability domain](../domain/capability.md)
+- [Execution domain](../domain/execution.md)

@@ -1,6 +1,6 @@
 # Capability Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

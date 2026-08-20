@@ -1,6 +1,6 @@
 # Event Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

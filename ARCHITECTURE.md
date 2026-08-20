@@ -1,8 +1,8 @@
 # CompanyOS Architecture
 
-Status: DRAFT
+Status: APPROVED
 
-This file is the canonical top-level architecture document for CompanyOS. It remains a draft until approved by the project owner.
+This file is the canonical top-level architecture document for CompanyOS, approved by the project owner per the criteria in [docs/architecture/README.md](docs/architecture/README.md#approval-authority). A material boundary or invariant change returns it to `DRAFT` unless an accepted ADR already authorizes that change.
 
 ## System boundary
 
@@ -17,7 +17,7 @@ See [System Context](docs/architecture/system-context.md) for actors, terminolog
 - **Kernel:** organizational semantics and invariants.
 - **Application:** use-case orchestration across Governance, Kernel, Persistence, and Runtime.
 - **Identity:** authentication and trusted evidence for durable Principal identities; see [Identity](docs/architecture/identity.md).
-- **Runtime:** workflow execution mechanics.
+- **Runtime:** workflow execution mechanics, including the canonical Execution-state contract for attempts, leases, checkpoints, waits, retries, and resume; see [Runtime](docs/architecture/runtime.md) and [Execution](docs/domain/execution.md).
 - **Daemon:** continuous availability and supervision.
 - **Departments:** pluggable organizational functions using shared contracts.
 - **Intelligence:** provider-independent intelligence capability and routing.

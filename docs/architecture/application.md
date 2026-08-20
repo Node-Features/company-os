@@ -1,6 +1,6 @@
 # CompanyOS Application Layer
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 
@@ -55,7 +55,7 @@ Transport headers, UI models, provider payloads, and agent messages are translat
 
 ## First vertical slice
 
-The first vertical slice coordinates `CREATE_WORKFLOW`, `START_WORKFLOW`, Runtime execution, and `ACCEPT_WORKFLOW_RESULT`. The [Workflow domain](../domain/workflow.md#first-slice-commands-and-legal-transitions) owns states, legal transitions, and preconditions; the [Command domain](../domain/command.md#first-slice-command-vocabulary) owns command meaning. Application owns only use-case sequencing and transaction coordination. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, resource, Result, and Runtime execution records remain external records referenced by immutable identity/version.
+The first vertical slice coordinates `CREATE_WORKFLOW`, `START_WORKFLOW`, Runtime execution, and the Runtime-result outcomes `ACCEPT_WORKFLOW_RESULT`, `REJECT_WORKFLOW_RESULT`, and `CANCEL_WORKFLOW`. The [Workflow domain](../domain/workflow.md#first-slice-commands-and-legal-transitions) owns states, legal transitions, and preconditions; the [Command domain](../domain/command.md#first-slice-command-vocabulary) owns command meaning. Application owns only use-case sequencing and transaction coordination. The Workflow is the aggregate root. Objective, WorkflowDefinition, CapabilityDefinition, Principal, policy, approval, resource, Result, and Runtime execution records remain external records referenced by immutable identity/version.
 
 The request uses the canonical [WorkflowCommandEnvelope](../domain/command.md#workflowcommandenvelope). Application validates its shape and loads its referenced authoritative versions; it does not redefine or infer missing command fields.
 
@@ -96,7 +96,11 @@ Read-only use cases still enforce organization, identity, authorization, classif
 
 ## Runtime-result use case
 
-Runtime returns execution evidence and a proposed immutable Result through a new Application request. Application validates and coordinates persistence of those observations without changing Workflow state, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command referencing the persisted Result. Application reloads current authoritative state, asks the Kernel to perform preliminary proposal validation, and submits the resulting immutable `GovernedCommandProposal` to Governance. `DENY` and `REQUIRE_APPROVAL` follow the same non-transition and pending-approval paths as other commands. Only on a current `ALLOW` does Application ask the Kernel for the final decision, then atomically persist the accepted Result reference, state, and events before Runtime advances.
+Runtime returns execution evidence and a proposed immutable Result through a new Application request. Application validates and coordinates persistence of those observations without changing Workflow state, then constructs the canonical [`ACCEPT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) command for a `SUCCEEDED` outcome, or [`REJECT_WORKFLOW_RESULT`](../domain/command.md#first-slice-command-vocabulary) for a `FAILED`, `TIMED_OUT`, or `PARTIAL` outcome, referencing the persisted Result. An `INDETERMINATE` outcome constructs neither command; Application persists the observation and leaves the Workflow at its current state pending reconciliation. Application reloads current authoritative state, asks the Kernel to perform preliminary proposal validation, and submits the resulting immutable `GovernedCommandProposal` to Governance. `DENY` and `REQUIRE_APPROVAL` follow the same non-transition and pending-approval paths as other commands. Only on a current `ALLOW` does Application ask the Kernel for the final decision, then atomically persist the accepted or rejected Result reference, state, and events before Runtime advances.
+
+## Cancellation use case
+
+An authorized Principal (human or service, per applicable policy) may request `CANCEL_WORKFLOW` while a Workflow is `PLANNED` or `READY`. This follows the same state-changing use case as any other command: proposal validation, Governance evaluation, and only on current `ALLOW` a final Kernel decision that transitions the Workflow to `CANCELLED`. If the Workflow was `READY`, Application also notifies Runtime that the outstanding ExecutionIntent is cancelled; Runtime's acknowledgement is a recoverable wake-up hint, not a precondition for the commit having already succeeded.
 
 The final Kernel stage revalidates the unchanged proposal digest against current authoritative state; Governance permission cannot make an invalid result transition legal. Runtime never calls a storage adapter to mark organizational work complete. A provider callback, checkpoint, success message, artifact, or exit code cannot bypass either Kernel stage, Governance, or the Application-coordinated commit.
 

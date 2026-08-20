@@ -1,6 +1,6 @@
 # Principal Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

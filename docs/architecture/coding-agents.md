@@ -1,6 +1,6 @@
 # Coding-Agent Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

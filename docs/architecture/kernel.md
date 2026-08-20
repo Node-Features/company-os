@@ -1,6 +1,6 @@
 # CompanyOS Kernel
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

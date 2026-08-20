@@ -1,6 +1,6 @@
 # Engineering Workspace Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

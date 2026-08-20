@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/status-pre--alpha-6f42c1?style=flat-square" alt="Status: Pre-alpha" />
-  <img src="https://img.shields.io/badge/architecture-in%20design-0969da?style=flat-square" alt="Architecture in design" />
+  <img src="https://img.shields.io/badge/architecture-approved-2da44e?style=flat-square" alt="Architecture approved" />
   <img src="https://img.shields.io/badge/open%20source-built%20for%20contributors-2da44e?style=flat-square" alt="Open Source" />
 </p>
 
@@ -208,8 +208,8 @@ Detailed architecture lives under:
 
 **[`docs/architecture/`](docs/architecture/)**
 
-> Architecture is currently being specified and audited.  
-> DRAFT documents are not treated as accepted architectural decisions.
+> All 14 `docs/architecture/` documents, all 20 `docs/domain/` documents, and `ADR-0001` through `ADR-0003` are **approved** (2026-08-20).  
+> The first-slice technology stack — Go (`companyd`) for Kernel, Application, Governance, Identity, Runtime, and Daemon; Next.js for UI and APIs; Supabase for persistence — is proposed in **[ADR-0004](docs/adr/ADR-0004-first-slice-technology-stack.md)**, pending approval.
 
 ---
 
@@ -467,9 +467,9 @@ CompanyOS is currently in its **architecture and documentation-control phase**.
 - [x] Define project direction
 - [x] Establish documentation hierarchy
 - [x] Establish open-source provenance process
-- [ ] Complete architecture reconciliation
-- [ ] Resolve remaining ownership boundaries
-- [ ] Accept foundational ADRs
+- [x] Complete architecture reconciliation
+- [x] Resolve remaining ownership boundaries
+- [x] Accept foundational ADRs
 
 ### Phase 1 — First vertical slice
 
@@ -576,11 +576,11 @@ Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
 ## Project status
 
 > [!WARNING]
-> **CompanyOS is currently pre-alpha.**
+> **CompanyOS is currently pre-alpha. No implementation exists yet.**
 >
-> The repository is primarily defining architecture, domain semantics, governance boundaries, reference provenance, and the first executable vertical slice.
+> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0003`). The first-slice technology stack is proposed in `ADR-0004`, pending approval. The repository is now moving toward the first executable vertical slice.
 >
-> Documentation marked **DRAFT** is not an accepted architectural contract unless an accepted ADR or canonical domain specification explicitly establishes it.
+> Documentation marked **DRAFT** or **PROPOSED** is not an accepted contract until the project owner explicitly approves it.
 
 No production-ready autonomous-company runtime is claimed at this stage.
 

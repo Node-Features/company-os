@@ -1,6 +1,6 @@
 # Organizational Knowledge Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

@@ -1,6 +1,6 @@
 # Evaluation Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Ownership
 

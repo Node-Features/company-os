@@ -1,6 +1,6 @@
 # CompanyOS Daemon
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

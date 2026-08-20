@@ -1,6 +1,6 @@
 # Organization Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 

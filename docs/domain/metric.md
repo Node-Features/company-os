@@ -1,6 +1,6 @@
 # Metric Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Ownership
 

@@ -1,6 +1,6 @@
 # Persistence Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 
@@ -57,6 +57,8 @@ The first slice uses these explicit transaction boundaries:
 3. **Workflow start:** atomically persist the KernelDecisionEnvelope for accepted `START_WORKFLOW`, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and its ExecutionIntent.
 4. **Runtime execution and result reporting:** claims, leases, attempts, heartbeats, waits, retries, and checkpoints commit through ExecutionRepository. Runtime submits execution Evidence and a proposed immutable Result through Application, which coordinates their persistence through the applicable ports without changing Workflow state. These records cannot rewrite Governance evidence, Approval consumption, or the originating ExecutionIntent.
 5. **Result acceptance:** atomically persist the KernelDecisionEnvelope for accepted `ACCEPT_WORKFLOW_RESULT`, accepted immutable Result reference, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and final Workflow version. It creates no further ExecutionIntent in this slice.
+6. **Result rejection:** atomically persist the KernelDecisionEnvelope for accepted `REJECT_WORKFLOW_RESULT`, the rejected immutable Result reference, resulting DomainEvents, GovernanceDecision reference, closure of any PendingCommand, consumption of applicable single-use Approval, idempotency outcome, and final `FAILED` Workflow version. An `INDETERMINATE` Result is persisted as execution evidence only, through the ExecutionRepository, and causes no Workflow-state transaction.
+7. **Workflow cancellation:** atomically persist the KernelDecisionEnvelope for accepted `CANCEL_WORKFLOW`, resulting DomainEvents, GovernanceDecision reference, idempotency outcome, and final `CANCELLED` Workflow version. If the Workflow was `READY`, cancellation of the outstanding ExecutionIntent is recorded in the same transaction as durable intent for Runtime to observe; it does not require Runtime's acknowledgement to commit.
 
 The domain-owned [first-slice command/transition table](../domain/workflow.md#first-slice-commands-and-legal-transitions) defines legality; this document defines only the required atomic storage boundaries. Any failure of a listed atomic write commits none of that boundary.
 
@@ -120,4 +122,4 @@ An EventRepository/outbox may publish records after the accepted transaction, bu
 - [Evidence](../domain/evidence.md)
 - [Metric](../domain/metric.md)
 - [Knowledge](../domain/knowledge.md)
-- Future execution-state domain contract
+- [Execution-state domain contract](../domain/execution.md)

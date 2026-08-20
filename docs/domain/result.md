@@ -1,6 +1,6 @@
 # Result Domain
 
-Status: DRAFT
+Status: APPROVED
 
 ## Definition
 
@@ -20,7 +20,7 @@ A Result contains:
 - error classification, retryability claim, and reconciliation reference when applicable;
 - integrity, provenance, and security classification.
 
-Result acceptance is a separate Kernel decision. The first slice submits [`ACCEPT_WORKFLOW_RESULT`](command.md#first-slice-command-vocabulary) and uses the legal transition owned by the [Workflow domain](workflow.md#first-slice-commands-and-legal-transitions). Other slices may reject a Result, request more evidence, or create further intent only after their owning domain defines those semantics.
+Result acceptance and rejection are separate Kernel decisions. The first slice submits [`ACCEPT_WORKFLOW_RESULT`](command.md#first-slice-command-vocabulary) for a `SUCCEEDED` outcome or [`REJECT_WORKFLOW_RESULT`](command.md#first-slice-command-vocabulary) for a `FAILED`, `TIMED_OUT`, or `PARTIAL` outcome, using the legal transitions owned by the [Workflow domain](workflow.md#first-slice-commands-and-legal-transitions). An `INDETERMINATE` outcome advances neither command in this slice. Requesting more evidence or creating further intent from a Result remains future work once an owning domain defines those semantics.
 
 ## Invariants
 

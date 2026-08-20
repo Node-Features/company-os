@@ -1,6 +1,6 @@
 # CompanyOS Department Architecture
 
-Status: DRAFT
+Status: APPROVED
 
 ## Responsibility
 

@@ -431,6 +431,20 @@ CompanyOS
 │   └── references/
 │       Open-source research and provenance
 │
+├── apps/
+│   ├── companyd/
+│   │   Go service scaffold — Kernel, Application, Governance, Identity,
+│   │   Runtime, and Daemon per ADR-0004. HTTP health endpoint and a
+│   │   Postgres adapter are wired; domain packages are still stubs.
+│   │
+│   └── web/
+│       Next.js UI + thin API adapter scaffold, wired to Supabase Auth
+│       and to companyd's health endpoint.
+│
+├── supabase/
+│   CLI project root (config.toml, migrations/) for the hosted
+│   Supabase project. No schema exists yet.
+│
 └── .companyos/
     └── agent-memory/
         Compact, non-canonical context for coding agents
@@ -490,6 +504,11 @@ Persisted result
    ↓
 Event
 ```
+
+- [x] `companyd` (Go) and `web` (Next.js) scaffolds build cleanly
+- [x] `web` ↔ Supabase and `web` ↔ `companyd` ↔ Postgres connectivity verified end-to-end (`/api/health`)
+- [ ] First domain persistence: `workflows` table + a real `AuthoritativeStateRepository` adapter
+- [ ] `CREATE_WORKFLOW` → `START_WORKFLOW` → `ACCEPT_WORKFLOW_RESULT` through the Kernel
 
 ### Phase 2 — Governed execution
 
@@ -576,9 +595,11 @@ Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
 ## Project status
 
 > [!WARNING]
-> **CompanyOS is currently pre-alpha. No implementation exists yet.**
+> **CompanyOS is currently pre-alpha. No governed domain logic exists yet.**
 >
-> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0003`). The first-slice technology stack is proposed in `ADR-0004`, pending approval. The repository is now moving toward the first executable vertical slice.
+> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0003`). The first-slice technology stack is proposed in `ADR-0004`, pending approval.
+>
+> A connected scaffold exists under `apps/` and `supabase/`: `companyd` (Go) and `web` (Next.js) build cleanly, and `web` → Supabase → `companyd` → Postgres connectivity is verified end-to-end. No Kernel, Governance, or workflow persistence logic has been implemented — the domain packages in `apps/companyd/internal/` are still stubs.
 >
 > Documentation marked **DRAFT** or **PROPOSED** is not an accepted contract until the project owner explicitly approves it.
 

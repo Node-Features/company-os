@@ -3,7 +3,7 @@
 - **Last updated:** 2026-08-20
 - **Current phase:** All architecture and domain documents approved; first-slice technology stack drafted as `ADR-0004`, pending owner approval
 - **Architecture approver:** Project owner (`Node-Features`)
-- **Next task:** Project owner reviews `ADR-0004` (Go `companyd` for Kernel/Application/Governance/Identity/Runtime/Daemon; Next.js for UI and the Application adapter; Supabase/Postgres for persistence, state-plus-outbox, and notification) and, if satisfied, changes `Status: PROPOSED` to `Status: APPROVED`
+- **Next task:** `ROADMAP.md#phase-1--first-vertical-slice` now has an ordered, buildable checklist (Slices 0-7). Slice 0 is approving `ADR-0004` (Go `companyd` for Kernel/Application/Governance/Identity/Runtime/Daemon; Next.js for UI and the Application adapter; Supabase/Postgres for persistence, state-plus-outbox, and notification) — the scaffold under `apps/` and `supabase/` already matches its proposal and builds cleanly, with `web` → Supabase → `companyd` → Postgres connectivity verified end-to-end, but contains no domain logic yet.
 
 ## Approved material
 

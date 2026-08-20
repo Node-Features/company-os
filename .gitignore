@@ -1,0 +1,23 @@
+# Go
+apps/companyd/tmp/
+apps/companyd/companyd
+*.exe
+
+# Node / Next.js
+node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+
+# Env
+.env
+.env.local
+*.env
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# OS / editor
+.DS_Store
+Thumbs.db

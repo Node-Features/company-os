@@ -1,0 +1,12 @@
+{
+  "name": "company-os",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repo-root tooling for CompanyOS (Supabase CLI). App code lives in apps/web and apps/companyd.",
+  "scripts": {
+    "supabase": "supabase"
+  },
+  "devDependencies": {
+    "supabase": "^2.115.0"
+  }
+}

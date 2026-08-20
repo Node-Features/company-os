@@ -92,12 +92,7 @@ Registration is idempotent for identical `(id, version, digest)` and rejects a d
 
 ## Lifecycle and removal
 
-Proposed lifecycle:
-
-```text
-REGISTERED -> VALIDATED -> ACTIVE -> DISABLED -> RETIRED
-                  \-----------------> REJECTED
-```
+The canonical [Department lifecycle](../domain/department.md#department-lifecycle) applies, including its `VALIDATED` state between registration and activation.
 
 Disabling stops new work and subscriptions but preserves identity, history, artifacts, approvals, metrics, and knowledge provenance. Removal requires dependency analysis, draining or migration of running workflows, reassignment of memberships and owned contracts, and preservation of historical resolution. Physical package deletion is a deployment concern and cannot erase the domain record.
 

@@ -4,7 +4,6 @@ This directory indexes CompanyOS documentation without duplicating its canonical
 
 | Area | Responsibility | Status | Read when |
 |---|---|---|---|
-| [Project state](project-state.md) | Current progress, blockers, and open questions | DRAFT | Read at the start of every task. |
 | [Architecture](architecture/README.md) | Architectural boundaries and component ownership | NOT YET SPECIFIED | Read when making or reviewing architectural decisions. |
 | [Domain](domain/README.md) | Domain definitions and invariants | NOT YET SPECIFIED | Read when working with organizational concepts or state. |
 | [Workflows](workflows/README.md) | End-to-end workflow semantics | NOT YET SPECIFIED | Read when defining or changing workflow behavior. |

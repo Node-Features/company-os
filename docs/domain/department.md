@@ -70,11 +70,11 @@ Membership lifecycle is proposed as `PROPOSED -> ACTIVE -> SUSPENDED -> ENDED`, 
 The Department identity persists independently of any definition version or implementation package. Proposed lifecycle:
 
 ```text
-REGISTERED -> ACTIVE -> DISABLED -> RETIRED
-          \-> REJECTED
+REGISTERED -> VALIDATED -> ACTIVE -> DISABLED -> RETIRED
+                  \-----------------> REJECTED
 ```
 
-Activation requires one validated compatible DepartmentDefinition. Disablement stops new work but preserves existing state and may require Runtime draining. Retirement prevents reactivation under that identity while preserving all historical evidence.
+`VALIDATED` means the current DepartmentDefinition version has passed schema, reference, and compatibility validation but has not yet been authorized to accept work. Activation requires one validated compatible DepartmentDefinition. Disablement stops new work but preserves existing state and may require Runtime draining. Retirement prevents reactivation under that identity while preserving all historical evidence.
 
 ## Coordination rules
 

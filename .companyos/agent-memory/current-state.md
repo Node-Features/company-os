@@ -1,6 +1,6 @@
 # Current State
 
-- **Last updated:** 2026-08-19
+- **Last updated:** 2026-08-20
 - **Current phase:** Architecture audit correction
 - **Architecture approver:** Project owner (`Node-Features`)
 - **Next task:** Perform Reconciliation B for Governance and Approval, preserving the canonical Workflow and command contracts
@@ -27,7 +27,6 @@ None.
 
 - Architecture documents cannot be approved until applicable `CRITICAL` and `MAJOR` audit findings are resolved.
 - Runtime attempts, leases, checkpoints, waits, retries, and resume lack a minimum canonical execution-state contract.
-- Department lifecycle conflicts: the domain transitions directly from `REGISTERED` to `ACTIVE`, while Department architecture introduces `VALIDATED` as a state.
 - A fresh read-only architecture audit is required after the remaining corrections before document approval or implementation.
 
 ## Unresolved implementation choices

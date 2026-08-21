@@ -13,9 +13,54 @@ import (
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/httpapi"
+	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/anthropic"
+	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/fallback"
+	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/gemini"
+	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/openai"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/persistence/supabase"
+	"github.com/Node-Features/company-os/apps/companyd/internal/application"
+	"github.com/Node-Features/company-os/apps/companyd/internal/daemon"
+	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
+	"github.com/Node-Features/company-os/apps/companyd/internal/runtime"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
+
+// providerCooldown is how long a provider is skipped after a
+// rate-limit/outage failure before internal/adapters/intelligence/fallback
+// tries it again.
+const providerCooldown = 60 * time.Second
+
+// buildProviders constructs one fallback.Provider per configured API key,
+// in priority order Gemini, OpenAI, Anthropic. Priority order is a
+// deployment choice (first-slice plan), not an architectural ranking —
+// docs/architecture/intelligence.md's evidence-based Router (M&E
+// reliability, Finance cost, Governance eligibility) is Phase 3+ work; this
+// is a much narrower "don't retry a provider that just rate-limited us"
+// concern, scoped entirely inside the ProviderAdapter port.
+func buildProviders(ctx context.Context) []fallback.Provider {
+	var providers []fallback.Provider
+
+	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
+		p, err := gemini.New(ctx, key)
+		if err != nil {
+			log.Printf("companyd: gemini adapter: %v", err)
+		} else {
+			providers = append(providers, fallback.Provider{Name: "gemini", Adapter: p})
+		}
+	}
+	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+		providers = append(providers, fallback.Provider{Name: "openai", Adapter: openai.New(key)})
+	}
+	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+		providers = append(providers, fallback.Provider{Name: "anthropic", Adapter: anthropic.New(key)})
+	}
+
+	if len(providers) == 0 {
+		log.Println("companyd: no GEMINI_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY set — Runtime dispatch will fail every attempt")
+	}
+	return providers
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -33,18 +78,67 @@ func main() {
 	// nil until DATABASE_URL is configured, so /health can honestly report
 	// "not_configured" instead of a misleading connection failure.
 	var db httpapi.DBPinger
+	var pool *supabase.Pool
 	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
-		pool, err := supabase.Connect(ctx, dsn)
+		p, err := supabase.Connect(ctx, dsn)
 		if err != nil {
 			log.Printf("companyd: failed to connect to database: %v", err)
 		} else {
-			defer pool.Close()
-			db = pool
+			defer p.Close()
+			db = p
+			pool = p
 		}
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", httpapi.HealthHandler(db))
+
+	// Kernel, Application, Governance, Identity, Runtime, and Daemon are
+	// co-located in this one process per ADR-0004. They require a database
+	// connection; without one companyd still serves /health in a degraded
+	// state rather than failing to start.
+	var d *daemon.Daemon
+	if pool != nil {
+		providers := buildProviders(ctx)
+		provider := fallback.New(providers, providerCooldown)
+		if len(providers) > 0 {
+			log.Printf("companyd: intelligence providers (priority order, %s cooldown on rate-limit/outage): %s", providerCooldown, provider)
+		}
+
+		wakeup := make(chan uuid.UUID, 16)
+		app := &application.Application{
+			Repo:     supabase.NewWorkflowRepository(pool),
+			Pending:  supabase.NewPendingCommandRepository(pool),
+			Exec:     supabase.NewExecutionRepository(pool),
+			Fixtures: fixtures.NewRegistry(),
+			Notify:   wakeup,
+		}
+		rt := &runtime.Runtime{
+			Exec:          supabase.NewExecutionRepository(pool),
+			App:           app,
+			Provider:      provider,
+			ProviderName:  provider.String(),
+			Fixtures:      fixtures.NewRegistry(),
+			PollInterval:  5 * time.Second,
+			LeaseDuration: 60 * time.Second,
+			Wakeup:        wakeup,
+		}
+		d = daemon.New(rt)
+
+		mux.HandleFunc("POST /v1/workflows", httpapi.CreateWorkflowHandler(app))
+		mux.HandleFunc("POST /v1/workflows/{workflowId}/start", httpapi.StartWorkflowHandler(app))
+		mux.HandleFunc("POST /v1/workflows/{workflowId}/results/accept", httpapi.AcceptResultHandler(app))
+		mux.HandleFunc("POST /v1/workflows/{workflowId}/results/reject", httpapi.RejectResultHandler(app))
+		mux.HandleFunc("GET /v1/workflows/{workflowId}", httpapi.GetWorkflowHandler(app))
+
+		if err := d.Start(ctx); err != nil {
+			log.Printf("companyd: daemon start error: %v", err)
+		} else {
+			log.Println("companyd: daemon started (Runtime dispatch loop running)")
+		}
+	} else {
+		log.Println("companyd: no DATABASE_URL — Kernel/Application/Runtime/Daemon not started, /v1/workflows routes unavailable")
+	}
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
@@ -53,10 +147,6 @@ func main() {
 			log.Printf("companyd: http server error: %v", err)
 		}
 	}()
-
-	// TODO: construct Kernel, Application, Governance, Identity, Runtime, and
-	// Daemon, then run the Daemon lifecycle described in
-	// docs/architecture/daemon.md#lifecycle.
 
 	<-ctx.Done()
 	log.Println("companyd: shutdown signal received, draining")
@@ -67,7 +157,9 @@ func main() {
 		log.Printf("companyd: http server shutdown error: %v", err)
 	}
 
-	// TODO: stop accepting work, drain bounded in-flight operations,
-	// checkpoint or abandon leases safely, then close dependencies,
-	// per docs/architecture/daemon.md#lifecycle.
+	if d != nil {
+		if err := d.Shutdown(shutdownCtx); err != nil {
+			log.Printf("companyd: daemon shutdown error: %v", err)
+		}
+	}
 }

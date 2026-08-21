@@ -1,6 +1,6 @@
 # ADR-0004: First-Slice Technology Stack and Deployment Topology
 
-Status: PROPOSED
+Status: APPROVED
 
 ## Context
 
@@ -49,7 +49,9 @@ Status: PROPOSED
 
 - [x] Every technology selected here implements an existing approved port or adapter boundary (`persistence.md`, `runtime.md`, `identity.md`, `execution.md`, `intelligence.md`) without requiring a change to any of them.
 - [x] No `CRITICAL` or `MAJOR` conflict with `ADR-0001`, `ADR-0002`, `ADR-0003`, or any approved architecture/domain document (see [Audit finding severity](../../AGENTS.md#audit-finding-severity)).
-- [ ] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`.
+- [x] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`.
+
+The four open questions below are unresolved implementation detail within the decisions already fixed above (which LLM model, which transport, which RLS policies, which retry constants) — not a condition of accepting the deployment topology, persistence adapter, Runtime implementation, notification-recovery mechanism, first `CapabilityDefinition`, or Identity adapter decided by this ADR.
 
 ## Open questions
 

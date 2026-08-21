@@ -208,8 +208,8 @@ Detailed architecture lives under:
 
 **[`docs/architecture/`](docs/architecture/)**
 
-> All 14 `docs/architecture/` documents, all 20 `docs/domain/` documents, and `ADR-0001` through `ADR-0003` are **approved** (2026-08-20).  
-> The first-slice technology stack — Go (`companyd`) for Kernel, Application, Governance, Identity, Runtime, and Daemon; Next.js for UI and APIs; Supabase for persistence — is proposed in **[ADR-0004](docs/adr/ADR-0004-first-slice-technology-stack.md)**, pending approval.
+> All 14 `docs/architecture/` documents, all 20 `docs/domain/` documents, and `ADR-0001` through `ADR-0004` are **approved** (`ADR-0001`–`ADR-0003` on 2026-08-20, `ADR-0004` on 2026-08-21).  
+> The first-slice technology stack — Go (`companyd`) for Kernel, Application, Governance, Identity, Runtime, and Daemon; Next.js for UI and APIs; Supabase for persistence — is fixed in **[ADR-0004](docs/adr/ADR-0004-first-slice-technology-stack.md)**. Its LLM provider, Next.js↔`companyd` transport, Supabase RLS design, and Retry policy defaults remain open implementation questions within that decision.
 
 ---
 
@@ -433,17 +433,21 @@ CompanyOS
 │
 ├── apps/
 │   ├── companyd/
-│   │   Go service scaffold — Kernel, Application, Governance, Identity,
-│   │   Runtime, and Daemon per ADR-0004. HTTP health endpoint and a
-│   │   Postgres adapter are wired; domain packages are still stubs.
+│   │   Go service — Kernel, Application, Governance, Runtime, and Daemon
+│   │   implemented for the first vertical slice (ADR-0004), dispatching
+│   │   to Gemini/OpenAI/Anthropic behind an automatic-fallback router.
+│   │   Identity is still a stub — no real authentication yet.
 │   │
 │   └── web/
-│       Next.js UI + thin API adapter scaffold, wired to Supabase Auth
-│       and to companyd's health endpoint.
+│       Next.js UI + thin API adapter, wired to companyd's Workflow API
+│       (create/start/status) with a live-polling trigger page. Supabase
+│       client scaffolding exists for future auth, not yet used for
+│       real sign-in.
 │
 ├── supabase/
-│   CLI project root (config.toml, migrations/) for the hosted
-│   Supabase project. No schema exists yet.
+│   CLI project root (config.toml, migrations/) for the hosted Supabase
+│   project. First-slice schema applied: workflows, domain_events,
+│   execution_intents/attempts, results, governance_decisions, and more.
 │
 └── .companyos/
     └── agent-memory/
@@ -474,7 +478,7 @@ This keeps both humans and coding agents from loading unnecessary context.
 
 ## Roadmap
 
-CompanyOS is currently in its **architecture and documentation-control phase**.
+CompanyOS has an approved architecture and a working first vertical slice — `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT/REJECT_WORKFLOW_RESULT` runs end to end against the real database and a real provider call. Work is moving into governed execution, the adaptive-organization departments, and production readiness.
 
 ### Phase 0 — Foundation
 
@@ -507,8 +511,9 @@ Event
 
 - [x] `companyd` (Go) and `web` (Next.js) scaffolds build cleanly
 - [x] `web` ↔ Supabase and `web` ↔ `companyd` ↔ Postgres connectivity verified end-to-end (`/api/health`)
-- [ ] First domain persistence: `workflows` table + a real `AuthoritativeStateRepository` adapter
-- [ ] `CREATE_WORKFLOW` → `START_WORKFLOW` → `ACCEPT_WORKFLOW_RESULT` through the Kernel
+- [x] First domain persistence: `workflows` table + a real `AuthoritativeStateRepository` adapter
+- [x] `CREATE_WORKFLOW` → `START_WORKFLOW` → `ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT` through the Kernel
+- [ ] `CANCEL_WORKFLOW` (only remaining first-slice command)
 
 ### Phase 2 — Governed execution
 
@@ -538,7 +543,7 @@ Finance
 Research
 ```
 
-See the full **[ROADMAP.md](ROADMAP.md)**.
+`ROADMAP.md` now tracks this in more granular phases (security/testing foundations, governed execution, adaptive organization, knowledge, engineering workspaces, remaining departments, CI/CD, and production deployment) than the three shown here — see the full **[ROADMAP.md](ROADMAP.md)**.
 
 ---
 
@@ -595,11 +600,13 @@ Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
 ## Project status
 
 > [!WARNING]
-> **CompanyOS is currently pre-alpha. No governed domain logic exists yet.**
+> **CompanyOS is currently pre-alpha. A first vertical slice works end to end; most of the organization — departments, real authentication, production deployment — does not exist yet.**
 >
-> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0003`). The first-slice technology stack is proposed in `ADR-0004`, pending approval.
+> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0004`).
 >
-> A connected scaffold exists under `apps/` and `supabase/`: `companyd` (Go) and `web` (Next.js) build cleanly, and `web` → Supabase → `companyd` → Postgres connectivity is verified end-to-end. No Kernel, Governance, or workflow persistence logic has been implemented — the domain packages in `apps/companyd/internal/` are still stubs.
+> `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT` runs end to end against a real database and a real LLM call, triggered from `web`: real Kernel legality checks, a real (if minimal) Governance decision, atomic Postgres persistence, and Runtime dispatch to Gemini/OpenAI/Anthropic with automatic fallback on rate-limit or outage. `CANCEL_WORKFLOW` is the only first-slice command not yet implemented.
+>
+> Not yet implemented: real human authentication (Runtime currently uses one hardcoded fixture Principal and Organization), Supabase Row-Level Security (zero policies today, safe only because there's a single hardcoded organization), the `REQUIRE_APPROVAL`/`DENY` Governance paths, every department beyond fixture data, and production deployment. See [`ROADMAP.md`](ROADMAP.md) for the full sequencing to production.
 >
 > Documentation marked **DRAFT** or **PROPOSED** is not an accepted contract until the project owner explicitly approves it.
 

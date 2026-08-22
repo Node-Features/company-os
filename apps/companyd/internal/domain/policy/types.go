@@ -48,11 +48,25 @@ type PrincipalRef struct {
 	Authenticated bool
 }
 
+// Role identifies a first-slice illustrative agent/principal role for
+// role-scoped policy matching (ADR-0008). It is this slice's stand-in for a
+// real role/delegation lookup — docs/domain/principal.md's "delegation
+// references" — the same way Request.EvidencePresent stands in for real
+// authentication evidence: a caller-asserted Role is trusted here, not yet
+// verified against a persisted binding. Not to be confused with
+// docs/domain/capability.md's Capability — a provider-independent dispatch
+// contract (e.g. "generate text"), a different concept that already owns
+// that name.
+type Role string
+
 // Rule is one hardcoded first-slice policy entry (first-slice plan
 // decision #12 — policy.md leaves policy administration as future work).
+// An empty Role matches every role, preserving every rule written before
+// ADR-0008 added role-scoped matching.
 type Rule struct {
 	RuleID       string
 	Effect       Effect
+	Role         Role
 	ActionPrefix string
 	Action       string
 	Autonomy     AutonomyLevel

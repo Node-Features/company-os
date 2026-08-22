@@ -1,6 +1,6 @@
 # Finance Department
 
-Status: DRAFT
+Status: APPROVED
 
 ## Mission
 

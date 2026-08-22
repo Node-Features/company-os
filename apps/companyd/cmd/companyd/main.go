@@ -63,11 +63,18 @@ func buildProviders(ctx context.Context) []fallback.Provider {
 }
 
 func main() {
+	// Boot stage 1: OS signal handling (ADR-0006). Cooperative shutdown is
+	// wired before any dependency is touched.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Boot stage 2: config loading (ADR-0006; daemon.md "process-scoped
+	// configuration loading").
 	_ = godotenv.Load() // best-effort local dev convenience; production sets real env vars
 
+	// Boot stage 3: logging bootstrap. stdlib log only today — no
+	// structured logging, metrics, or tracing exists yet (ADR-0006 open
+	// question).
 	log.Println("companyd: starting")
 
 	port := os.Getenv("PORT")
@@ -75,6 +82,8 @@ func main() {
 		port = "8080"
 	}
 
+	// Boot stage 4: adapter construction — persistence. Connects first;
+	// everything below this point depends on it.
 	// nil until DATABASE_URL is configured, so /health can honestly report
 	// "not_configured" instead of a misleading connection failure.
 	var db httpapi.DBPinger
@@ -97,14 +106,25 @@ func main() {
 	// co-located in this one process per ADR-0004. They require a database
 	// connection; without one companyd still serves /health in a degraded
 	// state rather than failing to start.
+	//
+	// Note on Kernel specifically (ADR-0006): there is no "start Kernel"
+	// stage below. Kernel (internal/kernel/workflow) is stateless — per
+	// docs/architecture/kernel.md it is "usable without a running
+	// scheduler, worker, daemon, model, or external workflow engine." It is
+	// invoked synchronously, per request, from inside Application (boot
+	// stage 6 below), never constructed or started here.
 	var d *daemon.Daemon
 	if pool != nil {
+		// Boot stage 5: adapter construction — intelligence providers.
 		providers := buildProviders(ctx)
 		provider := fallback.New(providers, providerCooldown)
 		if len(providers) > 0 {
 			log.Printf("companyd: intelligence providers (priority order, %s cooldown on rate-limit/outage): %s", providerCooldown, provider)
 		}
 
+		// Boot stage 6: Application construction. This is what invokes
+		// Kernel decision functions later, per governed request — see the
+		// note above.
 		wakeup := make(chan uuid.UUID, 16)
 		app := &application.Application{
 			Repo:     supabase.NewWorkflowRepository(pool),
@@ -113,6 +133,8 @@ func main() {
 			Fixtures: fixtures.NewRegistry(),
 			Notify:   wakeup,
 		}
+		// Boot stage 7: Runtime construction — the "runtime subsystems"
+		// stage (dispatch loop, leases, retries).
 		rt := &runtime.Runtime{
 			Exec:          supabase.NewExecutionRepository(pool),
 			App:           app,
@@ -123,8 +145,13 @@ func main() {
 			LeaseDuration: 60 * time.Second,
 			Wakeup:        wakeup,
 		}
+		// Boot stage 8: Daemon construction and start — supervises
+		// Runtime's dispatch loop (daemon.md's process-lifecycle
+		// ownership), not a handoff to Kernel.
 		d = daemon.New(rt)
 
+		// Boot stage 9: agent/workflow-layer entry points. Only reachable
+		// once stages 4-8 above succeeded.
 		mux.HandleFunc("POST /v1/workflows", httpapi.CreateWorkflowHandler(app))
 		mux.HandleFunc("POST /v1/workflows/{workflowId}/start", httpapi.StartWorkflowHandler(app))
 		mux.HandleFunc("POST /v1/workflows/{workflowId}/results/accept", httpapi.AcceptResultHandler(app))
@@ -140,6 +167,7 @@ func main() {
 		log.Println("companyd: no DATABASE_URL — Kernel/Application/Runtime/Daemon not started, /v1/workflows routes unavailable")
 	}
 
+	// Boot stage 10: HTTP server starts listening.
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
 		log.Printf("companyd: listening on :%s", port)
@@ -148,6 +176,8 @@ func main() {
 		}
 	}()
 
+	// Boot stage 11: block until shutdown signal, then drain and stop in
+	// dependency-reverse order (daemon.md's supervision model).
 	<-ctx.Done()
 	log.Println("companyd: shutdown signal received, draining")
 

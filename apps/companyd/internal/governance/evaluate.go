@@ -25,6 +25,12 @@ type Request struct {
 	// EvidencePresent stands in for real authentication evidence
 	// validation this slice (decision #5).
 	EvidencePresent      bool
+	// Role is this slice's stand-in for a resolved role/delegation lookup —
+	// see policy.Role's doc comment (ADR-0008). Zero value "" matches only
+	// role-agnostic rules (Role-less Rules), never a role-scoped one — an
+	// unrecognized or absent Role fails closed, it does not fall back to
+	// "any role."
+	Role                  policy.Role
 	Action                string
 	ResourceType          string
 	ResourceID            string
@@ -64,7 +70,7 @@ func Evaluate(ctx context.Context, req Request) (policy.GovernanceDecision, erro
 		return decision, nil
 	}
 
-	rule, matched := matchRule(req.Action)
+	rule, matched := matchRule(req.Role, req.Action)
 	if !matched || rule.Effect != policy.EffectPermit {
 		decision.Outcome = policy.DecisionDeny
 		reason := "no matching permit rule (default-deny)"

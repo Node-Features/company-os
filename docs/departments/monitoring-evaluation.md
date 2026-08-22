@@ -1,6 +1,6 @@
 # Monitoring & Evaluation Department
 
-Status: DRAFT
+Status: APPROVED
 
 ## Mission
 

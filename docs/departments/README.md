@@ -4,10 +4,10 @@ This directory owns each department's mission, responsibilities, authority, inte
 
 | Document | Purpose | Status | Read when |
 |---|---|---|---|
-| `research.md` | Research responsibility and continuous discovery | DRAFT | Read when working on organizational research. |
-| `monitoring-evaluation.md` | Independent evaluation responsibilities | DRAFT | Read when measuring quality or outcomes. |
+| `research.md` | Research responsibility and continuous discovery | APPROVED | Read when working on organizational research. |
+| `monitoring-evaluation.md` | Independent evaluation responsibilities | APPROVED | Read when measuring quality or outcomes. |
 | `design.md` | Design responsibilities and outputs | NOT YET SPECIFIED | Read when defining design work. |
 | `engineering.md` | Engineering responsibilities and authority | NOT YET SPECIFIED | Read when working on software delivery. |
 | `deployment.md` | Deployment responsibilities and authority | NOT YET SPECIFIED | Read when releasing changes. |
 | `education.md` | Education and public-engagement responsibilities | NOT YET SPECIFIED | Read when publishing or engaging externally. |
-| `finance.md` | Resource intelligence and cost governance | DRAFT | Read when evaluating budgets or cost/value. |
+| `finance.md` | Resource intelligence and cost governance | APPROVED | Read when evaluating budgets or cost/value. |

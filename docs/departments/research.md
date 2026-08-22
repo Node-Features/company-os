@@ -1,6 +1,6 @@
 # Research Department
 
-Status: DRAFT
+Status: APPROVED
 
 ## Mission
 

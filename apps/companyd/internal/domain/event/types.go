@@ -26,8 +26,9 @@ type DomainEvent struct {
 
 // First-slice WorkflowEvent types (workflow.md's produced Event types).
 const (
-	TypeWorkflowCreated = "WORKFLOW_CREATED"
-	TypeWorkflowStarted = "WORKFLOW_STARTED"
+	TypeWorkflowCreated   = "WORKFLOW_CREATED"
+	TypeWorkflowStarted   = "WORKFLOW_STARTED"
 	TypeWorkflowCompleted = "WORKFLOW_COMPLETED"
 	TypeWorkflowFailed    = "WORKFLOW_FAILED"
+	TypeWorkflowCancelled = "WORKFLOW_CANCELLED"
 )

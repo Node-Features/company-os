@@ -155,6 +155,36 @@ func AcceptResultHandler(app *application.Application) http.HandlerFunc { return
 // RejectResultHandler handles POST /v1/workflows/{workflowId}/results/reject.
 func RejectResultHandler(app *application.Application) http.HandlerFunc { return resultDecisionHandler(app) }
 
+// CancelWorkflowHandler handles POST /v1/workflows/{workflowId}/cancel.
+func CancelWorkflowHandler(app *application.Application) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workflowID, err := uuid.Parse(r.PathValue("workflowId"))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid workflowId")
+			return
+		}
+		var body struct {
+			ExpectedVersion int64  `json:"expectedVersion"`
+			IdempotencyKey  string `json:"idempotencyKey"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if body.IdempotencyKey == "" {
+			body.IdempotencyKey = uuid.New().String()
+		}
+		requestID := uuid.New()
+		res := app.CancelWorkflow(r.Context(), application.CancelWorkflowRequest{
+			RequestID:       requestID,
+			IdempotencyKey:  body.IdempotencyKey,
+			WorkflowID:      workflowID,
+			ExpectedVersion: body.ExpectedVersion,
+		})
+		writeResult(w, requestID, res)
+	}
+}
+
 // GetWorkflowHandler handles GET /v1/workflows/{workflowId}.
 func GetWorkflowHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -174,12 +204,13 @@ func GetWorkflowHandler(app *application.Application) http.HandlerFunc {
 		}
 
 		resp := struct {
-			WorkflowID     string                        `json:"workflowId"`
-			State          string                        `json:"state"`
-			Version        int64                         `json:"version"`
-			WaitReason     *string                       `json:"waitReason"`
-			TerminalReason *string                       `json:"terminalReason"`
-			LatestResult   *application.LatestResultView `json:"latestResult,omitempty"`
+			WorkflowID     string                          `json:"workflowId"`
+			State          string                          `json:"state"`
+			Version        int64                           `json:"version"`
+			WaitReason     *string                         `json:"waitReason"`
+			TerminalReason *string                         `json:"terminalReason"`
+			LatestResult   *application.LatestResultView   `json:"latestResult,omitempty"`
+			Units          []application.ExecutionUnitView `json:"units"`
 		}{
 			WorkflowID:     status.Workflow.WorkflowID,
 			State:          status.Workflow.State,
@@ -187,6 +218,7 @@ func GetWorkflowHandler(app *application.Application) http.HandlerFunc {
 			WaitReason:     status.Workflow.WaitReason,
 			TerminalReason: status.Workflow.TerminalReason,
 			LatestResult:   status.LatestResult,
+			Units:          status.Units,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)

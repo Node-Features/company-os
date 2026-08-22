@@ -9,6 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// newTestApp wires an Application against the in-memory fakes
+// (fake_repo_test.go). Per docs/testing/strategy.md's sanctioned-fakes
+// decision, this file exists only for tests that need deterministic
+// control over concurrency or commit/notify ordering — properties a real
+// database and network round-trip make flaky to assert on directly.
+// State-transition correctness (the happy path, idempotent replay,
+// rejecting an already-terminal command) is proved exclusively against
+// real persistence in integration_test.go; a fake is never the sole
+// evidence for that claim, so those cases were retired from here rather
+// than duplicated.
 func newTestApp() (*Application, chan uuid.UUID) {
 	notify := make(chan uuid.UUID, 8)
 	app := &Application{
@@ -19,40 +29,6 @@ func newTestApp() (*Application, chan uuid.UUID) {
 		Notify:   notify,
 	}
 	return app, notify
-}
-
-func TestCreateWorkflow_Accepted(t *testing.T) {
-	app, _ := newTestApp()
-	res := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
-	if res.Outcome != Accepted {
-		t.Fatalf("outcome = %s, want ACCEPTED (reasons: %v)", res.Outcome, res.Reasons)
-	}
-	if res.Workflow == nil || res.Workflow.State != "PLANNED" {
-		t.Fatalf("workflow state = %+v, want PLANNED", res.Workflow)
-	}
-}
-
-func TestCreateWorkflow_IdempotentReplayReturnsSameOutcome(t *testing.T) {
-	app, _ := newTestApp()
-	key := uuid.New().String()
-
-	first := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
-	second := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
-
-	if first.Outcome != Accepted {
-		t.Fatalf("first call outcome = %s, want ACCEPTED", first.Outcome)
-	}
-	if second.Outcome != first.Outcome {
-		t.Fatalf("replayed outcome = %s, want %s (same as first call)", second.Outcome, first.Outcome)
-	}
-
-	repo := app.Repo.(*fakeRepo)
-	repo.mu.Lock()
-	count := len(repo.workflows)
-	repo.mu.Unlock()
-	if count != 1 {
-		t.Fatalf("workflows created = %d, want exactly 1 (idempotency must not create a second transition)", count)
-	}
 }
 
 func TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict(t *testing.T) {
@@ -122,3 +98,4 @@ func TestStartWorkflow_NotifiesOnlyAfterCommit(t *testing.T) {
 		t.Fatal("expected a notify after StartWorkflow committed its ExecutionIntent")
 	}
 }
+

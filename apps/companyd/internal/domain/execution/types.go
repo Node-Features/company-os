@@ -84,3 +84,29 @@ type ClaimedExecution struct {
 	Attempt ExecutionAttempt
 	Intent  workflow.ExecutionIntent
 }
+
+// IntentStatus is execution_intents.status (docs/domain/workflow.md's
+// ExecutionIntent, execution.md's claim lifecycle around it).
+type IntentStatus string
+
+const (
+	IntentPending IntentStatus = "PENDING"
+	IntentClaimed IntentStatus = "CLAIMED"
+	IntentClosed  IntentStatus = "CLOSED"
+)
+
+// ExecutionUnit groups one ExecutionIntent with every ExecutionAttempt made
+// against it, oldest first, for a Workflow. This is a read-model grouping
+// for status/UI projections — it is not itself a persisted or authoritative
+// record; the intent and attempt rows it groups are. Deliberately not
+// called "Node": that word is reserved for a CompanyOS runtime/compute
+// node — an addressable participant with its own resources and
+// capabilities that a scheduler places work onto (see
+// docs/architecture/node.md) — which is a different concept from this
+// per-Workflow dispatch bookkeeping and does not exist in this codebase yet.
+type ExecutionUnit struct {
+	IntentID     uuid.UUID
+	IntentStatus IntentStatus
+	DueAt        time.Time
+	Attempts     []ExecutionAttempt
+}

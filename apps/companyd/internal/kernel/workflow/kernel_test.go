@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/policy"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/result"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
@@ -219,5 +220,123 @@ func TestValidateResultProposal_IndeterminateNeitherAcceptsNorRejects(t *testing
 		if len(reasons) == 0 {
 			t.Errorf("%s: expected rejection reasons", ct)
 		}
+	}
+}
+
+func TestCancelWorkflow_PlannedOrReadyToCancelled(t *testing.T) {
+	for _, prior := range []workflow.State{workflow.StatePlanned, workflow.StateReady} {
+		t.Run(string(prior), func(t *testing.T) {
+			principalID := uuid.New()
+			current := workflow.Workflow{
+				OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 2, State: prior,
+				InitiatingPrincipalID: principalID,
+			}
+			expected := current.Version
+			cmd := command.WorkflowCommandEnvelope{
+				CommandID: uuid.New(), CommandType: command.CancelWorkflow, OrganizationID: current.OrganizationID,
+				WorkflowID: current.WorkflowID, ExpectedVersion: &expected, RequestingPrincipalID: principalID,
+				DeclaredTime: time.Now(),
+			}
+			proposal, reasons := ValidateCancelProposal(cmd, current)
+			if proposal == nil {
+				t.Fatalf("expected proposal, got: %v", reasons)
+			}
+			decision := allowDecision(proposal.ProposalDigest)
+			kd, reasons := FinalizeCancel(cmd, *proposal, decision, current, cmd.DeclaredTime)
+			if kd == nil {
+				t.Fatalf("expected decision, got rejection: %v", reasons)
+			}
+			if kd.NextState != workflow.StateCancelled || kd.NextVersion != 3 {
+				t.Errorf("got state=%s version=%d, want CANCELLED/3", kd.NextState, kd.NextVersion)
+			}
+			if len(kd.Events) != 1 || kd.Events[0].EventType != event.TypeWorkflowCancelled {
+				t.Errorf("expected one WORKFLOW_CANCELLED event, got %+v", kd.Events)
+			}
+		})
+	}
+}
+
+func TestValidateCancelProposal_TerminalStateRejected(t *testing.T) {
+	for _, terminal := range []workflow.State{workflow.StateCompleted, workflow.StateFailed, workflow.StateCancelled} {
+		t.Run(string(terminal), func(t *testing.T) {
+			principalID := uuid.New()
+			current := workflow.Workflow{
+				OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 3, State: terminal,
+				InitiatingPrincipalID: principalID,
+			}
+			expected := current.Version
+			cmd := command.WorkflowCommandEnvelope{
+				CommandID: uuid.New(), CommandType: command.CancelWorkflow, OrganizationID: current.OrganizationID,
+				WorkflowID: current.WorkflowID, ExpectedVersion: &expected, RequestingPrincipalID: principalID,
+				DeclaredTime: time.Now(),
+			}
+			proposal, reasons := ValidateCancelProposal(cmd, current)
+			if proposal != nil {
+				t.Fatalf("expected rejection from terminal state %s, got proposal", terminal)
+			}
+			found := false
+			for _, r := range reasons {
+				if r == command.ReasonIllegalState {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("reasons = %v, want to include %q", reasons, command.ReasonIllegalState)
+			}
+		})
+	}
+}
+
+func TestValidateCancelProposal_UnauthorizedPrincipalRejected(t *testing.T) {
+	current := workflow.Workflow{
+		OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 1, State: workflow.StatePlanned,
+		InitiatingPrincipalID: uuid.New(),
+	}
+	expected := current.Version
+	cmd := command.WorkflowCommandEnvelope{
+		CommandID: uuid.New(), CommandType: command.CancelWorkflow, OrganizationID: current.OrganizationID,
+		WorkflowID: current.WorkflowID, ExpectedVersion: &expected,
+		RequestingPrincipalID: uuid.New(), // a different Principal than InitiatingPrincipalID
+		DeclaredTime:          time.Now(),
+	}
+	proposal, reasons := ValidateCancelProposal(cmd, current)
+	if proposal != nil {
+		t.Fatal("expected rejection for a non-initiating Principal")
+	}
+	found := false
+	for _, r := range reasons {
+		if r == command.ReasonPrincipalNotAuthorized {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("reasons = %v, want to include %q", reasons, command.ReasonPrincipalNotAuthorized)
+	}
+}
+
+func TestValidateCancelProposal_WrongVersionRejected(t *testing.T) {
+	principalID := uuid.New()
+	current := workflow.Workflow{
+		OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 3, State: workflow.StateReady,
+		InitiatingPrincipalID: principalID,
+	}
+	staleExpected := int64(1)
+	cmd := command.WorkflowCommandEnvelope{
+		CommandID: uuid.New(), CommandType: command.CancelWorkflow, OrganizationID: current.OrganizationID,
+		WorkflowID: current.WorkflowID, ExpectedVersion: &staleExpected, RequestingPrincipalID: principalID,
+		DeclaredTime: time.Now(),
+	}
+	proposal, reasons := ValidateCancelProposal(cmd, current)
+	if proposal != nil {
+		t.Fatal("expected rejection on version mismatch")
+	}
+	found := false
+	for _, r := range reasons {
+		if r == command.ReasonVersionMismatch {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("reasons = %v, want to include %q", reasons, command.ReasonVersionMismatch)
 	}
 }

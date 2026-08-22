@@ -37,6 +37,31 @@ export type LatestResult = {
   output?: { text?: string };
 };
 
+// One ExecutionAttempt against an ExecutionUnit's ExecutionIntent. See
+// apps/companyd/internal/application/workflow_status.go's AttemptView.
+export type ExecutionAttempt = {
+  attemptId: string;
+  attemptNumber: number;
+  status: string;
+  providerRunId?: string;
+  createdAt: string;
+  lastHeartbeatAt?: string;
+  terminalAt?: string;
+};
+
+// An ExecutionUnit groups one ExecutionIntent with every ExecutionAttempt
+// made against it, for this Workflow. Deliberately not called "Node" — that
+// word is reserved for a CompanyOS runtime/compute node (an addressable
+// participant with its own resources and capabilities that a scheduler
+// places work onto), a different, not-yet-built concept. See
+// apps/companyd/internal/domain/execution/types.go.
+export type ExecutionUnit = {
+  intentId: string;
+  intentStatus: string;
+  dueAt: string;
+  attempts: ExecutionAttempt[];
+};
+
 export type WorkflowStatus = {
   workflowId: string;
   state: string;
@@ -44,6 +69,7 @@ export type WorkflowStatus = {
   waitReason: string | null;
   terminalReason: string | null;
   latestResult?: LatestResult;
+  units: ExecutionUnit[];
 };
 
 export async function createWorkflow(): Promise<WorkflowCommandResult> {
@@ -60,6 +86,18 @@ export async function startWorkflow(
   expectedVersion: number,
 ): Promise<WorkflowCommandResult> {
   const res = await fetch(`${COMPANYD_URL}/v1/workflows/${workflowId}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expectedVersion }),
+  });
+  return res.json();
+}
+
+export async function cancelWorkflow(
+  workflowId: string,
+  expectedVersion: number,
+): Promise<WorkflowCommandResult> {
+  const res = await fetch(`${COMPANYD_URL}/v1/workflows/${workflowId}/cancel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ expectedVersion }),

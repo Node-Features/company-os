@@ -27,3 +27,11 @@ type SubmitResultRequest struct {
 	ResultID        uuid.UUID
 	ExpectedVersion int64
 }
+
+// CancelWorkflowRequest is the ApplicationRequest for CANCEL_WORKFLOW.
+type CancelWorkflowRequest struct {
+	RequestID       uuid.UUID
+	IdempotencyKey  string
+	WorkflowID      uuid.UUID
+	ExpectedVersion int64
+}

@@ -440,9 +440,11 @@ CompanyOS
 │   │
 │   └── web/
 │       Next.js UI + thin API adapter, wired to companyd's Workflow API
-│       (create/start/status) with a live-polling trigger page. Supabase
-│       client scaffolding exists for future auth, not yet used for
-│       real sign-in.
+│       (create/start/status/cancel) with a trigger page that receives
+│       live push updates over Supabase Realtime (slow reconciliation
+│       poll as fallback, not the primary path). Supabase client
+│       scaffolding exists for future auth, not yet used for real
+│       sign-in.
 │
 ├── supabase/
 │   CLI project root (config.toml, migrations/) for the hosted Supabase
@@ -478,7 +480,7 @@ This keeps both humans and coding agents from loading unnecessary context.
 
 ## Roadmap
 
-CompanyOS has an approved architecture and a working first vertical slice — `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT/REJECT_WORKFLOW_RESULT` runs end to end against the real database and a real provider call. Work is moving into governed execution, the adaptive-organization departments, and production readiness.
+CompanyOS has an approved architecture and a working first vertical slice — `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT/REJECT/CANCEL_WORKFLOW_RESULT` runs end to end against the real database and a real provider call, with live push updates over Supabase Realtime. The security and testing foundations (threat model, agent authority, tool security, workspace isolation, testing strategy, contract tests, failure injection) are also written and approved. Work is moving into governed execution, the adaptive-organization departments, and production readiness.
 
 ### Phase 0 — Foundation
 
@@ -512,8 +514,10 @@ Event
 - [x] `companyd` (Go) and `web` (Next.js) scaffolds build cleanly
 - [x] `web` ↔ Supabase and `web` ↔ `companyd` ↔ Postgres connectivity verified end-to-end (`/api/health`)
 - [x] First domain persistence: `workflows` table + a real `AuthoritativeStateRepository` adapter
-- [x] `CREATE_WORKFLOW` → `START_WORKFLOW` → `ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT` through the Kernel
-- [ ] `CANCEL_WORKFLOW` (only remaining first-slice command)
+- [x] `CREATE_WORKFLOW` → `START_WORKFLOW` → `ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT`/`CANCEL_WORKFLOW` through the Kernel
+- [x] Live push updates over Supabase Realtime, replacing polling
+
+Phase 1 is complete. The security & testing foundations that ground the phases below (threat model, agent authority, tool security, workspace isolation, testing strategy, contract tests, failure injection) are also complete — `ROADMAP.md`'s own Phase 2, not shown as a separate step in this simplified view; see the note below.
 
 ### Phase 2 — Governed execution
 
@@ -543,7 +547,7 @@ Finance
 Research
 ```
 
-`ROADMAP.md` now tracks this in more granular phases (security/testing foundations, governed execution, adaptive organization, knowledge, engineering workspaces, remaining departments, CI/CD, and production deployment) than the three shown here — see the full **[ROADMAP.md](ROADMAP.md)**.
+`ROADMAP.md` now tracks this in more granular phases (security/testing foundations, governed execution, adaptive organization, knowledge, engineering workspaces, remaining departments, CI/CD, and production deployment) than the three shown here — its Phase 2 (security/testing foundations, complete) and Phase 3 (governed execution) map to this section's "Phase 2" above; its Phase 4 (adaptive organization) maps to this section's "Phase 3." See the full **[ROADMAP.md](ROADMAP.md)** for the authoritative numbering.
 
 ---
 
@@ -602,9 +606,9 @@ Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
 > [!WARNING]
 > **CompanyOS is currently pre-alpha. A first vertical slice works end to end; most of the organization — departments, real authentication, production deployment — does not exist yet.**
 >
-> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0004`).
+> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0004`). Security and testing foundations are also approved (`docs/security/`, `docs/testing/`).
 >
-> `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT` runs end to end against a real database and a real LLM call, triggered from `web`: real Kernel legality checks, a real (if minimal) Governance decision, atomic Postgres persistence, and Runtime dispatch to Gemini/OpenAI/Anthropic with automatic fallback on rate-limit or outage. `CANCEL_WORKFLOW` is the only first-slice command not yet implemented.
+> `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT`/`CANCEL_WORKFLOW` runs end to end against a real database and a real LLM call, triggered from `web`, with live push updates over Supabase Realtime: real Kernel legality checks, a real (if minimal) Governance decision, atomic Postgres persistence, and Runtime dispatch to Gemini/OpenAI/Anthropic with automatic fallback on rate-limit or outage. All first-slice commands are implemented.
 >
 > Not yet implemented: real human authentication (Runtime currently uses one hardcoded fixture Principal and Organization), Supabase Row-Level Security (zero policies today, safe only because there's a single hardcoded organization), the `REQUIRE_APPROVAL`/`DENY` Governance paths, every department beyond fixture data, and production deployment. See [`ROADMAP.md`](ROADMAP.md) for the full sequencing to production.
 >

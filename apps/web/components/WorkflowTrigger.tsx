@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import type { WorkflowStatus } from "@/lib/companyd-client";
+import WorkflowExecutionTree from "./WorkflowExecutionTree";
 
 const TERMINAL_STATES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
+
+// Realtime push is best-effort (docs/architecture/events.md: notification
+// "is a recoverable hint, not a dependency"), so this slow reconciliation
+// poll is the safety net for a missed broadcast or a dropped socket — not
+// the primary driver of UI updates anymore. Mirrors
+// internal/runtime.Runtime's own wake-up-plus-poll-fallback shape
+// server-side.
+const RECONCILE_INTERVAL_MS = 15000;
 
 function Loader({ label }: { label: string }) {
   return (
@@ -15,8 +26,9 @@ function Loader({ label }: { label: string }) {
 }
 
 // Minimal Phase 1 vertical-slice trigger: create a Workflow, start it, and
-// poll its status until terminal. No design polish by design — this proves
-// the kernel-to-daemon-to-web-to-db loop, not a finished UI. See
+// watch its status until terminal, pushed over Supabase Realtime rather
+// than polled. No design polish by design — this proves the
+// kernel-to-daemon-to-web-to-db loop, not a finished UI. See
 // docs/architecture/application.md and ROADMAP.md's Phase 1 slices.
 export default function WorkflowTrigger() {
   const [workflow, setWorkflow] = useState<{ id: string; version: number } | null>(null);
@@ -24,13 +36,34 @@ export default function WorkflowTrigger() {
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const reconcileRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopWatching();
     };
   }, []);
+
+  function stopWatching() {
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
+    if (reconcileRef.current) {
+      clearInterval(reconcileRef.current);
+      reconcileRef.current = null;
+    }
+    setPolling(false);
+  }
+
+  async function refreshStatus(workflowId: string) {
+    const s: WorkflowStatus = await fetch(`/api/workflows/${workflowId}`).then((r) => r.json());
+    setStatus(s);
+    if (TERMINAL_STATES.has(s.state)) {
+      stopWatching();
+    }
+  }
 
   async function handleCreate() {
     setBusy(true);
@@ -63,23 +96,61 @@ export default function WorkflowTrigger() {
         return;
       }
       setWorkflow({ id: workflow.id, version: result.version });
-      startPolling(workflow.id);
+      startWatching(workflow.id);
     } finally {
       setBusy(false);
     }
   }
 
-  function startPolling(workflowId: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    setPolling(true);
-    pollRef.current = setInterval(async () => {
-      const s: WorkflowStatus = await fetch(`/api/workflows/${workflowId}`).then((r) => r.json());
-      setStatus(s);
-      if (TERMINAL_STATES.has(s.state)) {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setPolling(false);
+  async function handleCancel() {
+    if (!workflow) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const version = status?.version ?? workflow.version;
+      const result = await fetch(`/api/workflows/${workflow.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedVersion: version }),
+      }).then((r) => r.json());
+      if (result.outcome !== "ACCEPTED") {
+        setError(`cancel failed: ${result.outcome} ${result.reasons?.join(", ") ?? ""}`);
+        return;
       }
-    }, 2000);
+      stopWatching();
+      setWorkflow({ id: workflow.id, version: result.version });
+      setStatus((prev) => (prev ? { ...prev, state: result.state, version: result.version } : prev));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Subscribes to a per-Workflow Supabase Realtime broadcast channel
+  // instead of polling — see internal/adapters/notify/realtime.Publisher.
+  // A broadcast is only a hint ("something changed"), so the handler always
+  // refetches the real status through companyd rather than trusting the
+  // broadcast payload itself.
+  function startWatching(workflowId: string) {
+    stopWatching();
+    setPolling(true);
+
+    const channel = createClient()
+      .channel(`workflow:${workflowId}`)
+      .on("broadcast", { event: "workflow_changed" }, () => {
+        refreshStatus(workflowId);
+      })
+      .subscribe((subscribeStatus) => {
+        if (subscribeStatus === "SUBSCRIBED") {
+          // Catches anything that changed between create/start and the
+          // subscription actually going live.
+          refreshStatus(workflowId);
+        }
+      });
+    channelRef.current = channel;
+
+    reconcileRef.current = setInterval(() => {
+      refreshStatus(workflowId);
+    }, RECONCILE_INTERVAL_MS);
   }
 
   return (
@@ -90,6 +161,13 @@ export default function WorkflowTrigger() {
         </button>
         <button className="btn btn-accent" onClick={handleStart} disabled={busy || !workflow || Boolean(status)}>
           Start Workflow
+        </button>
+        <button
+          className="btn"
+          onClick={handleCancel}
+          disabled={busy || !workflow || (status !== null && TERMINAL_STATES.has(status.state))}
+        >
+          Cancel Workflow
         </button>
         {busy && <Loader label="Transmitting" />}
       </div>
@@ -115,6 +193,9 @@ export default function WorkflowTrigger() {
             <span className={`state-badge state-${status.state}`}>{status.state}</span>
             {polling && !TERMINAL_STATES.has(status.state) && <Loader label="Awaiting Runtime" />}
           </div>
+
+          <WorkflowExecutionTree workflowState={status.state} units={status.units} />
+
           {status.latestResult && (
             <>
               <div className="status-row">

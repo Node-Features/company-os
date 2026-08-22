@@ -170,6 +170,51 @@ func finalizeResult(cmd command.WorkflowCommandEnvelope, proposal command.Govern
 	}, nil
 }
 
+// FinalizeCancel is final Kernel validation for CANCEL_WORKFLOW: PLANNED ->
+// CANCELLED or READY -> CANCELLED. If current was READY, the caller is
+// responsible for recording durable cancellation of the outstanding
+// ExecutionIntent per docs/domain/execution.md's invariants — this
+// function does not assume the in-flight attempt stopped immediately.
+func FinalizeCancel(cmd command.WorkflowCommandEnvelope, proposal command.GovernedCommandProposal, decision policy.GovernanceDecision, current workflow.Workflow, declaredTime time.Time) (*command.KernelDecisionEnvelope, []string) {
+	if reasons := verifyAllow(proposal, decision); reasons != nil {
+		return nil, reasons
+	}
+	nextVersion := current.Version + 1
+	evt := event.DomainEvent{
+		EventID:        uuid.New(),
+		OrganizationID: cmd.OrganizationID,
+		EventType:      event.TypeWorkflowCancelled,
+		SchemaVersion:  1,
+		SubjectType:    "Workflow",
+		SubjectID:      cmd.WorkflowID,
+		SubjectVersion: nextVersion,
+		OccurredAt:     declaredTime,
+		CorrelationID:  cmd.CorrelationID,
+		CausationID:    cmd.CausationID,
+		WorkflowID:     &cmd.WorkflowID,
+		PrincipalID:    &cmd.RequestingPrincipalID,
+		Payload:        map[string]any{"priorState": current.State},
+	}
+	return &command.KernelDecisionEnvelope{
+		DecisionID:           uuid.New(),
+		SchemaVersion:        1,
+		ProposalID:           proposal.ProposalID,
+		ProposalDigest:       proposal.ProposalDigest,
+		OrganizationID:       cmd.OrganizationID,
+		AggregateID:          cmd.WorkflowID,
+		PriorVersion:         &current.Version,
+		Accepted:             true,
+		NextState:            workflow.StateCancelled,
+		NextVersion:          nextVersion,
+		Events:               []event.DomainEvent{evt},
+		Intent:               nil,
+		GovernanceDecisionID: decision.DecisionID,
+		DecidedAt:            declaredTime,
+		CorrelationID:        cmd.CorrelationID,
+		CausationID:          cmd.CausationID,
+	}, nil
+}
+
 func verifyAllow(proposal command.GovernedCommandProposal, decision policy.GovernanceDecision) []string {
 	if decision.Outcome != policy.DecisionAllow {
 		return []string{command.ReasonGovernanceDenied}

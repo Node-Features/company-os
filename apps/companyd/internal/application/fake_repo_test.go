@@ -15,8 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// fakeRepo is an in-memory ports.AuthoritativeStateRepository for pipeline
-// tests — no DB required.
+// fakeRepo is an in-memory ports.AuthoritativeStateRepository. Sanctioned
+// under docs/testing/strategy.md for pipeline_test.go's concurrency- and
+// ordering-specific tests only — it is never the sole evidence for a
+// state-transition correctness claim; integration_test.go's real-database
+// tests own that.
 type fakeRepo struct {
 	mu          sync.Mutex
 	workflows   map[string]*workflow.Workflow
@@ -57,7 +60,7 @@ func (f *fakeRepo) CreateWorkflow(_ context.Context, w *workflow.Workflow, _ []e
 	return nil
 }
 
-func (f *fakeRepo) CommitTransition(_ context.Context, w *workflow.Workflow, expectedVersion int64, _ []event.DomainEvent, _ uuid.UUID, _ *workflow.ExecutionIntent, _ *uuid.UUID, _ *uuid.UUID, decideResult *ports.ResultDecision) error {
+func (f *fakeRepo) CommitTransition(_ context.Context, w *workflow.Workflow, expectedVersion int64, _ []event.DomainEvent, _ uuid.UUID, _ *workflow.ExecutionIntent, _ *uuid.UUID, _ *uuid.UUID, decideResult *ports.ResultDecision, _ bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	k := key(w.OrganizationID, w.WorkflowID)
@@ -132,6 +135,9 @@ func (f *fakeExec) GetResult(_ context.Context, _ uuid.UUID, resultID uuid.UUID)
 }
 func (f *fakeExec) GetLatestResult(context.Context, uuid.UUID, uuid.UUID) (*result.Result, error) {
 	return nil, ports.ErrNotFound
+}
+func (f *fakeExec) ListExecutionUnits(context.Context, uuid.UUID, uuid.UUID) ([]execution.ExecutionUnit, error) {
+	return nil, nil
 }
 
 // fakePending is a no-op ports.PendingCommandRepository — this slice's

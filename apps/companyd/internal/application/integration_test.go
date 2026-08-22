@@ -191,3 +191,141 @@ func TestIntegration_StartWorkflow_ConflictOnStaleVersion(t *testing.T) {
 		t.Fatalf("StartWorkflow with stale version outcome = %s, want REJECTED (Kernel proposal validation catches it before any write)", res.Outcome)
 	}
 }
+
+func TestIntegration_CancelWorkflow_PlannedToCancelled(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	if created.Outcome != Accepted {
+		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
+	}
+	workflowID := uuid.MustParse(created.Workflow.WorkflowID)
+
+	cancelled := app.CancelWorkflow(ctx, CancelWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+	})
+	if cancelled.Outcome != Accepted {
+		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v)", cancelled.Outcome, cancelled.Reasons)
+	}
+	if cancelled.Workflow.State != "CANCELLED" {
+		t.Fatalf("state after cancel = %s, want CANCELLED", cancelled.Workflow.State)
+	}
+
+	status, err := app.GetWorkflowStatus(ctx, workflowID)
+	if err != nil {
+		t.Fatalf("GetWorkflowStatus: %v", err)
+	}
+	if status.Workflow.State != "CANCELLED" || status.Workflow.TerminalReason == nil {
+		t.Fatalf("status = %+v, want CANCELLED with a TerminalReason", status)
+	}
+}
+
+func TestIntegration_CancelWorkflow_ReadyToCancelled_ClosesOutstandingIntent(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	if created.Outcome != Accepted {
+		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
+	}
+	workflowID := uuid.MustParse(created.Workflow.WorkflowID)
+
+	started := app.StartWorkflow(ctx, StartWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+	})
+	if started.Outcome != Accepted {
+		t.Fatalf("StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
+	}
+
+	cancelled := app.CancelWorkflow(ctx, CancelWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: started.Workflow.Version,
+	})
+	if cancelled.Outcome != Accepted {
+		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v)", cancelled.Outcome, cancelled.Reasons)
+	}
+	if cancelled.Workflow.State != "CANCELLED" {
+		t.Fatalf("state after cancel = %s, want CANCELLED", cancelled.Workflow.State)
+	}
+
+	// The outstanding ExecutionIntent START_WORKFLOW produced must now be
+	// durably closed — Runtime's claim query (status = 'PENDING') must
+	// never pick it up, per docs/domain/execution.md's invariants.
+	claims, err := app.Exec.ClaimDueIntents(ctx, fixtures.OrganizationID, 10, time.Minute, "integration-test-worker")
+	if err != nil {
+		t.Fatalf("ClaimDueIntents: %v", err)
+	}
+	for _, c := range claims {
+		if c.Intent.WorkflowID == workflowID {
+			t.Fatalf("cancelled Workflow's ExecutionIntent %s was still claimable after CANCEL_WORKFLOW", c.Intent.IntentID)
+		}
+	}
+}
+
+// TestIntegration_CreateWorkflow_IdempotentReplayReturnsSameOutcome proves
+// the idempotency-replay guard (application.md) against real persistence —
+// docs/testing/strategy.md requires a state-transition correctness claim to
+// hold against the real database, not only fake_repo_test.go's in-memory
+// fakeRepo.
+func TestIntegration_CreateWorkflow_IdempotentReplayReturnsSameOutcome(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	key := uuid.New().String()
+
+	first := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
+	if first.Outcome != Accepted {
+		t.Fatalf("first call outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
+	}
+
+	// The replay path (application.go's replay()) intentionally returns
+	// only Outcome, not a re-fetched Workflow view, keeping the fast path
+	// cheap — so idempotency is verified by confirming no second
+	// transition was applied, not by comparing a Workflow field replay
+	// never populates.
+	second := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
+	if second.Outcome != first.Outcome {
+		t.Fatalf("replayed outcome = %s, want %s (same as first call)", second.Outcome, first.Outcome)
+	}
+
+	workflowID := uuid.MustParse(first.Workflow.WorkflowID)
+	status, err := app.GetWorkflowStatus(ctx, workflowID)
+	if err != nil {
+		t.Fatalf("GetWorkflowStatus: %v", err)
+	}
+	if status.Workflow.Version != 1 {
+		t.Fatalf("version after replay = %d, want 1 (idempotency must not create a second transition)", status.Workflow.Version)
+	}
+}
+
+// TestIntegration_CancelWorkflow_AlreadyTerminalRejected proves cancelling
+// an already-terminal Workflow is REJECTED against real persistence, per
+// docs/testing/strategy.md's same real-database requirement.
+func TestIntegration_CancelWorkflow_AlreadyTerminalRejected(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	if created.Outcome != Accepted {
+		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
+	}
+	workflowID := uuid.MustParse(created.Workflow.WorkflowID)
+
+	first := app.CancelWorkflow(ctx, CancelWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+	})
+	if first.Outcome != Accepted {
+		t.Fatalf("setup: first cancel outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
+	}
+
+	second := app.CancelWorkflow(ctx, CancelWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: first.Workflow.Version,
+	})
+	if second.Outcome != Rejected {
+		t.Fatalf("cancelling an already-CANCELLED workflow outcome = %s, want REJECTED", second.Outcome)
+	}
+}

@@ -51,7 +51,13 @@ type AuthoritativeStateRepository interface {
 	// DomainEvents/outbox rows, the GovernanceDecision reference, an
 	// optional new ExecutionIntent, and optional PendingCommand closure /
 	// Approval consumption. Returns ErrConflict if expectedVersion does
-	// not match the current stored version.
+	// not match the current stored version. closeOutstandingIntent, when
+	// true, atomically marks any still-PENDING ExecutionIntent for this
+	// Workflow CLOSED in the same transaction — CANCEL_WORKFLOW's durable
+	// record that Runtime must not claim it, per
+	// docs/domain/execution.md's invariants. It does not touch an intent
+	// already CLAIMED; an in-flight attempt is not assumed to stop
+	// immediately.
 	CommitTransition(
 		ctx context.Context,
 		w *workflow.Workflow,
@@ -62,6 +68,7 @@ type AuthoritativeStateRepository interface {
 		closePendingCommand *uuid.UUID,
 		consumeApproval *uuid.UUID,
 		decideResult *ResultDecision,
+		closeOutstandingIntent bool,
 	) error
 
 	// SaveGovernanceDecision persists a GovernanceDecision independent of
@@ -106,6 +113,11 @@ type ExecutionRepository interface {
 	// GetLatestResult serves the status read endpoint's latestResult field.
 	// Returns ErrNotFound if the Workflow has no Result yet.
 	GetLatestResult(ctx context.Context, orgID, workflowID uuid.UUID) (*result.Result, error)
+
+	// ListExecutionUnits serves the status read endpoint's units field:
+	// every ExecutionIntent for this Workflow plus every ExecutionAttempt
+	// made against each, oldest first. A read-only projection, not a claim.
+	ListExecutionUnits(ctx context.Context, orgID, workflowID uuid.UUID) ([]execution.ExecutionUnit, error)
 }
 
 // PendingCommandRepository persists a REQUIRE_APPROVAL command and its

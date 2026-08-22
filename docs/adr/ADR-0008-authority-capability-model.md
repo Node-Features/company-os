@@ -54,7 +54,7 @@ Principal  policy.Role    governance.Evaluate  string   policy.Resource
 
 The `transfer_funds` row is deliberately `REQUIRE_APPROVAL`, not `DENY`: "denied without additional authority" is exactly what `REQUIRE_APPROVAL` means — eligible, but missing Approval evidence — which is more precise than the binary allow/deny the request's own design table used. A caller that treats `REQUIRE_APPROVAL` as a plain denial has misread the decision (`governance.md`).
 
-This table is illustrative, the same way `ADR-0005`'s Organization/Objective/Capability signatures were: `docs/security/agent-authority.md` (`ROADMAP.md` Phase 2 Slice 2, not yet written) is where real agent-authority policy gets decided; `research_agent`/`finance_agent` are role strings for this demonstration, not registered `AgentDefinition`s — `internal/domain/agent` still doesn't exist.
+This table is illustrative, the same way `ADR-0005`'s Organization/Objective/Capability signatures were: [`docs/security/agent-authority.md`](../security/agent-authority.md) (`ROADMAP.md` Phase 2 Slice 2, now written and approved) is where real agent-authority policy gets decided; `research_agent`/`finance_agent` are role strings for this demonstration, not registered `AgentDefinition`s — `internal/domain/agent` still doesn't exist.
 
 ## Consequences
 
@@ -83,7 +83,7 @@ This table is illustrative, the same way `ADR-0005`'s Organization/Objective/Cap
 
 ## Open questions
 
-- OPEN QUESTION: `docs/security/agent-authority.md` (`ROADMAP.md` Phase 2 Slice 2, not yet written) is where real per-department agent authority should be decided — this ADR's `research_agent`/`finance_agent` rules should not be read as pre-empting that document.
+- OPEN QUESTION: [`docs/security/agent-authority.md`](../security/agent-authority.md) (`ROADMAP.md` Phase 2 Slice 2, now written and approved) is where real per-department agent authority is decided — this ADR's `research_agent`/`finance_agent` rules should not be read as pre-empting that document.
 - OPEN QUESTION: should `Role` become a real, persisted binding (resolved through `docs/domain/principal.md`'s delegation references) before any production policy depends on it, given it is entirely caller-asserted today?
 
 ## Dependencies

@@ -31,7 +31,7 @@ These boundaries are specified in the canonical architecture documents below. Th
 
 ## Detailed security documentation
 
-Threat models, agent-authority limits, tool-access controls, and workspace-isolation requirements belong in [docs/security/](docs/security/README.md). Those documents are not yet written; this file is the summary they will detail, per [docs/security/README.md](docs/security/README.md).
+Threat models, agent-authority limits, tool-access controls, and workspace-isolation requirements are detailed in [docs/security/](docs/security/README.md): [`threat-model.md`](docs/security/threat-model.md), [`agent-authority.md`](docs/security/agent-authority.md), [`tool-security.md`](docs/security/tool-security.md), and [`workspace-isolation.md`](docs/security/workspace-isolation.md), all `APPROVED` as of 2026-08-22 (`ROADMAP.md` Phase 2). This file remains the project-wide summary; those documents own the actual mechanism and reasoning.
 
 ## Supported versions
 

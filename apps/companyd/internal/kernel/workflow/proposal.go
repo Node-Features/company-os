@@ -115,3 +115,26 @@ func ValidateResultProposal(cmd command.WorkflowCommandEnvelope, current workflo
 		"outcome":  res.Outcome,
 	}), nil
 }
+
+// ValidateCancelProposal is preliminary Kernel validation for
+// CANCEL_WORKFLOW: PLANNED -> CANCELLED or READY -> CANCELLED, requested
+// only by the Workflow's initiating Principal (docs/domain/workflow.md:
+// "Requested by an authorized Principal").
+func ValidateCancelProposal(cmd command.WorkflowCommandEnvelope, current workflow.Workflow) (*command.GovernedCommandProposal, []string) {
+	var reasons []string
+	if current.State != workflow.StatePlanned && current.State != workflow.StateReady {
+		reasons = append(reasons, command.ReasonIllegalState)
+	}
+	if cmd.ExpectedVersion == nil || *cmd.ExpectedVersion != current.Version {
+		reasons = append(reasons, command.ReasonVersionMismatch)
+	}
+	if cmd.RequestingPrincipalID != current.InitiatingPrincipalID {
+		reasons = append(reasons, command.ReasonPrincipalNotAuthorized)
+	}
+	if len(reasons) > 0 {
+		return nil, reasons
+	}
+	return newProposal(cmd, cmd.WorkflowID.String(), map[string]any{
+		"priorState": current.State,
+	}), nil
+}

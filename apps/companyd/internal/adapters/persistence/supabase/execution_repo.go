@@ -191,6 +191,69 @@ func (r *ExecutionRepository) GetResult(ctx context.Context, orgID, resultID uui
 	return &res, nil
 }
 
+// ListExecutionUnits serves ports.ExecutionRepository's status-projection
+// read: every ExecutionIntent for workflowID plus every ExecutionAttempt
+// made against each, oldest first. Two queries rather than a join — intents
+// without any attempt yet (freshly claimed, or still PENDING) must still
+// appear as a unit with an empty Attempts slice.
+func (r *ExecutionRepository) ListExecutionUnits(ctx context.Context, orgID, workflowID uuid.UUID) ([]execution.ExecutionUnit, error) {
+	rows, err := r.p.pool.Query(ctx, `
+		SELECT intent_id, status, due_at FROM execution_intents
+		WHERE organization_id=$1 AND workflow_id=$2 ORDER BY created_at`, orgID, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	unitsByIntent := map[uuid.UUID]*execution.ExecutionUnit{}
+	var order []uuid.UUID
+	for rows.Next() {
+		var u execution.ExecutionUnit
+		if err := rows.Scan(&u.IntentID, &u.IntentStatus, &u.DueAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		unitsByIntent[u.IntentID] = &u
+		order = append(order, u.IntentID)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(order) == 0 {
+		return nil, nil
+	}
+
+	attemptRows, err := r.p.pool.Query(ctx, `
+		SELECT attempt_id, organization_id, intent_id, workflow_id, workflow_version, logical_operation_id,
+		       attempt_number, capability_request_id, status, lease_owner, lease_fencing_token, lease_expires_at,
+		       provider_run_id, created_at, last_heartbeat_at, next_attempt_due_at, terminal_at, result_id
+		FROM execution_attempts WHERE organization_id=$1 AND workflow_id=$2 ORDER BY created_at`, orgID, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer attemptRows.Close()
+	for attemptRows.Next() {
+		var a execution.ExecutionAttempt
+		if err := attemptRows.Scan(&a.AttemptID, &a.OrganizationID, &a.IntentID, &a.WorkflowID, &a.WorkflowVersion,
+			&a.LogicalOperationID, &a.AttemptNumber, &a.CapabilityRequestID, &a.Status, &a.LeaseOwner,
+			&a.LeaseFencingToken, &a.LeaseExpiresAt, &a.ProviderRunID, &a.CreatedAt, &a.LastHeartbeatAt,
+			&a.NextAttemptDueAt, &a.TerminalAt, &a.ResultID); err != nil {
+			return nil, err
+		}
+		if u, ok := unitsByIntent[a.IntentID]; ok {
+			u.Attempts = append(u.Attempts, a)
+		}
+	}
+	if err := attemptRows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]execution.ExecutionUnit, 0, len(order))
+	for _, id := range order {
+		out = append(out, *unitsByIntent[id])
+	}
+	return out, nil
+}
+
 func (r *ExecutionRepository) GetLatestResult(ctx context.Context, orgID, workflowID uuid.UUID) (*result.Result, error) {
 	row := r.p.pool.QueryRow(ctx, `
 		SELECT result_id, organization_id, result_type, workflow_id, objective_id, intent_id, attempt_id,

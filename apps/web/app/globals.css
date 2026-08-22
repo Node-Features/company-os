@@ -213,6 +213,87 @@ main {
   animation: pulse-text 1.4s ease-in-out infinite;
 }
 
+.unit-tree {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.unit-tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  white-space: pre;
+}
+
+.unit-tree-prefix {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.unit-tree-marker {
+  font-size: 0.55rem;
+}
+
+.unit-tree-label {
+  color: var(--text);
+  white-space: normal;
+}
+
+.unit-tree-sub {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.unit-tree-status {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.unit-tree-duration {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.unit-empty {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin: 0.35rem 0 0;
+}
+
+.unit-cyan {
+  color: var(--neon-cyan);
+}
+.unit-amber {
+  color: var(--neon-amber);
+}
+.unit-green {
+  color: var(--neon-green);
+}
+.unit-danger {
+  color: var(--danger);
+}
+.unit-dim {
+  color: var(--text-dim);
+}
+
+@keyframes unit-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 6px currentColor;
+  }
+  50% {
+    opacity: 0.4;
+    text-shadow: none;
+  }
+}
+
+.unit-pulse {
+  animation: unit-pulse 1.1s ease-in-out infinite;
+}
+
 .result-text {
   color: var(--text);
   background: #000814;

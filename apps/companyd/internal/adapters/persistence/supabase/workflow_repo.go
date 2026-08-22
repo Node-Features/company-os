@@ -82,6 +82,7 @@ func (r *WorkflowRepository) CommitTransition(
 	closePendingCommand *uuid.UUID,
 	consumeApproval *uuid.UUID,
 	decideResult *ports.ResultDecision,
+	closeOutstandingIntent bool,
 ) error {
 	tx, err := r.p.pool.Begin(ctx)
 	if err != nil {
@@ -133,6 +134,15 @@ func (r *WorkflowRepository) CommitTransition(
 	}
 	if decideResult != nil {
 		if _, err := tx.Exec(ctx, `UPDATE results SET accepted=$1, decided_at=now() WHERE result_id=$2`, decideResult.Accepted, decideResult.ResultID); err != nil {
+			return err
+		}
+	}
+
+	if closeOutstandingIntent {
+		if _, err := tx.Exec(ctx, `
+			UPDATE execution_intents SET status='CLOSED'
+			WHERE organization_id=$1 AND workflow_id=$2 AND status='PENDING'`,
+			w.OrganizationID, w.WorkflowID); err != nil {
 			return err
 		}
 	}

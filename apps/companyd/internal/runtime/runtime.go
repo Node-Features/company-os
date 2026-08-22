@@ -44,8 +44,27 @@ type Runtime struct {
 	PollInterval  time.Duration
 	LeaseDuration time.Duration
 	Wakeup        <-chan uuid.UUID
+	// Notifier is an optional best-effort ping to web's per-Workflow
+	// realtime channel on each ExecutionUnit (ExecutionIntent/
+	// ExecutionAttempt) transition — CLAIMED, DISPATCHED, terminal — none
+	// of which produce a DomainEvent of their own. A nil Notifier is never
+	// an error; the receiver's reconciliation poll is the durable
+	// fallback, same as Application.Notify's in-process wake-up hint.
+	Notifier ports.ChangeNotifier
 
 	wg sync.WaitGroup
+}
+
+// notifyChanged is a non-blocking best-effort ping — errors are logged, not
+// surfaced, since ports.ChangeNotifier's contract is a recoverable hint,
+// never a dependency (mirrors ports.Publisher's same contract).
+func (r *Runtime) notifyChanged(ctx context.Context, workflowID uuid.UUID) {
+	if r.Notifier == nil {
+		return
+	}
+	if err := r.Notifier.NotifyWorkflowChanged(ctx, workflowID); err != nil {
+		log.Printf("runtime: notify workflow changed: %v", err)
+	}
 }
 
 // Start runs the poll-and-wake loop until ctx is cancelled.
@@ -77,6 +96,7 @@ func (r *Runtime) Sweep(ctx context.Context) {
 		return
 	}
 	for _, c := range claims {
+		r.notifyChanged(ctx, c.Intent.WorkflowID)
 		r.wg.Add(1)
 		go func(c execution.ClaimedExecution) {
 			defer r.wg.Done()
@@ -98,6 +118,7 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 		// so it's treated as terminal rather than looping.
 		log.Printf("runtime: dispatch not authorized for intent %s: %s", intent.IntentID, decision.Outcome)
 		_ = r.Exec.RecordTerminal(ctx, attempt.AttemptID, *attempt.LeaseFencingToken, execution.StatusFailedTerminal, nil)
+		r.notifyChanged(ctx, intent.WorkflowID)
 		return
 	}
 
@@ -105,6 +126,7 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 		log.Printf("runtime: record dispatched: %v", err)
 		return
 	}
+	r.notifyChanged(ctx, intent.WorkflowID)
 
 	capDef := r.Fixtures.Capability()
 	dispatchCtx, cancel := context.WithTimeout(ctx, capDef.Timeout)
@@ -157,6 +179,7 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 		if err := r.Exec.ScheduleRetry(ctx, intent.OrganizationID, intent.IntentID, now.Add(backoff)); err != nil {
 			log.Printf("runtime: schedule retry: %v", err)
 		}
+		r.notifyChanged(ctx, intent.WorkflowID)
 		return
 	}
 
@@ -193,6 +216,7 @@ func (r *Runtime) submitResult(ctx context.Context, attempt execution.ExecutionA
 		log.Printf("runtime: record terminal: %v", err)
 		return
 	}
+	r.notifyChanged(ctx, intent.WorkflowID)
 	outcome := r.App.SubmitResult(ctx, application.SubmitResultRequest{
 		RequestID:       uuid.New(),
 		IdempotencyKey:  res.IdempotencyKey,

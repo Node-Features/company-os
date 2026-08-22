@@ -17,6 +17,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/fallback"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/gemini"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/openai"
+	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/notify/realtime"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/persistence/supabase"
 	"github.com/Node-Features/company-os/apps/companyd/internal/application"
 	"github.com/Node-Features/company-os/apps/companyd/internal/daemon"
@@ -126,6 +127,7 @@ func main() {
 		// Kernel decision functions later, per governed request — see the
 		// note above.
 		wakeup := make(chan uuid.UUID, 16)
+		realtimePublisher := supabase.NewRealtimePublisher(pool)
 		app := &application.Application{
 			Repo:     supabase.NewWorkflowRepository(pool),
 			Pending:  supabase.NewPendingCommandRepository(pool),
@@ -144,11 +146,34 @@ func main() {
 			PollInterval:  5 * time.Second,
 			LeaseDuration: 60 * time.Second,
 			Wakeup:        wakeup,
+			Notifier:      realtimePublisher,
 		}
 		// Boot stage 8: Daemon construction and start — supervises
 		// Runtime's dispatch loop (daemon.md's process-lifecycle
 		// ownership), not a handoff to Kernel.
 		d = daemon.New(rt)
+
+		// Boot stage 8b: realtime.Sweeper — Phase 1 Slice 8's push path.
+		// Reads event_outbox (nothing did before this slice) and broadcasts
+		// a minimal hint over Supabase Realtime (via realtime.send() over
+		// the same DATABASE_URL pool, not a separate credential — see
+		// supabase.RealtimePublisher) for web's browser client to receive
+		// directly. Gated only on pool != nil, the same condition
+		// everything else in this block already depends on — no new env
+		// var required. Not supervised by Daemon (which is scoped to
+		// Runtime's Scheduler contract) — it's best-effort and
+		// idempotent-on-retry by construction, so it's started and left to
+		// stop on ctx.Done() like the HTTP server below, with no explicit
+		// drain needed.
+		sweeper := &realtime.Sweeper{
+			Outbox:       supabase.NewOutboxRepository(pool),
+			Publisher:    realtimePublisher,
+			OrgID:        fixtures.OrganizationID,
+			PollInterval: time.Second,
+			BatchSize:    50,
+		}
+		go sweeper.Start(ctx)
+		log.Println("companyd: realtime sweeper started (event_outbox -> Supabase Realtime Broadcast)")
 
 		// Boot stage 9: agent/workflow-layer entry points. Only reachable
 		// once stages 4-8 above succeeded.
@@ -156,6 +181,7 @@ func main() {
 		mux.HandleFunc("POST /v1/workflows/{workflowId}/start", httpapi.StartWorkflowHandler(app))
 		mux.HandleFunc("POST /v1/workflows/{workflowId}/results/accept", httpapi.AcceptResultHandler(app))
 		mux.HandleFunc("POST /v1/workflows/{workflowId}/results/reject", httpapi.RejectResultHandler(app))
+		mux.HandleFunc("POST /v1/workflows/{workflowId}/cancel", httpapi.CancelWorkflowHandler(app))
 		mux.HandleFunc("GET /v1/workflows/{workflowId}", httpapi.GetWorkflowHandler(app))
 
 		if err := d.Start(ctx); err != nil {

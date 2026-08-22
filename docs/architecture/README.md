@@ -32,3 +32,4 @@ Approval applies to the reviewed version. A material boundary or invariant chang
 | `events.md` | Architectural event responsibilities | APPROVED | Read when changing event flow. |
 | `knowledge.md` | Organizational knowledge ownership | APPROVED | Read when designing knowledge handling. |
 | `persistence.md` | Authoritative persistence responsibilities | APPROVED | Read when changing durable state. |
+| `node.md` | Runtime/compute node identity, capabilities, and scheduler placement | DRAFT | Read when designing multi-node execution capacity, distinct from organizational topology. |

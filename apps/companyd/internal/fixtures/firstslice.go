@@ -65,6 +65,7 @@ func NewRegistry() Registry {
 			Commands: []string{
 				string(command.CreateWorkflow), string(command.StartWorkflow),
 				string(command.AcceptWorkflowResult), string(command.RejectWorkflowResult),
+				string(command.CancelWorkflow),
 			},
 			RequiredCapabilityID:      CapabilityID,
 			RequiredCapabilityVersion: 1,

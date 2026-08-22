@@ -9,8 +9,7 @@ import (
 )
 
 // CommandType is one of the first-slice command vocabulary entries. See
-// docs/domain/command.md. CANCEL_WORKFLOW is named but not wired to a
-// legal Kernel transition path in this slice (out of scope).
+// docs/domain/command.md.
 type CommandType string
 
 const (
@@ -138,4 +137,5 @@ const (
 	ReasonResultBindingMismatch = "RESULT_BINDING_MISMATCH"
 	ReasonGovernanceDenied      = "GOVERNANCE_DENIED"
 	ReasonGovernanceStale       = "GOVERNANCE_STALE"
+	ReasonPrincipalNotAuthorized = "PRINCIPAL_NOT_AUTHORIZED"
 )

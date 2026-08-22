@@ -123,7 +123,7 @@ func TestWorkflowRepository_CommitTransition_StaleVersionRejected(t *testing.T) 
 	next.Version = 2
 	next.State = workflow.StateReady
 	staleExpected := int64(99) // wrong on purpose
-	err := repo.CommitTransition(ctx, &next, staleExpected, []event.DomainEvent{newTestEvent(w.OrganizationID, w.WorkflowID, 2)}, uuid.New(), nil, nil, nil, nil)
+	err := repo.CommitTransition(ctx, &next, staleExpected, []event.DomainEvent{newTestEvent(w.OrganizationID, w.WorkflowID, 2)}, uuid.New(), nil, nil, nil, nil, false)
 	if err != ports.ErrConflict {
 		t.Fatalf("CommitTransition with stale version error = %v, want ports.ErrConflict", err)
 	}
@@ -152,7 +152,7 @@ func TestWorkflowRepository_CommitTransition_AtomicWithEvents(t *testing.T) {
 	next.Version = 2
 	next.State = workflow.StateReady
 	evt := newTestEvent(w.OrganizationID, w.WorkflowID, 2)
-	if err := repo.CommitTransition(ctx, &next, 1, []event.DomainEvent{evt}, uuid.New(), nil, nil, nil, nil); err != nil {
+	if err := repo.CommitTransition(ctx, &next, 1, []event.DomainEvent{evt}, uuid.New(), nil, nil, nil, nil, false); err != nil {
 		t.Fatalf("CommitTransition: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func TestExecutionRepository_ClaimDueIntents_NoDuplicateUnderConcurrency(t *test
 	next := *w
 	next.Version = 2
 	next.State = workflow.StateReady
-	if err := wfRepo.CommitTransition(ctx, &next, 1, []event.DomainEvent{newTestEvent(orgID, w.WorkflowID, 2)}, uuid.New(), intent, nil, nil, nil); err != nil {
+	if err := wfRepo.CommitTransition(ctx, &next, 1, []event.DomainEvent{newTestEvent(orgID, w.WorkflowID, 2)}, uuid.New(), intent, nil, nil, nil, false); err != nil {
 		t.Fatalf("CommitTransition with intent: %v", err)
 	}
 
@@ -234,5 +234,125 @@ func TestExecutionRepository_ClaimDueIntents_NoDuplicateUnderConcurrency(t *test
 	}
 	if total != 1 {
 		t.Fatalf("total claims across 5 concurrent sweeps = %d, want exactly 1", total)
+	}
+}
+
+func TestOutboxRepository_LoadMarkPublished_RoundTrips(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	outbox := NewOutboxRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	w := newTestWorkflow(orgID)
+	evt := newTestEvent(orgID, w.WorkflowID, 1)
+	if err := wfRepo.CreateWorkflow(ctx, w, []event.DomainEvent{evt}, uuid.New()); err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+
+	unpublished, err := outbox.LoadUnpublished(ctx, orgID, 100)
+	if err != nil {
+		t.Fatalf("LoadUnpublished: %v", err)
+	}
+	found := false
+	for _, e := range unpublished {
+		if e.EventID == evt.EventID {
+			found = true
+			if e.EventType != evt.EventType || e.SubjectID != evt.SubjectID {
+				t.Errorf("loaded event = %+v, want it to round-trip newTestEvent's fields", e)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("CreateWorkflow's event %s not found among unpublished outbox rows", evt.EventID)
+	}
+
+	if err := outbox.MarkPublished(ctx, []uuid.UUID{evt.EventID}); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+
+	afterPublish, err := outbox.LoadUnpublished(ctx, orgID, 100)
+	if err != nil {
+		t.Fatalf("LoadUnpublished after MarkPublished: %v", err)
+	}
+	for _, e := range afterPublish {
+		if e.EventID == evt.EventID {
+			t.Fatalf("event %s still returned by LoadUnpublished after MarkPublished", evt.EventID)
+		}
+	}
+}
+
+func TestOutboxRepository_MarkPublishFailed_LeavesRowUnpublished(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	outbox := NewOutboxRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	w := newTestWorkflow(orgID)
+	evt := newTestEvent(orgID, w.WorkflowID, 1)
+	if err := wfRepo.CreateWorkflow(ctx, w, []event.DomainEvent{evt}, uuid.New()); err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+
+	if err := outbox.MarkPublishFailed(ctx, []uuid.UUID{evt.EventID}, "realtime unreachable"); err != nil {
+		t.Fatalf("MarkPublishFailed: %v", err)
+	}
+
+	unpublished, err := outbox.LoadUnpublished(ctx, orgID, 100)
+	if err != nil {
+		t.Fatalf("LoadUnpublished: %v", err)
+	}
+	found := false
+	for _, e := range unpublished {
+		if e.EventID == evt.EventID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("event %s should still be unpublished after MarkPublishFailed, so a later Sweep retries it", evt.EventID)
+	}
+
+	var attempts int
+	var lastErr *string
+	if err := pool.pool.QueryRow(ctx, `SELECT publish_attempts, last_error FROM event_outbox WHERE event_id = $1`, evt.EventID).Scan(&attempts, &lastErr); err != nil {
+		t.Fatalf("query event_outbox: %v", err)
+	}
+	if attempts != 1 {
+		t.Errorf("publish_attempts = %d, want 1", attempts)
+	}
+	if lastErr == nil || *lastErr != "realtime unreachable" {
+		t.Errorf("last_error = %v, want \"realtime unreachable\"", lastErr)
+	}
+}
+
+func TestRealtimePublisher_Publish_WorkflowEventSucceeds(t *testing.T) {
+	pool := requirePool(t)
+	publisher := NewRealtimePublisher(pool)
+	ctx := context.Background()
+
+	wfID := uuid.New()
+	evt := newTestEvent(testOrgID(), wfID, 1)
+	evt.WorkflowID = &wfID
+
+	// This is the one real risk in switching from an HTTP call to a SQL
+	// call: does the DATABASE_URL role have EXECUTE on realtime.send()? A
+	// permission-denied error here means that grant is missing on the
+	// Supabase project, not a bug in this code.
+	if err := publisher.Publish(ctx, []event.DomainEvent{evt}); err != nil {
+		t.Fatalf("Publish: %v (does the DATABASE_URL role have EXECUTE on realtime.send?)", err)
+	}
+}
+
+func TestRealtimePublisher_Publish_NoWorkflowEventIsNoop(t *testing.T) {
+	pool := requirePool(t)
+	publisher := NewRealtimePublisher(pool)
+	ctx := context.Background()
+
+	evt := newTestEvent(testOrgID(), uuid.New(), 1)
+	evt.WorkflowID = nil
+
+	if err := publisher.Publish(ctx, []event.DomainEvent{evt}); err != nil {
+		t.Fatalf("Publish with no WorkflowID should be a no-op, got error: %v", err)
 	}
 }

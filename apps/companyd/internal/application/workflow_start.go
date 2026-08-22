@@ -69,7 +69,7 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 	next.State = kd.NextState
 	next.UpdatedAt = cmd.DeclaredTime
 
-	if err := a.Repo.CommitTransition(ctx, &next, req.ExpectedVersion, kd.Events, kd.GovernanceDecisionID, kd.Intent, nil, nil, nil); err != nil {
+	if err := a.Repo.CommitTransition(ctx, &next, req.ExpectedVersion, kd.Events, kd.GovernanceDecisionID, kd.Intent, nil, nil, nil, false); err != nil {
 		if errors.Is(err, ports.ErrConflict) {
 			return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
 		}

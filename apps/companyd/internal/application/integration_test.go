@@ -44,6 +44,7 @@ func requireRealApp(t *testing.T) *Application {
 		MonitoringEvaluation: supabase.NewMonitoringEvaluationRepository(pool),
 		Finance:              supabase.NewFinanceRepository(pool),
 		Objective:            supabase.NewObjectiveRepository(pool),
+		Knowledge:            supabase.NewKnowledgeRepository(pool),
 	}
 }
 

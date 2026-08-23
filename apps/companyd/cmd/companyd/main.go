@@ -173,6 +173,7 @@ func main() {
 				MonitoringEvaluation: supabase.NewMonitoringEvaluationRepository(pool),
 				Finance:              supabase.NewFinanceRepository(pool),
 				Objective:            supabase.NewObjectiveRepository(pool),
+				Knowledge:            supabase.NewKnowledgeRepository(pool),
 			}
 			// Boot stage 7: Runtime construction — the "runtime subsystems"
 			// stage (dispatch loop, leases, retries).
@@ -259,6 +260,11 @@ func main() {
 				// already generic by CommandType.
 				mux.HandleFunc("POST /v1/objectives/propose", withAuth(httpapi.ProposeObjectiveHandler(app)))
 				mux.HandleFunc("GET /v1/objectives/{objectiveId}", withAuth(httpapi.GetObjectiveHandler(app)))
+
+				// ROADMAP.md Phase 5 Slice 1 — docs/architecture/knowledge.md's
+				// ingestion/versioning flow.
+				mux.HandleFunc("POST /v1/knowledge/items/capture", withAuth(httpapi.CaptureKnowledgeCandidateHandler(app)))
+				mux.HandleFunc("GET /v1/knowledge/items/{knowledgeItemId}", withAuth(httpapi.GetKnowledgeItemHandler(app)))
 			} else {
 				log.Println("companyd: Supabase Auth verifier unavailable — /v1/workflows and /v1/approvals routes not mounted")
 			}

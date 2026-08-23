@@ -74,6 +74,13 @@ var firstSlicePolicies = []policy.Rule{
 	// created, per departments.md's Objective creation gate.
 	{RuleID: "objective-propose", Effect: policy.EffectPermit, Action: "objective.propose", Autonomy: policy.AutonomyApprovalRequired},
 
+	// ROADMAP.md Phase 5 Slice 1's KnowledgeItem ingestion/versioning use
+	// case (docs/architecture/knowledge.md steps 1-4). AUTOMATIC: capturing
+	// a DRAFT candidate is not approving Knowledge — knowledge.md is
+	// explicit that only knowledge.review/knowledge.approve (a later
+	// slice) needs human review.
+	{RuleID: "knowledge-item-capture", Effect: policy.EffectPermit, Action: "knowledge.item.capture", Autonomy: policy.AutonomyAutomatic},
+
 	{RuleID: "research-agent-read-market-data", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.read_market_data", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-agent-create-report", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.create_report", Autonomy: policy.AutonomyAutomatic},
 

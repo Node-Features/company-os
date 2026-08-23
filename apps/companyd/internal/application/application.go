@@ -34,6 +34,9 @@ type Application struct {
 	// Objective persists proposed Objectives (ROADMAP.md Phase 4 Slice 4,
 	// docs/architecture/departments.md's Objective creation gate).
 	Objective ports.ObjectiveRepository
+	// Knowledge persists KnowledgeItem versions (ROADMAP.md Phase 5 Slice 1,
+	// docs/architecture/knowledge.md's ingestion/versioning flow).
+	Knowledge ports.KnowledgeRepository
 }
 
 func viewOf(w *workflow.Workflow) *WorkflowView {

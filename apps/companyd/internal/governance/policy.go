@@ -81,6 +81,15 @@ var firstSlicePolicies = []policy.Rule{
 	// slice) needs human review.
 	{RuleID: "knowledge-item-capture", Effect: policy.EffectPermit, Action: "knowledge.item.capture", Autonomy: policy.AutonomyAutomatic},
 
+	// ROADMAP.md Phase 5 Slice 2's knowledge.approve governed action.
+	// Unconditional AutonomyApprovalRequired, same shape as
+	// "objective-propose" above — but unlike Objective's "no numeric field
+	// to condition on" reasoning, this one is a permanent architectural
+	// prohibition: docs/architecture/knowledge.md is explicit that
+	// deterministic automatic approval is disabled until a dedicated ADR is
+	// accepted, not merely a judgment call this slice made.
+	{RuleID: "knowledge-approve", Effect: policy.EffectPermit, Action: "knowledge.approve", Autonomy: policy.AutonomyApprovalRequired},
+
 	{RuleID: "research-agent-read-market-data", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.read_market_data", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-agent-create-report", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.create_report", Autonomy: policy.AutonomyAutomatic},
 

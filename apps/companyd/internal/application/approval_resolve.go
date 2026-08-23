@@ -42,7 +42,17 @@ func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRe
 	}
 
 	if !req.Approve {
-		return Result{Outcome: Rejected, Reasons: []string{command.ReasonApprovalRejected}}
+		// ApproveKnowledgeItem is the one CommandType whose reject
+		// disposition is itself a real state transition (DRAFT -> REJECTED,
+		// docs/architecture/knowledge.md's "separate rejected-review
+		// transition") rather than a no-op — every other CommandType keeps
+		// today's exact behavior unchanged via the default case.
+		switch pc.CommandType {
+		case command.ApproveKnowledgeItem:
+			return a.rejectApproveKnowledgeItem(ctx, pc, appr)
+		default:
+			return Result{Outcome: Rejected, Reasons: []string{command.ReasonApprovalRejected}}
+		}
 	}
 
 	switch pc.CommandType {
@@ -50,6 +60,8 @@ func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRe
 		return a.resumeCancelWorkflow(ctx, pc, appr)
 	case command.ProposeObjective:
 		return a.resumeProposeObjective(ctx, pc, appr)
+	case command.ApproveKnowledgeItem:
+		return a.resumeApproveKnowledgeItem(ctx, pc, appr)
 	default:
 		return Result{Outcome: Unavailable, Reasons: []string{"unsupported command type for resumption: " + string(pc.CommandType)}}
 	}

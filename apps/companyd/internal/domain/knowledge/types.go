@@ -7,9 +7,10 @@ import (
 )
 
 // Status is KnowledgeItem's lifecycle. See docs/domain/knowledge.md.
-// Phase 5 Slice 1 (ingestion/versioning) only ever writes StatusDraft —
-// every other value is reached only by the knowledge.review/knowledge.approve
-// governed action, a later slice.
+// Phase 5 Slice 1 (ingestion/versioning) only ever writes StatusDraft;
+// Phase 5 Slice 2 (knowledge.approve) additionally writes StatusApproved
+// and StatusRejected. StatusInReview/StatusSuperseded/StatusExpired remain
+// unexercised — future work.
 type Status string
 
 const (
@@ -54,11 +55,9 @@ const (
 // versions; each new normalization of the same source is a new row with an
 // incremented Version, never an overwrite.
 //
-// Deferred to later slices, per docs/domain/knowledge.md's own minimum
-// contract: purpose, audience, validity conditions, review deadline,
-// retention, contradiction/supersession/derivation links, and the
-// Governance-decision/reviewer/Approval fields (those belong to the
-// knowledge.review/knowledge.approve action, not ingestion).
+// Deferred, per docs/domain/knowledge.md's own minimum contract: purpose,
+// audience, validity conditions, review deadline, retention, and
+// contradiction/supersession/derivation links.
 type KnowledgeItem struct {
 	KnowledgeItemID       uuid.UUID
 	OrganizationID        uuid.UUID
@@ -76,4 +75,15 @@ type KnowledgeItem struct {
 	// it never causes a merge or blocks capture.
 	DuplicateOfItemID *uuid.UUID
 	CreatedAt         time.Time
+	// ReviewerPrincipalID, GovernanceDecisionID, ApprovalID, and ReviewedAt
+	// are all nil until knowledge.approve (Phase 5 Slice 2) resolves —
+	// docs/domain/knowledge.md: "Governance decision, authenticated
+	// reviewer Principal, Authority/policy versions, and review evidence
+	// when approved." ReviewerPrincipalID is the actual decider (always
+	// fixtures.Registry.ApproverPrincipal() today), distinct from whichever
+	// Principal requested the review.
+	ReviewerPrincipalID *uuid.UUID
+	GovernanceDecisionID *uuid.UUID
+	ApprovalID           *uuid.UUID
+	ReviewedAt           *time.Time
 }

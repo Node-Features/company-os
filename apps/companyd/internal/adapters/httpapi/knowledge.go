@@ -51,6 +51,42 @@ func CaptureKnowledgeCandidateHandler(app *application.Application) http.Handler
 	}
 }
 
+// RequestKnowledgeApprovalHandler handles
+// POST /v1/knowledge/items/{knowledgeItemId}/request-approval. The actual
+// approve/reject decision reuses the existing
+// POST /v1/approvals/{approvalId}/decide route unchanged — its dispatch is
+// already generic by CommandType.
+func RequestKnowledgeApprovalHandler(app *application.Application) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principalID, ok := requirePrincipal(w, r)
+		if !ok {
+			return
+		}
+		itemID, err := uuid.Parse(r.PathValue("knowledgeItemId"))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid knowledgeItemId")
+			return
+		}
+		var body struct {
+			Version       int    `json:"version"`
+			ContentDigest string `json:"contentDigest"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		requestID := uuid.New()
+		res := app.RequestKnowledgeApproval(r.Context(), application.RequestKnowledgeApprovalRequest{
+			RequestID:       requestID,
+			PrincipalID:     principalID,
+			KnowledgeItemID: itemID,
+			Version:         body.Version,
+			ContentDigest:   body.ContentDigest,
+		})
+		writeDepartmentResult(w, requestID, res)
+	}
+}
+
 // GetKnowledgeItemHandler handles GET /v1/knowledge/items/{knowledgeItemId}.
 func GetKnowledgeItemHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

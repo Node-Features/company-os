@@ -210,3 +210,195 @@ func TestIntegration_Knowledge_VersionIncrementsOnChangedContent(t *testing.T) {
 		t.Fatalf("Version = %d, want 2", item.Version)
 	}
 }
+
+// captureKnowledgeItem publishes a real Finding with producerPrincipalID as
+// the driving Principal, captures it, and returns the resulting DRAFT
+// KnowledgeItem — the fixture Slice 2's approval-flow tests build on.
+func captureKnowledgeItem(t *testing.T, app *Application, ctx context.Context, producerPrincipalID uuid.UUID, claim string) knowledgedomain.KnowledgeItem {
+	t.Helper()
+	findingID := publishFindingWithClaim(t, app, ctx, producerPrincipalID, claim)
+	res := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
+		RequestID: uuid.New(), PrincipalID: producerPrincipalID,
+		SourceType: knowledgedomain.SourceResearchFinding, SourceID: findingID,
+	})
+	if res.Outcome != Accepted || res.ResourceID == nil {
+		t.Fatalf("CaptureKnowledgeCandidate outcome = %s (reasons: %v)", res.Outcome, res.Reasons)
+	}
+	item, err := app.GetKnowledgeItem(ctx, *res.ResourceID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	return item
+}
+
+// TestIntegration_Knowledge_RequestApproval_ThenApprove proves the full
+// knowledge.approve REQUIRE_APPROVAL round trip: request -> APPROVAL_REQUIRED
+// (item still DRAFT) -> human approve -> item APPROVED with every review
+// field populated.
+func TestIntegration_Knowledge_RequestApproval_ThenApprove(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+	requesterID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Approval-flow test claim, unique per run: "+uuid.New().String())
+
+	reqRes := app.RequestKnowledgeApproval(ctx, RequestKnowledgeApprovalRequest{
+		RequestID: uuid.New(), PrincipalID: requesterID,
+		KnowledgeItemID: item.KnowledgeItemID, Version: item.Version, ContentDigest: item.ContentDigest,
+	})
+	if reqRes.Outcome != ApprovalRequired || reqRes.ApprovalID == nil {
+		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
+	}
+
+	stillDraft, err := app.GetKnowledgeItem(ctx, item.KnowledgeItemID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	if stillDraft.Status != knowledgedomain.StatusDraft {
+		t.Fatalf("Status = %s, want DRAFT while pending", stillDraft.Status)
+	}
+
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	if decideRes.Outcome != Accepted || decideRes.ResourceID == nil {
+		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", decideRes.Outcome, decideRes.Reasons)
+	}
+
+	approved, err := app.GetKnowledgeItem(ctx, item.KnowledgeItemID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	if approved.Status != knowledgedomain.StatusApproved {
+		t.Fatalf("Status = %s, want APPROVED", approved.Status)
+	}
+	if approved.ReviewerPrincipalID == nil || approved.GovernanceDecisionID == nil || approved.ApprovalID == nil || approved.ReviewedAt == nil {
+		t.Fatalf("review fields not populated: %+v", approved)
+	}
+}
+
+// TestIntegration_Knowledge_RequestApproval_ThenReject proves a human
+// reject transitions the item to REJECTED (docs/architecture/knowledge.md's
+// "separate rejected-review transition"), not left DRAFT, and that a
+// second resolution of the same Approval is CONFLICT.
+func TestIntegration_Knowledge_RequestApproval_ThenReject(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+	requesterID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Rejection-flow test claim, unique per run: "+uuid.New().String())
+
+	reqRes := app.RequestKnowledgeApproval(ctx, RequestKnowledgeApprovalRequest{
+		RequestID: uuid.New(), PrincipalID: requesterID,
+		KnowledgeItemID: item.KnowledgeItemID, Version: item.Version, ContentDigest: item.ContentDigest,
+	})
+	if reqRes.Outcome != ApprovalRequired || reqRes.ApprovalID == nil {
+		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
+	}
+
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: false})
+	if decideRes.Outcome != Rejected {
+		t.Fatalf("ResolveApproval(reject) outcome = %s, want REJECTED", decideRes.Outcome)
+	}
+
+	rejected, err := app.GetKnowledgeItem(ctx, item.KnowledgeItemID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	if rejected.Status != knowledgedomain.StatusRejected {
+		t.Fatalf("Status = %s, want REJECTED", rejected.Status)
+	}
+
+	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	if again.Outcome != Conflict {
+		t.Fatalf("second resolution outcome = %s, want CONFLICT", again.Outcome)
+	}
+}
+
+// TestIntegration_Knowledge_RequestApproval_SelfReviewDenied proves
+// separation-of-duties as a real Governance DENY (governance.Request.
+// ExcludedPrincipalID): the review requester cannot be the candidate's own
+// producer, and a DENY leaves the candidate unchanged
+// (docs/architecture/knowledge.md).
+func TestIntegration_Knowledge_RequestApproval_SelfReviewDenied(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Self-review test claim, unique per run: "+uuid.New().String())
+
+	reqRes := app.RequestKnowledgeApproval(ctx, RequestKnowledgeApprovalRequest{
+		RequestID: uuid.New(), PrincipalID: producerID, // same Principal as the producer
+		KnowledgeItemID: item.KnowledgeItemID, Version: item.Version, ContentDigest: item.ContentDigest,
+	})
+	if reqRes.Outcome != Denied {
+		t.Fatalf("RequestKnowledgeApproval(self-review) outcome = %s, want DENIED", reqRes.Outcome)
+	}
+
+	unchanged, err := app.GetKnowledgeItem(ctx, item.KnowledgeItemID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	if unchanged.Status != knowledgedomain.StatusDraft {
+		t.Fatalf("Status = %s, want DRAFT (unchanged)", unchanged.Status)
+	}
+}
+
+// TestIntegration_Knowledge_RequestApproval_StaleVersionRejected proves a
+// version that changed between request and resolution is rejected before
+// Governance is even reached (docs/architecture/knowledge.md: "a stale item
+// version... requires a new Governance evaluation"), not silently approved
+// against stale content. Seeds the newer version directly through the
+// repository, bypassing Application — the same pattern Slice 1's
+// version-increment test uses, since nothing in Application itself can
+// create a second version for an item mid-review (this item's source
+// Finding can never change).
+func TestIntegration_Knowledge_RequestApproval_StaleVersionRejected(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+	requesterID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Stale-version test claim, unique per run: "+uuid.New().String())
+
+	reqRes := app.RequestKnowledgeApproval(ctx, RequestKnowledgeApprovalRequest{
+		RequestID: uuid.New(), PrincipalID: requesterID,
+		KnowledgeItemID: item.KnowledgeItemID, Version: item.Version, ContentDigest: item.ContentDigest,
+	})
+	if reqRes.Outcome != ApprovalRequired || reqRes.ApprovalID == nil {
+		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
+	}
+
+	if err := app.Knowledge.CaptureItem(ctx, &knowledgedomain.KnowledgeItem{
+		KnowledgeItemID:       item.KnowledgeItemID,
+		OrganizationID:        item.OrganizationID,
+		Version:               item.Version + 1,
+		Claim:                 "changed content after the review request was made",
+		ContentDigest:         "a-different-digest-simulating-changed-content",
+		Classification:        knowledgedomain.ClassificationInternal,
+		SourceType:            item.SourceType,
+		SourceID:              item.SourceID,
+		ProducedByPrincipalID: producerID,
+		ProducedByMethod:      knowledgedomain.MethodSourceVerbatim,
+		Status:                knowledgedomain.StatusDraft,
+		CreatedAt:              time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed newer version: %v", err)
+	}
+
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	if decideRes.Outcome != Rejected {
+		t.Fatalf("ResolveApproval(approve) outcome = %s, want REJECTED (stale)", decideRes.Outcome)
+	}
+	if len(decideRes.Reasons) != 1 || decideRes.Reasons[0] != "knowledge_item_stale_version_or_digest" {
+		t.Fatalf("reasons = %v, want [knowledge_item_stale_version_or_digest]", decideRes.Reasons)
+	}
+
+	latest, err := app.GetKnowledgeItem(ctx, item.KnowledgeItemID)
+	if err != nil {
+		t.Fatalf("GetKnowledgeItem: %v", err)
+	}
+	if latest.Status != knowledgedomain.StatusDraft {
+		t.Fatalf("latest version Status = %s, want DRAFT (never transitioned)", latest.Status)
+	}
+}

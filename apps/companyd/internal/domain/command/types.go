@@ -23,6 +23,10 @@ const (
 	// gate command — not a Workflow command at all, but shares
 	// CommandType/PendingCommand/Approval since those are already generic.
 	ProposeObjective CommandType = "PROPOSE_OBJECTIVE"
+	// ApproveKnowledgeItem is ROADMAP.md Phase 5 Slice 2's knowledge.approve
+	// governed action — same reuse of CommandType/PendingCommand/Approval
+	// as ProposeObjective.
+	ApproveKnowledgeItem CommandType = "APPROVE_KNOWLEDGE_ITEM"
 )
 
 // ActionFor is the exact Action mapping table in docs/domain/command.md.
@@ -33,6 +37,7 @@ var ActionFor = map[CommandType]string{
 	RejectWorkflowResult: "workflow.result.reject",
 	CancelWorkflow:       "workflow.cancel",
 	ProposeObjective:     "objective.propose",
+	ApproveKnowledgeItem: "knowledge.approve",
 }
 
 // WorkflowCommandEnvelope is the transport-independent request to change
@@ -81,6 +86,29 @@ type ObjectiveProposalCommandEnvelope struct {
 	SourceID              uuid.UUID
 	Title                 string
 	Intent                string
+	RequestingPrincipalID uuid.UUID
+	DeclaredTime          time.Time
+	CorrelationID         uuid.UUID
+}
+
+// KnowledgeApprovalCommandEnvelope is the transport-independent request to
+// approve a KnowledgeItem candidate (ROADMAP.md Phase 5 Slice 2) —
+// deliberately not a WorkflowCommandEnvelope or ObjectiveProposalCommandEnvelope:
+// it transitions an existing, already-versioned row rather than creating a
+// new one or a new version.
+type KnowledgeApprovalCommandEnvelope struct {
+	SchemaVersion   int
+	CommandID       uuid.UUID
+	RequestID       uuid.UUID
+	IdempotencyKey  string
+	CommandType     CommandType // always ApproveKnowledgeItem
+	OrganizationID  uuid.UUID
+	KnowledgeItemID uuid.UUID
+	Version         int
+	ContentDigest   string
+	// RequestingPrincipalID is who asked for review, not the eventual
+	// decider — the decider is always fixtures.Registry.ApproverPrincipal(),
+	// same as every other REQUIRE_APPROVAL flow in this codebase.
 	RequestingPrincipalID uuid.UUID
 	DeclaredTime          time.Time
 	CorrelationID         uuid.UUID

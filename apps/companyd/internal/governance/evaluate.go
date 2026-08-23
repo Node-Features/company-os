@@ -49,6 +49,15 @@ type Request struct {
 	// Nil means this action carries no resource-instance ownership
 	// requirement.
 	ResourceOwnerPrincipalID *uuid.UUID
+	// ExcludedPrincipalID, when non-nil, is a resource-derived Principal the
+	// requester must NOT be — the inverse of ResourceOwnerPrincipalID.
+	// Implements per-resource separation-of-duties (docs/architecture/
+	// knowledge.md's knowledge.approve step 6: "require independence from
+	// authorship") as a real Governance-layer authorization check, not a
+	// Kernel legality one — same precedent as ResourceOwnerPrincipalID
+	// moving CancelWorkflow's ownership check out of Kernel (ROADMAP.md
+	// Phase 3 Slice 1). Nil means this action carries no exclusion.
+	ExcludedPrincipalID *uuid.UUID
 	// AdditionalAutonomyRequirement, when non-nil, is a resource-instance
 	// autonomy requirement the caller resolved from trusted Context (e.g.
 	// "this Workflow is READY, an in-flight cancel needs human sign-off") —
@@ -129,6 +138,14 @@ func Evaluate(ctx context.Context, req Request) (policy.GovernanceDecision, erro
 	if req.ResourceOwnerPrincipalID != nil && *req.ResourceOwnerPrincipalID != req.PrincipalID {
 		decision.Outcome = policy.DecisionDeny
 		reason := "principal does not own this resource"
+		decision.Reason = &reason
+		decision.AutonomyLevel = policy.AutonomyHumanOnly
+		return decision, nil
+	}
+
+	if req.ExcludedPrincipalID != nil && *req.ExcludedPrincipalID == req.PrincipalID {
+		decision.Outcome = policy.DecisionDeny
+		reason := "principal excluded from this resource (separation of duties)"
 		decision.Reason = &reason
 		decision.AutonomyLevel = policy.AutonomyHumanOnly
 		return decision, nil

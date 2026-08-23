@@ -11,7 +11,7 @@ Statuses mirror existing document metadata. Rows marked `NOT YET SPECIFIED` are 
 | `department.md` | Department identity and contracts | APPROVED | Read when changing department semantics. |
 | `workflow.md` | Workflow state and transition invariants | APPROVED | Read when changing workflow semantics. |
 | `execution.md` | Runtime execution-state mechanics: attempts, leases, checkpoints, waits, retries, resume | APPROVED | Read when changing Runtime recovery, retry, or dispatch mechanics. |
-| `agent.md` | Agent definition, participation, and authority boundary | DRAFT | Read when defining agent behavior or lifecycle. Reopened 2026-08-23 for a display-avatar addition; pending re-review. |
+| `agent.md` | Agent definition, participation, and authority boundary | APPROVED | Read when defining agent behavior or lifecycle. Reopened and re-approved 2026-08-23 for a display-avatar addition. |
 | `capability.md` | Provider-independent outcome and dispatch contract | APPROVED | Read when requesting, routing, or implementing capabilities. |
 | `command.md` | Shared command, governed-proposal, Kernel-decision, and pending-command envelopes | APPROVED | Read when coordinating a state-changing request across Application, Kernel, or Governance. |
 | `principal.md` | Durable actor identity and delegation references | APPROVED | Read when identifying human, agent, service, or provider actors. |

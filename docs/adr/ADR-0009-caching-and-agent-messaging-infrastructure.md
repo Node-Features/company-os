@@ -1,6 +1,6 @@
 # ADR-0009: Caching and Agent-Messaging Infrastructure
 
-Status: PROPOSED
+Status: APPROVED (2026-08-23, project owner `Node-Features`)
 
 ## Context
 
@@ -30,41 +30,56 @@ readiness here.
 ### Redis — cache layer, adopted
 
 Redis is adopted strictly as a **disposable, rebuildable cache**, never an authoritative store.
-This is not a new invariant this ADR introduces; it is the same rule `persistence.md` and
-`knowledge.md` already state for every projection in this system ("Search, embeddings, graphs,
-summaries, and caches are disposable projections... authoritative status is loaded from its
-repository" — `knowledge.md`). Redis is the first concrete cache *technology* adopted under a rule
-that already existed.
+This is not a new invariant this ADR introduces; `persistence.md`'s own invariant list states it
+directly: "Conversation, cache, search index, vector index, provider state, checkpoint, and
+message history are never authoritative business state" — Redis is the first concrete cache
+*technology* adopted under a rule that already existed and already named "cache" and "provider
+state" specifically. `knowledge.md`'s "disposable projections" language for Knowledge specifically
+is the same rule applied to one record class, not a second, separate rule.
 
-First candidate hot paths (not committed to exhaustively — the first implementation slice picks
-one, real design not invented here): Governance policy-rule lookups (once persisted — see the open
-question below), intelligence-provider fallback/cooldown state (`fallback.Provider` already tracks
-this, but only in one process's memory — it doesn't survive a restart and can't be shared across
-more than one `companyd` process), and `GetKnowledgeItem`/`QueryKnowledge` reads.
+**First concrete cache path, decided: intelligence-provider fallback/cooldown state.**
+`fallback.Provider` already tracks this, but only in one process's memory — it doesn't survive a
+restart and can't be shared across more than one `companyd` process, which is an operational
+correctness gap today, not merely a latency optimization the way the other candidates
+(Governance policy lookups once persisted; `GetKnowledgeItem`/`QueryKnowledge` reads) are. Chosen
+as the first path specifically because it's the simplest to reason about: **TTL-based
+invalidation** (the cooldown already has a natural expiry — `providerCooldown = 60 * time.Second`
+in `cmd/companyd/main.go` today — Redis just needs to hold that same TTL), and a **fail-open
+cold-cache fallback**: a Redis miss or outage means "assume no active cooldown, the provider is
+eligible to try" — degrading to the exact behavior this codebase has today (in-memory-only, so
+effectively no cross-process cooldown sharing), never blocking dispatch. The Governance-policy and
+`KnowledgeItem` candidates remain real future work but are deliberately not decided here — each has
+a harder invalidation story (write-through on every policy edit; consistency with the
+approve/reject transition) that deserves its own review, not inherited from this ADR by default.
 
 Every cached read must define its invalidation trigger and a cold-cache fallback to Postgres
-before it ships — a Redis outage must degrade latency, never correctness or availability. This is
-an acceptance criterion (below), not left to each implementer to improvise per-cache.
+before it ships — a Redis outage must degrade latency, never correctness or availability.
 
-### QStash — async agent messaging, proposed but not committed
+### QStash — `web`-side only, decided
 
-Kept separate deliberately, because its fit is not as clean as Redis's and this ADR should say so
-rather than rubber-stamp the request. QStash's value proposition — durable HTTP callbacks without
-a long-running worker — is strongest for serverless/edge deployments. `companyd` is explicitly not
-that: `ADR-0004` chose one long-running Go process with its own Postgres-outbox-polling worker
-(`Daemon`-supervised `Runtime`, and separately the realtime `Sweeper`), which already solves
-"reliable async dispatch" once, inside that process.
+Kept separate from Redis deliberately, because its fit is not as clean and this ADR should say so
+rather than rubber-stamp the original request. QStash's value proposition — durable HTTP callbacks
+without a long-running worker — is strongest for serverless/edge deployments. `companyd` is
+explicitly not that: `ADR-0004` chose one long-running Go process with its own
+Postgres-outbox-polling worker (`Daemon`-supervised `Runtime`, and separately the realtime
+`Sweeper`), which already solves "reliable async dispatch" once, inside that process. A second
+async mechanism for the same class of problem inside `companyd` would be net-new complexity for no
+clear win.
 
-QStash's clearest fit today is on the `web` side (Vercel, already serverless) for
-scheduled/webhook-driven work — not as a replacement for `companyd`'s existing dispatch loop. Its
-stronger long-term case is Agent-to-Agent messaging once more than one `companyd`-equivalent
-process exists (`docs/architecture/node.md`, currently `DRAFT`, with its own open question — "does
-the first slice need multiple Nodes at all" — genuinely unresolved).
+**Decided (project owner, 2026-08-23): QStash is scoped to `web` only.** `web` already runs on
+Vercel (serverless, `ADR-0004`) — QStash's actual fit, not a workaround. It is adopted for
+scheduled/webhook-driven work on that side (candidate first use: Phase 10's UI surface, as a
+concrete need arises), tied to a real slice rather than adopted speculatively. `companyd` keeps its
+existing Postgres-outbox pattern unchanged — this decision does not introduce a second async
+mechanism there.
 
-Decision: adopt QStash for `web`-side scheduled/webhook work if and when a Phase 10 slice actually
-needs it. Defer any Agent-to-Agent messaging use of it until `node.md`'s multi-process question is
-resolved — building Agent messaging on a cross-process queuing technology before the architecture
-has decided whether CompanyOS is single- or multi-process is premature commitment.
+Agent-to-Agent messaging (the original motivating need, ROADMAP.md Phase 11 Slice 4) is explicitly
+**not** decided by this ADR to run on QStash. That remains deferred until `node.md`'s multi-process
+question resolves — building cross-process Agent messaging on a queuing technology before the
+architecture has decided whether CompanyOS is single- or multi-process would still be premature
+commitment, regardless of QStash's now-decided `web` role. Phase 11 Slice 4 may land on a narrower
+single-process interim mechanism (e.g. the existing Postgres-outbox pattern, reused) if the Node
+question is still open when that slice starts.
 
 ## Consequences
 
@@ -80,9 +95,8 @@ has decided whether CompanyOS is single- or multi-process is premature commitmen
 
 - A new infrastructure dependency and failure mode: Redis unavailability must degrade gracefully,
   not error — this has to be designed into the first cache, not retrofitted later.
-- Using QStash inside `companyd` itself (not just `web`) would duplicate the Postgres-outbox
-  pattern that already works there — a second async mechanism for the same class of problem is
-  complexity without a clear win until multi-Node is real.
+- QStash stays intentionally out of `companyd` — using it there would duplicate the Postgres-outbox
+  pattern that already works, so this decision leaves that boundary explicit rather than implicit.
 - Cache invalidation correctness is a recurring, easy-to-get-wrong source of bugs; each cached read
   needs its own reviewed invalidation story, not a blanket "cache everything."
 
@@ -100,35 +114,37 @@ has decided whether CompanyOS is single- or multi-process is premature commitmen
 
 ## Acceptance criteria
 
-Not yet met — this ADR is `PROPOSED`. Acceptance requires:
+All met:
 
-1. A concrete cache-invalidation design for at least the first adopted cache path.
-2. An explicit decision on whether QStash usage starts on `web`, `companyd`, both, or neither, tied
-   to a real `ROADMAP.md` Phase 10/11 slice rather than adopted speculatively.
-3. Confirmation this doesn't contradict `persistence.md`'s authoritative-store ownership or
-   `knowledge.md`'s disposable-projection invariant.
-4. Project owner sign-off per `docs/adr/README.md`'s acceptance process.
+1. ✅ Concrete cache-invalidation design for the first adopted cache path (provider cooldown state:
+   TTL-based, fail-open cold-cache fallback — see "Redis" above).
+2. ✅ Explicit decision: QStash starts on `web` only, not `companyd` (project owner, 2026-08-23).
+3. ✅ Confirmed against the real text of `persistence.md`'s invariant list (quoted directly above,
+   not paraphrased) and `knowledge.md`'s disposable-projection language — no contradiction.
+4. ✅ Project owner sign-off, 2026-08-23 (this review).
 
 ## Open questions
 
-- OPEN QUESTION: What is the first concrete cache path, and its exact invalidation trigger (TTL,
-  write-through, event-driven)?
-- OPEN QUESTION: Does QStash get adopted at all before `node.md`'s multi-Node question is
-  resolved, or does Agent messaging wait on that?
+Remaining, genuinely unresolved — not blocking acceptance, carried forward:
+
 - OPEN QUESTION: Self-hosted Redis vs. a managed provider (e.g. Upstash Redis, which pairs
   naturally with Upstash QStash and fits the already-Vercel-hosted `web` deployment) — not decided
   here.
 - OPEN QUESTION: Who authorizes an Agent-to-Agent message — does it go through Governance like
   every other governed action, or is it non-authoritative "Agent memory" per `agent.md`'s own
   invariant ("Agent messages and memory are non-authoritative unless accepted by the owning domain
-  operation")? This ADR does not answer that; it only proposes the transport.
+  operation")? This ADR decides `web`-only QStash scope; it does not decide Agent-messaging
+  authorization or transport.
+- OPEN QUESTION: When the Governance-policy-lookup and `KnowledgeItem`-read cache paths are
+  eventually built, each needs its own invalidation design reviewed — not inherited from the
+  provider-cooldown path's TTL approach by default, since their correctness requirements differ.
 
 ## Dependencies
 
 - [ADR-0004: First-Slice Technology Stack](ADR-0004-first-slice-technology-stack.md)
-- [Persistence](../architecture/persistence.md)
-- [Knowledge](../architecture/knowledge.md) — disposable-projection precedent
-- [Node](../architecture/node.md) — the multi-process question this ADR's QStash decision depends on
+- [Persistence](../architecture/persistence.md) — "cache... provider state... never authoritative business state," the invariant Redis is adopted under
+- [Knowledge](../architecture/knowledge.md) — disposable-projection precedent, same rule applied to one record class
+- [Node](../architecture/node.md) — the multi-process question Agent-to-Agent messaging (not `web`'s QStash use, which this ADR decides directly) still depends on
 - [Agent](../domain/agent.md) — the eventual consumer of Agent-to-Agent messaging
 - [Intelligence](../architecture/intelligence.md) — `fallback.Provider`'s existing in-memory
-  cooldown state, the first candidate cache path
+  cooldown state, the decided first cache path

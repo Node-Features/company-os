@@ -1,11 +1,12 @@
 # Agent Domain
 
-Status: DRAFT
+Status: APPROVED (2026-08-23, project owner `Node-Features`)
 
-Reopened from `APPROVED` 2026-08-23 for one material addition — a display avatar on
+Reopened from `APPROVED` to `DRAFT` on 2026-08-23 for one material addition — a display avatar on
 `AgentDefinition` (see "Display identity" below) — per this repo's own rule that a material
-contract change returns a document to `DRAFT` until re-reviewed. Every other section is unchanged
-from the version the project owner approved 2026-08-20.
+contract change returns a document to `DRAFT` until re-reviewed, then re-approved the same day
+after reconciling the addition against `artifact.md` and `capability.md`'s actual contracts. Every
+other section is unchanged from the version the project owner originally approved 2026-08-20.
 
 ## Definition
 
@@ -33,10 +34,12 @@ AgentDefinition declares limits and requirements. It does not embed credentials,
 An Agent's `name` and avatar exist to make it recognizable to humans in UI surfaces — the
 [Department & Agent directory](../architecture/ui-ux.md) is the intended consumer — and carry no
 governance meaning. The avatar is produced like any other AI-generated work product: through a
-governed Capability request (see [Capability](capability.md)), with its output persisted as an
+governed [Capability](capability.md) request, with its output persisted as an
 [Artifact](artifact.md) and referenced by ID from `AgentDefinition`, the same pattern this system
 already uses for every other generated asset. `AgentDefinition` stores the reference, never image
-bytes or a raw provider URL directly.
+bytes or a raw provider URL directly — and only an `ACCEPTED` Artifact version may be referenced,
+per `artifact.md`'s own invariant that "storage does not imply acceptance": a merely `CANDIDATE`
+generated image is not yet a valid avatar reference.
 
 Name and avatar are versioned with `AgentDefinition` like every other field — changing either is a
 new `AgentDefinition` version, not a mutation of the active one, so historical UI/audit views can

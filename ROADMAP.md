@@ -6,6 +6,8 @@ This expands the phase summary in [README.md — Roadmap](README.md#roadmap). It
 
 This edition (2026-08-21) extends the roadmap from "first vertical slice" through to a genuinely production-ready CompanyOS: Phases 2 and 5–9 are new, and Phases 3–4 are expanded from single vague bullets into concrete, doc-grounded slices. Where a phase's sequencing is a judgment call rather than something a canonical doc mandates, that's said explicitly — this file tracks *intended* sequencing, and judgment calls are expected here, not disguised as doc-mandated order.
 
+A 2026-08-23 addition adds Phases 10–12 (Product UI surface, Agent workforce, Performance/messaging infrastructure), each gated on a new `DRAFT`/`PROPOSED` document (`docs/architecture/ui-ux.md`, `docs/adr/ADR-0009-caching-and-agent-messaging-infrastructure.md`) that has not yet been reviewed or approved — same gate discipline as every prior doc-grounded phase.
+
 ## Phase 0 — Foundation (complete)
 
 - [x] Define project direction and core principles (`README.md`)
@@ -155,14 +157,44 @@ Grounded in `ADR-0004`'s already-decided topology (`Status: APPROVED`): `company
 
 Once `docs/departments/deployment.md` (Phase 7 Slice 2) is written and approved, it becomes the governance owner for *authorizing* future releases through this pipeline. This phase's first production deploy doesn't wait for that — `ADR-0004` already authorized the topology — but later routine deploys should route through whatever governed action that department doc eventually defines.
 
-## Beyond Phase 9
+## Phase 10 — Product UI surface
 
-- The full evidence-based Intelligence Router [ADR-0003](docs/adr/ADR-0003-model-independent-intelligence.md) describes (Task Analyzer, Governance-eligible ranking, Finance budget, M&E evidence, persisted `RoutingDecision`) — `ADR-0003` itself is `APPROVED`; only this richer routing layer is undated future work. The first slice's `internal/adapters/intelligence/fallback` is a narrower, purely operational precursor: fixed-priority provider selection with rate-limit/outage cooldown, not evidence-based routing.
+Grounded in [`docs/architecture/ui-ux.md`](docs/architecture/ui-ux.md) (`Status: APPROVED`, 2026-08-23) — added 2026-08-23 after the project owner asked for a working session's worth of missing product surface (Approval visibility, Knowledge review, department reporting, mission/policy configuration, provider registration), then reconciled against the real backend docs/code and given a decided visual direction (cyberpunk, node-link graphs for Department/Agent and Workflow relationships, a real charting library) before approval. Everything the current `web` app can already do (Workflow console, login) is unaffected — this phase is additive.
+
+- [x] **Slice 0 — Approve `docs/architecture/ui-ux.md`.** Approved 2026-08-23.
+- [ ] **Slice 1 — Approval inbox.** New backend: `GET /v1/approvals?status=PENDING` (no list-pending endpoint exists today — only `POST /v1/approvals/{id}/decide`, which requires already knowing the ID). Since `PendingCommand`/`Approval` are already generic across `CancelWorkflow`/`ProposeObjective`/`ApproveKnowledgeItem`, one endpoint and one UI list cover every domain's interrupts at once. Plus the UI to act on it.
+- [ ] **Slice 2 — Knowledge library and review queue.** Pure UI — `GET /v1/knowledge/items` (browse `APPROVED`), the `DRAFT`/review flow (Slice 1-3 endpoints), and the approve/reject action. No new backend.
+- [ ] **Slice 3 — Research/M&E/Finance report and dashboard views.** Pure UI over `GET /v1/research/questions/{id}`, `.../me/subjects/{id}/performance-profile`, `.../finance/constraint-status`, `.../finance/evaluations/{id}`. No new backend. Charted via `ui-ux.md`'s "Visual direction" (`visx`/`Nivo` candidates) — every number reconciled against these real endpoints, never mocked.
+- [ ] **Slice 4 — Governance decision/audit trail.** New read endpoint over `governance_decisions` (records every `ALLOW`/`DENY`/`REQUIRE_APPROVAL` already, just never exposed) plus a UI.
+- [ ] **Slice 5 — Objective/mission direct authoring.** New governed use case: today an Objective can *only* be proposed from a Finding/Recommendation/Evaluation/ResourceEvaluation (Phase 4 Slice 4's gate) — there is no path for a human to directly author one. Needs a real design pass (autonomy level, whether it reuses `objective.propose` or is a distinct governed Action) before implementation, not invented here.
+- [ ] **Slice 6 — Policy administration.** Moves Governance's policy rules from hardcoded Go (`governance/policy.go`) to persisted, editable data, plus an admin UI. The largest, most safety-critical slice in this phase — Governance is the one subsystem every other governed action depends on; needs its own design review (schema, versioning, who may edit) before implementation, per `docs/domain/policy.md`'s own open "policy lifecycle" question.
+- [ ] **Slice 7 — AI provider registration.** Depends on `ADR-0003`'s full evidence-based Intelligence Router (Task Analyzer, Governance-eligible ranking, Finance budget, M&E evidence, persisted `RoutingDecision` — `ADR-0003` itself is `APPROVED`, only this richer routing layer is undated future work) and Phase 9 Slice 3 (secrets management, since provider API keys can't be stored without it). A narrower read-only "view current provider health/cooldown state" cut is possible sooner, ahead of the full Router.
+- [ ] **Slice 8 — Workflow thread visualization rework.** Replaces `WorkflowExecutionTree.tsx`'s flat list with the branching thread visual `ui-ux.md`'s "Visual direction" describes — no backend change, the data (`ExecutionIntent`/`ExecutionAttempt`) already exists. Same graph-rendering library as Phase 11 Slice 5's Department/Agent view, for one visual system rather than two.
+
+## Phase 11 — Agent workforce
+
+Grounded in [`docs/domain/agent.md`](docs/domain/agent.md) and [`docs/domain/department.md`](docs/domain/department.md) (both `APPROVED`, zero implementation — confirmed repeatedly across every Phase 4/5 slice this session: "no `DepartmentRegistry` infrastructure exists"). This is what "named AI agents working in every department, that communicate to get stuff done" (project owner, 2026-08-23) actually requires — Agent is "a CompanyOS-managed computational participant assigned a bounded organizational purpose," distinct from the anonymous LLM calls `Runtime` dispatches today.
+
+- [ ] **Slice 0 — `DepartmentRegistry`.** Register, validate, activate, disable, and retire `DepartmentDefinition` versions (`department.md`'s registry operations) for the seven anticipated departments (Research, M&E, Design, Engineering, Deployment, Education & Public Engagement, Finance).
+- [ ] **Slice 1 — `DepartmentMembership`.** Bind a human or Agent Principal to a Department role for a bounded time/authority scope — `PROPOSED → ACTIVE → SUSPENDED → ENDED` per `department.md`. This is the prerequisite Phase 10's "my departments" view is blocked on.
+- [ ] **Slice 2 — `Agent` record and `AgentDefinition`.** Register/activate/suspend/retire an Agent bound to a durable `AgentPrincipal`, per `agent.md`'s minimum lifecycle. Includes the display-avatar field `agent.md` gained 2026-08-23 (reopened to `DRAFT` for it, pending re-approval): a governed image-generation Capability request whose output is persisted as an `Artifact` and referenced by ID — needs a new `image-generation` `CapabilityDefinition` (this codebase has only ever had `bounded-text-generation`, `ADR-0004`) before this slice can implement the avatar path for real, not just the text/name fields.
+- [ ] **Slice 3 — Agent execution boundary.** An Agent proposes commands and requests Capabilities through the same Application/Governance path every other Principal uses (`agent.md`: "cannot create or enlarge its Authority, approve its own action... or bypass Application orchestration") — the first slice where a *named* Agent, not an anonymous dispatch, does governed work.
+- [ ] **Slice 4 — Agent-to-Agent messaging.** The "communicate to get stuff done" part. Depends on `ADR-0009`'s QStash decision and `docs/architecture/node.md`'s unresolved multi-process question — this slice does not get ahead of either; a narrower single-process interim mechanism (e.g. reusing the existing Postgres-outbox pattern) may land first if the Node question is still open when this slice starts. `agent.md`'s own invariant applies: "Agent messages and memory are non-authoritative unless accepted by the owning domain operation."
+- [ ] **Slice 5 — Department & Agent directory UI.** Unblocks Phase 10's directory screen now that Slices 0-2 give it something real to show — a node-link graph (`ui-ux.md`'s "Visual direction": recommended `@xyflow/react`) of real `DepartmentMembership` edges, each Agent node showing its name and avatar (`agent.md`'s display-identity fields), not a fabricated layout.
+
+## Phase 12 — Performance and messaging infrastructure
+
+Grounded in [`ADR-0009`](docs/adr/ADR-0009-caching-and-agent-messaging-infrastructure.md) (`Status: PROPOSED`). Same gate as every ADR-grounded phase: must reach `APPROVED` before implementation.
+
+- [ ] **Slice 0 — Approve `ADR-0009`.** Currently `PROPOSED`; acceptance criteria listed in the ADR itself (a concrete cache-invalidation design, an explicit QStash-scope decision, confirmation against `persistence.md`/`knowledge.md`'s disposable-projection invariant).
+- [ ] **Slice 1 — Redis cache, first hot path.** Whichever path `ADR-0009`'s acceptance work picks (candidates: Governance policy lookups once persisted by Phase 10 Slice 6, `KnowledgeItem` reads, or provider cooldown state) — with a defined invalidation trigger and cold-cache Postgres fallback from day one, not retrofitted.
+- [ ] **Slice 2 — Provider cooldown state shared via Redis.** `fallback.Provider`'s cooldown tracking is in-process memory only today — doesn't survive a restart, doesn't generalize across more than one `companyd` process.
+- [ ] **Slice 3 — QStash on `web`.** Only if a concrete Phase 10 slice needs scheduled/webhook-driven work by this point — `ADR-0009` explicitly does not commit to QStash inside `companyd` itself.
 
 ## Open questions
 
 - Which components run in one process versus separate deployment boundaries for the first Daemon? (see [Daemon — Open questions](docs/architecture/daemon.md#open-questions))
-- Phase-specific open questions carried forward from canonical docs are listed inline within Phases 4–6 above rather than duplicated here.
+- Phase-specific open questions carried forward from canonical docs are listed inline within Phases 4–6 and 10–12 above rather than duplicated here.
 
 ## Dependencies
 

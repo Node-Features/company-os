@@ -1,6 +1,11 @@
 # Agent Domain
 
-Status: APPROVED
+Status: DRAFT
+
+Reopened from `APPROVED` 2026-08-23 for one material addition — a display avatar on
+`AgentDefinition` (see "Display identity" below) — per this repo's own rule that a material
+contract change returns a document to `DRAFT` until re-reviewed. Every other section is unchanged
+from the version the project owner approved 2026-08-20.
 
 ## Definition
 
@@ -11,6 +16,8 @@ An `Agent` is a CompanyOS-managed computational participant assigned a bounded o
 An immutable AgentDefinition contains:
 
 - stable definition identity/version, name, purpose, responsibilities, and non-responsibilities;
+- a display avatar: an [Artifact](artifact.md) reference to a generated image representing the
+  Agent in UI surfaces (see "Display identity" below) — optional, presentational only;
 - eligible organization and role or department-membership references;
 - required and provided Capability identities/versions;
 - accepted task/input and produced Result/Evidence contracts;
@@ -20,6 +27,20 @@ An immutable AgentDefinition contains:
 - lifecycle status, compatibility range, and supersession references.
 
 AgentDefinition declares limits and requirements. It does not embed credentials, provider selection, mutable authority, or unrestricted tool lists.
+
+## Display identity
+
+An Agent's `name` and avatar exist to make it recognizable to humans in UI surfaces — the
+[Department & Agent directory](../architecture/ui-ux.md) is the intended consumer — and carry no
+governance meaning. The avatar is produced like any other AI-generated work product: through a
+governed Capability request (see [Capability](capability.md)), with its output persisted as an
+[Artifact](artifact.md) and referenced by ID from `AgentDefinition`, the same pattern this system
+already uses for every other generated asset. `AgentDefinition` stores the reference, never image
+bytes or a raw provider URL directly.
+
+Name and avatar are versioned with `AgentDefinition` like every other field — changing either is a
+new `AgentDefinition` version, not a mutation of the active one, so historical UI/audit views can
+still render an Agent exactly as it appeared when a given action was taken.
 
 ## Agent record
 
@@ -40,11 +61,17 @@ An Agent may propose commands and request Capabilities through Application use c
 - Suspension, revocation, cancellation, or lease expiry blocks new execution under the affected scope; late results remain evidence only.
 - Agents communicate through shared contracts; direct department implementation dependencies are prohibited.
 - Agent messages and memory are non-authoritative unless accepted by the owning domain operation.
+- Name and avatar are presentational only — changing either can never change Authority, Governance evaluation, execution eligibility, or which Principal an Agent operates through.
 
 ## OPEN QUESTIONS
 
 - Which AgentDefinition, if any, is required by the first vertical slice?
 - Which accountable-owner and supervision requirements vary by risk class?
+- OPEN QUESTION: Is an avatar mandatory at Agent registration, or may an Agent go `ACTIVE` without
+  one (falling back to a generic UI placeholder)? Not decided here.
+- OPEN QUESTION: Which Capability generates the avatar image, and under what governed Action —
+  reuses the existing image-generation-capability question `ROADMAP.md` Phase 11 Slice 2 will need
+  to resolve when it implements this field for real.
 
 ## Dependencies
 
@@ -54,3 +81,4 @@ An Agent may propose commands and request Capabilities through Application use c
 - [Evidence](evidence.md)
 - [Result](result.md)
 - [Resource](resource.md)
+- [Artifact](artifact.md) — avatar image storage

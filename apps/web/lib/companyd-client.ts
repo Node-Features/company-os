@@ -28,6 +28,9 @@ export type WorkflowCommandResult = {
   state?: string;
   requestId: string;
   reasons?: string[];
+  // Set only when outcome is APPROVAL_REQUIRED — see
+  // apps/companyd/internal/adapters/httpapi/approvals.go.
+  approvalId?: string;
 };
 
 export type LatestResult = {
@@ -72,10 +75,19 @@ export type WorkflowStatus = {
   units: ExecutionUnit[];
 };
 
-export async function createWorkflow(): Promise<WorkflowCommandResult> {
+// authHeaders builds the Authorization header every call below sends.
+// companyd requires and verifies this Supabase-issued JWT on every
+// /v1/workflows*/approvals* route (ROADMAP.md Phase 3 Slice 4) — it never
+// trusts a client-asserted Principal, so accessToken always comes from
+// the caller's own verified Supabase session, never a value chosen here.
+function authHeaders(accessToken: string): HeadersInit {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
+export async function createWorkflow(accessToken: string): Promise<WorkflowCommandResult> {
   const res = await fetch(`${COMPANYD_URL}/v1/workflows`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },
     body: JSON.stringify({}),
   });
   return res.json();
@@ -84,10 +96,11 @@ export async function createWorkflow(): Promise<WorkflowCommandResult> {
 export async function startWorkflow(
   workflowId: string,
   expectedVersion: number,
+  accessToken: string,
 ): Promise<WorkflowCommandResult> {
   const res = await fetch(`${COMPANYD_URL}/v1/workflows/${workflowId}/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },
     body: JSON.stringify({ expectedVersion }),
   });
   return res.json();
@@ -96,18 +109,42 @@ export async function startWorkflow(
 export async function cancelWorkflow(
   workflowId: string,
   expectedVersion: number,
+  accessToken: string,
 ): Promise<WorkflowCommandResult> {
   const res = await fetch(`${COMPANYD_URL}/v1/workflows/${workflowId}/cancel`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },
     body: JSON.stringify({ expectedVersion }),
   });
   return res.json();
 }
 
-export async function getWorkflowStatus(workflowId: string): Promise<WorkflowStatus> {
+// resolveApproval is the human decision on a PENDING Approval
+// (docs/domain/approval.md). The deciding Principal is never sent from
+// here — companyd always resolves it server-side to
+// fixtures.Registry.ApproverPrincipal(), the same never-client-asserted-
+// identity pattern every other call in this file follows. accessToken is
+// only companyd's authentication gate, not the deciding identity.
+export async function resolveApproval(
+  approvalId: string,
+  approve: boolean,
+  accessToken: string,
+): Promise<WorkflowCommandResult> {
+  const res = await fetch(`${COMPANYD_URL}/v1/approvals/${approvalId}/decide`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(accessToken) },
+    body: JSON.stringify({ approve }),
+  });
+  return res.json();
+}
+
+export async function getWorkflowStatus(
+  workflowId: string,
+  accessToken: string,
+): Promise<WorkflowStatus> {
   const res = await fetch(`${COMPANYD_URL}/v1/workflows/${workflowId}`, {
     cache: "no-store",
+    headers: authHeaders(accessToken),
   });
   return res.json();
 }

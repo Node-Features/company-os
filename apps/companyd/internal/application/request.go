@@ -35,3 +35,14 @@ type CancelWorkflowRequest struct {
 	WorkflowID      uuid.UUID
 	ExpectedVersion int64
 }
+
+// ResolveApprovalRequest is the ApplicationRequest for a human decision on
+// a PENDING Approval (docs/domain/approval.md's lifecycle step 3). The
+// deciding Principal is never carried on the request — like every other
+// Principal reference this slice, it's server-resolved from
+// fixtures.Registry.ApproverPrincipal(), never client-asserted.
+type ResolveApprovalRequest struct {
+	ApprovalID uuid.UUID
+	Approve    bool
+	Reason     *string
+}

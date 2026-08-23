@@ -287,7 +287,14 @@ func TestValidateCancelProposal_TerminalStateRejected(t *testing.T) {
 	}
 }
 
-func TestValidateCancelProposal_UnauthorizedPrincipalRejected(t *testing.T) {
+// TestValidateCancelProposal_PrincipalMismatchStillProducesProposal locks
+// in that the Kernel no longer rejects a non-initiating Principal itself —
+// that check moved to Governance (governance.evaluateGovernance's
+// ResourceOwnerPrincipalID, see governance/evaluate_test.go's
+// TestEvaluate_DeniesResourceOwnerMismatch) because ownership is an
+// authorization decision, not a state-transition legality one. The Kernel
+// only cares that state and version are legal.
+func TestValidateCancelProposal_PrincipalMismatchStillProducesProposal(t *testing.T) {
 	current := workflow.Workflow{
 		OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 1, State: workflow.StatePlanned,
 		InitiatingPrincipalID: uuid.New(),
@@ -300,17 +307,8 @@ func TestValidateCancelProposal_UnauthorizedPrincipalRejected(t *testing.T) {
 		DeclaredTime:          time.Now(),
 	}
 	proposal, reasons := ValidateCancelProposal(cmd, current)
-	if proposal != nil {
-		t.Fatal("expected rejection for a non-initiating Principal")
-	}
-	found := false
-	for _, r := range reasons {
-		if r == command.ReasonPrincipalNotAuthorized {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("reasons = %v, want to include %q", reasons, command.ReasonPrincipalNotAuthorized)
+	if proposal == nil {
+		t.Fatalf("expected a proposal despite the Principal mismatch (Kernel validates legality only), got rejection: %v", reasons)
 	}
 }
 

@@ -6,15 +6,44 @@ import (
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/policy"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	kernelwf "github.com/Node-Features/company-os/apps/companyd/internal/kernel/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
 
+// cancelAutonomyRequirement is ROADMAP.md Phase 3 Slice 2's concrete,
+// HTTP-reachable REQUIRE_APPROVAL trigger: cancelling a Workflow that's
+// already READY (dispatched, possibly mid-provider-call) needs a human's
+// sign-off; cancelling a PLANNED one (nothing dispatched yet) stays
+// automatic. Shared by the original request (CancelWorkflow) and the
+// resumed one (resumeCancelWorkflow) so both compute the identical
+// requirement from the identical fact (current Workflow state).
+func cancelAutonomyRequirement(state workflow.State) *policy.AutonomyLevel {
+	if state != workflow.StateReady {
+		return nil
+	}
+	lvl := policy.AutonomyApprovalRequired
+	return &lvl
+}
+
 // CancelWorkflow is the CANCEL_WORKFLOW use case: PLANNED -> CANCELLED or
 // READY -> CANCELLED, requested only by the Workflow's initiating
-// Principal. See docs/domain/workflow.md#first-slice-commands-and-legal-transitions.
+// Principal. The Kernel (kernelwf.ValidateCancelProposal) validates only
+// state/version legality; ownership is Governance's job
+// (docs/architecture/governance.md: "Governance determines whether a
+// specific principal may execute a specific action on a specific
+// resource") — the current Workflow's InitiatingPrincipalID is passed to
+// evaluateGovernance as the resource owner, so a non-initiator's request
+// is DENIED before FinalizeCancel ever runs, per governance.md's
+// invariant that no governed action reaches an executor without a
+// current persisted ALLOW decision (ROADMAP.md Phase 3 Slice 1).
+// Cancelling a READY Workflow additionally requires human approval
+// (cancelAutonomyRequirement, ROADMAP.md Phase 3 Slice 2) — the caller
+// gets ApprovalRequired with an ApprovalID to resolve via
+// Application.ResolveApproval rather than an immediate CANCELLED. See
+// docs/domain/workflow.md#first-slice-commands-and-legal-transitions.
 func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequest) Result {
 	reg := a.Fixtures
 
@@ -52,7 +81,10 @@ func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequ
 		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
-	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true)
+	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{
+		ResourceOwnerPrincipalID:      &current.InitiatingPrincipalID,
+		AdditionalAutonomyRequirement: cancelAutonomyRequirement(current.State),
+	})
 	if !ok {
 		return a.store(ctx, cmd, denyResult)
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/objective"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/google/uuid"
 )
@@ -18,6 +19,10 @@ const (
 	AcceptWorkflowResult CommandType = "ACCEPT_WORKFLOW_RESULT"
 	RejectWorkflowResult CommandType = "REJECT_WORKFLOW_RESULT"
 	CancelWorkflow       CommandType = "CANCEL_WORKFLOW"
+	// ProposeObjective is ROADMAP.md Phase 4 Slice 4's Objective-creation
+	// gate command — not a Workflow command at all, but shares
+	// CommandType/PendingCommand/Approval since those are already generic.
+	ProposeObjective CommandType = "PROPOSE_OBJECTIVE"
 )
 
 // ActionFor is the exact Action mapping table in docs/domain/command.md.
@@ -27,6 +32,7 @@ var ActionFor = map[CommandType]string{
 	AcceptWorkflowResult: "workflow.result.accept",
 	RejectWorkflowResult: "workflow.result.reject",
 	CancelWorkflow:       "workflow.cancel",
+	ProposeObjective:     "objective.propose",
 }
 
 // WorkflowCommandEnvelope is the transport-independent request to change
@@ -52,6 +58,32 @@ type WorkflowCommandEnvelope struct {
 	DeclaredTime          time.Time
 	CorrelationID         uuid.UUID
 	CausationID           *uuid.UUID
+}
+
+// ObjectiveProposalCommandEnvelope is the transport-independent request to
+// propose an Objective (ROADMAP.md Phase 4 Slice 4) — deliberately not a
+// WorkflowCommandEnvelope: it has no WorkflowID/DefinitionID/version to
+// compare-and-write against, since an Objective proposal creates a brand
+// new, unversioned record rather than transitioning an existing one.
+type ObjectiveProposalCommandEnvelope struct {
+	SchemaVersion  int
+	CommandID      uuid.UUID
+	RequestID      uuid.UUID
+	IdempotencyKey string
+	CommandType    CommandType // always ProposeObjective
+	OrganizationID uuid.UUID
+	// ObjectiveID is pre-generated at proposal time (mirrors WorkflowID
+	// being chosen before CREATE_WORKFLOW is even evaluated by
+	// Governance) so the eventual Objective's identity is fixed and
+	// digest-stable across the REQUIRE_APPROVAL replay.
+	ObjectiveID           uuid.UUID
+	SourceType            objective.SourceType
+	SourceID              uuid.UUID
+	Title                 string
+	Intent                string
+	RequestingPrincipalID uuid.UUID
+	DeclaredTime          time.Time
+	CorrelationID         uuid.UUID
 }
 
 // GovernedCommandProposal is the exact, immutable proposal Governance
@@ -137,5 +169,9 @@ const (
 	ReasonResultBindingMismatch = "RESULT_BINDING_MISMATCH"
 	ReasonGovernanceDenied      = "GOVERNANCE_DENIED"
 	ReasonGovernanceStale       = "GOVERNANCE_STALE"
-	ReasonPrincipalNotAuthorized = "PRINCIPAL_NOT_AUTHORIZED"
+	ReasonApprovalRejected        = "APPROVAL_REJECTED"
+	ReasonApprovalAlreadyResolved = "APPROVAL_ALREADY_RESOLVED"
+	ReasonApproverNotAuthorized   = "APPROVER_NOT_AUTHORIZED"
+	ReasonObjectiveAlreadyProposed = "OBJECTIVE_ALREADY_PROPOSED_FOR_SOURCE"
+	ReasonObjectiveSourceNotFound  = "OBJECTIVE_SOURCE_NOT_FOUND"
 )

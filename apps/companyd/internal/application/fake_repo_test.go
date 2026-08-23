@@ -21,18 +21,24 @@ import (
 // state-transition correctness claim; integration_test.go's real-database
 // tests own that.
 type fakeRepo struct {
-	mu          sync.Mutex
-	workflows   map[string]*workflow.Workflow
-	idempotency map[string]string
-	results     map[uuid.UUID]*result.Result
+	mu                  sync.Mutex
+	workflows           map[string]*workflow.Workflow
+	idempotency         map[string]string
+	results             map[uuid.UUID]*result.Result
+	governanceDecisions map[string]bool // keyed by governanceDecisionKey(orgID, action, resourceType, resourceID)
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		workflows:   map[string]*workflow.Workflow{},
-		idempotency: map[string]string{},
-		results:     map[uuid.UUID]*result.Result{},
+		workflows:           map[string]*workflow.Workflow{},
+		idempotency:         map[string]string{},
+		results:             map[uuid.UUID]*result.Result{},
+		governanceDecisions: map[string]bool{},
 	}
+}
+
+func governanceDecisionKey(orgID uuid.UUID, action, resourceType, resourceID string) string {
+	return orgID.String() + ":" + action + ":" + resourceType + ":" + resourceID
 }
 
 func key(org, id uuid.UUID) string { return org.String() + ":" + id.String() }
@@ -79,8 +85,18 @@ func (f *fakeRepo) CommitTransition(_ context.Context, w *workflow.Workflow, exp
 	return nil
 }
 
-func (f *fakeRepo) SaveGovernanceDecision(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, string, string, string, string, string, string, string, string, *string, *string) error {
+func (f *fakeRepo) SaveGovernanceDecision(_ context.Context, _ uuid.UUID, orgID uuid.UUID, _ uuid.UUID, _ uuid.UUID, _ uuid.UUID,
+	action, resourceType, resourceID string, _ string, _ string, _ string, _ string, _ string, _ *string, _ *string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.governanceDecisions[governanceDecisionKey(orgID, action, resourceType, resourceID)] = true
 	return nil
+}
+
+func (f *fakeRepo) GovernanceDecisionExists(_ context.Context, orgID uuid.UUID, action, resourceType, resourceID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.governanceDecisions[governanceDecisionKey(orgID, action, resourceType, resourceID)], nil
 }
 
 func (f *fakeRepo) IdempotencyLookup(_ context.Context, orgID uuid.UUID, k string) (bool, string, error) {
@@ -140,10 +156,17 @@ func (f *fakeExec) ListExecutionUnits(context.Context, uuid.UUID, uuid.UUID) ([]
 	return nil, nil
 }
 
-// fakePending is a no-op ports.PendingCommandRepository — this slice's
-// always-ALLOW policy never reaches REQUIRE_APPROVAL in these tests.
+// fakePending is a no-op ports.PendingCommandRepository — pipeline_test.go's
+// concurrency/ordering tests never reach REQUIRE_APPROVAL; the full
+// resolve/resume round trip is covered against the real database in
+// integration_test.go instead (docs/testing/strategy.md's fake-repository
+// decision — state-transition correctness belongs to the real-DB suite).
 type fakePending struct{}
 
 func (fakePending) CreatePendingApproval(context.Context, *command.PendingCommand, uuid.UUID, *approval.Approval) error {
 	return nil
+}
+
+func (fakePending) ResolveApproval(context.Context, uuid.UUID, uuid.UUID, bool, *string) (*command.PendingCommand, *approval.Approval, error) {
+	return nil, nil, ports.ErrConflict
 }

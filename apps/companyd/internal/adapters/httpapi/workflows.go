@@ -20,6 +20,9 @@ type workflowCommandResponse struct {
 	State      string   `json:"state,omitempty"`
 	RequestID  string   `json:"requestId"`
 	Reasons    []string `json:"reasons,omitempty"`
+	// ApprovalID is set only when Outcome is APPROVAL_REQUIRED — the
+	// client needs it to later call POST /v1/approvals/{approvalId}/decide.
+	ApprovalID string `json:"approvalId,omitempty"`
 }
 
 // statusCodeFor is first-slice plan decision #11's HTTP status mapping for
@@ -53,6 +56,9 @@ func writeResult(w http.ResponseWriter, requestID uuid.UUID, res application.Res
 		resp.WorkflowID = res.Workflow.WorkflowID
 		resp.Version = res.Workflow.Version
 		resp.State = res.Workflow.State
+	}
+	if res.ApprovalID != nil {
+		resp.ApprovalID = res.ApprovalID.String()
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCodeFor(res.Outcome))

@@ -22,6 +22,18 @@ type Application struct {
 	Exec     ports.ExecutionRepository
 	Fixtures fixtures.Registry
 	Notify   chan<- uuid.UUID
+	// Research persists the Research department's core contracts
+	// (ROADMAP.md Phase 4 Slice 1, docs/workflows/research-loop.md).
+	Research ports.ResearchRepository
+	// MonitoringEvaluation persists M&E's core contracts (ROADMAP.md Phase
+	// 4 Slice 2, docs/departments/monitoring-evaluation.md).
+	MonitoringEvaluation ports.MonitoringEvaluationRepository
+	// Finance persists Finance's core contracts (ROADMAP.md Phase 4 Slice
+	// 3, docs/departments/finance.md).
+	Finance ports.FinanceRepository
+	// Objective persists proposed Objectives (ROADMAP.md Phase 4 Slice 4,
+	// docs/architecture/departments.md's Objective creation gate).
+	Objective ports.ObjectiveRepository
 }
 
 func viewOf(w *workflow.Workflow) *WorkflowView {

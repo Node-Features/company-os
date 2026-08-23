@@ -36,6 +36,11 @@ export default function WorkflowTrigger() {
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when CANCEL_WORKFLOW returns APPROVAL_REQUIRED (Phase 3 Slice 2) —
+  // an in-flight cancel needs a human decision before it takes effect. See
+  // apps/companyd/internal/application/workflow_cancel.go's
+  // cancelAutonomyRequirement.
+  const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const reconcileRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -113,6 +118,10 @@ export default function WorkflowTrigger() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expectedVersion: version }),
       }).then((r) => r.json());
+      if (result.outcome === "APPROVAL_REQUIRED" && result.approvalId) {
+        setPendingApprovalId(result.approvalId);
+        return;
+      }
       if (result.outcome !== "ACCEPTED") {
         setError(`cancel failed: ${result.outcome} ${result.reasons?.join(", ") ?? ""}`);
         return;
@@ -120,6 +129,36 @@ export default function WorkflowTrigger() {
       stopWatching();
       setWorkflow({ id: workflow.id, version: result.version });
       setStatus((prev) => (prev ? { ...prev, state: result.state, version: result.version } : prev));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Resolves the pending Approval a READY-Workflow cancel produced. On
+  // approve, companyd immediately resumes and completes the cancel in the
+  // same call (docs/domain/approval.md's resolution steps) — this handler
+  // just reflects whatever the server actually did, it doesn't assume.
+  async function handleResolveApproval(approve: boolean) {
+    if (!pendingApprovalId || !workflow) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await fetch(`/api/approvals/${pendingApprovalId}/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve }),
+      }).then((r) => r.json());
+      setPendingApprovalId(null);
+      if (approve && result.outcome === "ACCEPTED") {
+        stopWatching();
+        setWorkflow({ id: workflow.id, version: result.version });
+        setStatus((prev) => (prev ? { ...prev, state: result.state, version: result.version } : prev));
+        return;
+      }
+      if (!approve && result.outcome === "REJECTED") {
+        return; // Workflow is untouched — still READY, still being watched.
+      }
+      setError(`approval decision failed: ${result.outcome} ${result.reasons?.join(", ") ?? ""}`);
     } finally {
       setBusy(false);
     }
@@ -165,7 +204,7 @@ export default function WorkflowTrigger() {
         <button
           className="btn"
           onClick={handleCancel}
-          disabled={busy || !workflow || (status !== null && TERMINAL_STATES.has(status.state))}
+          disabled={busy || !workflow || Boolean(pendingApprovalId) || (status !== null && TERMINAL_STATES.has(status.state))}
         >
           Cancel Workflow
         </button>
@@ -173,6 +212,18 @@ export default function WorkflowTrigger() {
       </div>
 
       {error && <p className="error-text">{error}</p>}
+
+      {pendingApprovalId && (
+        <div className="status-row">
+          <span className="status-label">Cancellation needs approval</span>
+          <button className="btn btn-accent" onClick={() => handleResolveApproval(true)} disabled={busy}>
+            Approve
+          </button>
+          <button className="btn" onClick={() => handleResolveApproval(false)} disabled={busy}>
+            Reject
+          </button>
+        </div>
+      )}
 
       {workflow && (
         <p className="workflow-id">

@@ -54,7 +54,7 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
-	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true)
+	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{})
 	if !ok {
 		return a.store(ctx, cmd, denyResult)
 	}

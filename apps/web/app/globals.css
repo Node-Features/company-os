@@ -172,6 +172,41 @@ main {
   margin-top: 1rem;
 }
 
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  margin-top: 0.6rem;
+}
+
+.field-input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.55rem 0.7rem;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0, 255, 242, 0.4);
+}
+
+.login-form .btn {
+  margin-top: 1.25rem;
+  align-self: flex-start;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

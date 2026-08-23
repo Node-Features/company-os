@@ -1,14 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-// Refreshes the Supabase Auth session cookie on every request. Wired in
-// from the root middleware.ts. This only maintains session state — it
-// makes no governed decision and must not be extended to do so.
+// Refreshes the Supabase Auth session cookie on every request and gates
+// access behind it. Wired in from the root proxy.ts (Next.js 16 renamed
+// "middleware" to "proxy" — see AGENTS.md). Session refresh itself makes
+// no governed decision; the redirect below is a login gate, not
+// authorization — every authoritative action still goes through
+// companyd's own JWT check (ROADMAP.md Phase 3 Slice 4).
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const createClient = (request: NextRequest) => {
+export const updateSession = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -36,8 +39,18 @@ export const createClient = (request: NextRequest) => {
     },
   );
 
-  // Touch the session so Supabase can refresh it if needed.
-  supabase.auth.getUser();
+  // Touch the session so Supabase can refresh it if needed, and use the
+  // same call to decide whether this request is authenticated.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  if (!user && pathname !== "/login") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 };

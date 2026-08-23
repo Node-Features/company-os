@@ -160,7 +160,11 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 			ProviderAdapter:      genResult.Provider,
 			ModelID:              genResult.ModelID,
 			Outcome:              result.OutcomeSucceeded,
-			Output:               map[string]any{"text": genResult.Text},
+			Output: map[string]any{
+				"text":         genResult.Text,
+				"inputTokens":  genResult.Usage.InputTokens,
+				"outputTokens": genResult.Usage.OutputTokens,
+			},
 			StartedAt:            attempt.CreatedAt,
 			ObservedAt:           now,
 			ReportedAt:           now,

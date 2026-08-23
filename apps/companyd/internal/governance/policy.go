@@ -28,6 +28,52 @@ var firstSlicePolicies = []policy.Rule{
 	{RuleID: "workflow-actions", Effect: policy.EffectPermit, ActionPrefix: "workflow.", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "capability-dispatch", Effect: policy.EffectPermit, Action: "capability.intelligence.dispatch", Autonomy: policy.AutonomyAutomatic},
 
+	// ROADMAP.md Phase 4 Slice 1's five Research use cases
+	// (docs/workflows/research-loop.md). Exact-Action entries, not a shared
+	// "research." prefix, so they don't overlap the pre-existing
+	// role-scoped illustrative research_agent rules below. AUTOMATIC per
+	// research-loop.md's scope boundary — research.md's own open question
+	// on which classes need human review is deliberately left unresolved,
+	// not answered here.
+	{RuleID: "research-signal-submit", Effect: policy.EffectPermit, Action: "research.signal.submit", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "research-question-open", Effect: policy.EffectPermit, Action: "research.question.open", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "research-evidence-record", Effect: policy.EffectPermit, Action: "research.evidence.record", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "research-finding-publish", Effect: policy.EffectPermit, Action: "research.finding.publish", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "research-recommendation-issue", Effect: policy.EffectPermit, Action: "research.recommendation.issue", Autonomy: policy.AutonomyAutomatic},
+
+	// ROADMAP.md Phase 4 Slice 2's two M&E use cases
+	// (docs/departments/monitoring-evaluation.md). AUTOMATIC per the same
+	// reasoning as Research's rules above — monitoring-evaluation.md's own
+	// open question on which outcomes need human/dual evaluation is
+	// deliberately left unresolved.
+	{RuleID: "me-metric-record", Effect: policy.EffectPermit, Action: "me.metric.record", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "me-evaluation-run", Effect: policy.EffectPermit, Action: "me.evaluation.run", Autonomy: policy.AutonomyAutomatic},
+
+	// ROADMAP.md Phase 4 Slice 3's four Finance use cases
+	// (docs/departments/finance.md). Exact-Action entries, distinct from
+	// the pre-existing illustrative finance_agent role-scoped rules below
+	// (finance.read_financial_data/.create_payment_request/.transfer_funds)
+	// — no overlap since matching here is exact-Action, not prefix.
+	// AUTOMATIC per the same reasoning as Research's/M&E's rules above —
+	// finance.md's own open question on budget authority/approval
+	// thresholds is deliberately left unresolved.
+	{RuleID: "finance-budget-create", Effect: policy.EffectPermit, Action: "finance.budget.create", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "finance-constraint-create", Effect: policy.EffectPermit, Action: "finance.constraint.create", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "finance-usage-record", Effect: policy.EffectPermit, Action: "finance.usage.record", Autonomy: policy.AutonomyAutomatic},
+	{RuleID: "finance-evaluation-run", Effect: policy.EffectPermit, Action: "finance.evaluation.run", Autonomy: policy.AutonomyAutomatic},
+
+	// ROADMAP.md Phase 4 Slice 4's Objective-creation gate
+	// (docs/architecture/departments.md). Unconditional
+	// AutonomyApprovalRequired — no resource-instance condition, same
+	// shape as "finance-agent-transfer-funds" below ("requires additional
+	// authority" maps precisely onto REQUIRE_APPROVAL). There is no
+	// numeric risk/magnitude field anywhere in Request/Rule to condition
+	// on, and no per-instance state analogous to Slice 2's "is this
+	// Workflow READY" exists for a not-yet-created Objective — every
+	// proposal genuinely requires human sign-off before an Objective is
+	// created, per departments.md's Objective creation gate.
+	{RuleID: "objective-propose", Effect: policy.EffectPermit, Action: "objective.propose", Autonomy: policy.AutonomyApprovalRequired},
+
 	{RuleID: "research-agent-read-market-data", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.read_market_data", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-agent-create-report", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.create_report", Autonomy: policy.AutonomyAutomatic},
 

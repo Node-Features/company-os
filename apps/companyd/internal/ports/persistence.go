@@ -78,6 +78,17 @@ type AuthoritativeStateRepository interface {
 		action, resourceType, resourceID, proposalDigest, trustedContextDigest, policyVersion, autonomyLevel, outcome string,
 		matchedRuleID, reason *string) error
 
+	// GovernanceDecisionExists reports whether a GovernanceDecision has
+	// been persisted for the given organization/action/resource — used to
+	// verify SaveGovernanceDecision's unconditional-persistence invariant
+	// (governance.md: "Policy, authority, approval, and decision records
+	// are persisted before dependent execution continues"). Looked up by
+	// resource identity rather than decision ID: several callers (e.g.
+	// CreateWorkflow) never expose the decision ID on their Result — it is
+	// not meant to be public API — so a test verifying persistence must be
+	// able to ask "was this action's decision recorded?" without it.
+	GovernanceDecisionExists(ctx context.Context, orgID uuid.UUID, action, resourceType, resourceID string) (bool, error)
+
 	// IdempotencyLookup and IdempotencyStore implement the replay guard
 	// application.md requires: retrying the same logical request returns
 	// the original outcome rather than creating a second transition.
@@ -121,8 +132,18 @@ type ExecutionRepository interface {
 }
 
 // PendingCommandRepository persists a REQUIRE_APPROVAL command and its
-// Approval — implemented even though this slice's always-ALLOW policy
-// never reaches it, per application.md's "never bypassed."
+// Approval, and resolves a human decision against it (ROADMAP.md Phase 3
+// Slice 2).
 type PendingCommandRepository interface {
 	CreatePendingApproval(ctx context.Context, pc *command.PendingCommand, decisionID uuid.UUID, appr *approval.Approval) error
+
+	// ResolveApproval records a human decision — PENDING -> APPROVED or
+	// PENDING -> REJECTED — and returns the updated Approval plus its
+	// associated PendingCommand so the caller can proceed (resume on
+	// approve, nothing further on reject — the PendingCommand is already
+	// closed in the same transaction). The WHERE status='PENDING' guard is
+	// the concurrency control: a second call against an already-decided
+	// Approval affects zero rows and returns ErrConflict, preventing
+	// double-resolution/double-resumption without a separate lock.
+	ResolveApproval(ctx context.Context, approvalID, decidedByPrincipalID uuid.UUID, approve bool, reason *string) (*command.PendingCommand, *approval.Approval, error)
 }

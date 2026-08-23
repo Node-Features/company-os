@@ -163,6 +163,16 @@ func (r *WorkflowRepository) SaveGovernanceDecision(ctx context.Context, decisio
 	return err
 }
 
+func (r *WorkflowRepository) GovernanceDecisionExists(ctx context.Context, orgID uuid.UUID, action, resourceType, resourceID string) (bool, error) {
+	var exists bool
+	err := r.p.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM governance_decisions
+			WHERE organization_id = $1 AND action = $2 AND resource_type = $3 AND resource_id = $4
+		)`, orgID, action, resourceType, resourceID).Scan(&exists)
+	return exists, err
+}
+
 func (r *WorkflowRepository) IdempotencyLookup(ctx context.Context, orgID uuid.UUID, key string) (bool, string, error) {
 	var outcome string
 	err := r.p.pool.QueryRow(ctx, `SELECT outcome FROM idempotency_keys WHERE organization_id=$1 AND idempotency_key=$2`, orgID, key).Scan(&outcome)

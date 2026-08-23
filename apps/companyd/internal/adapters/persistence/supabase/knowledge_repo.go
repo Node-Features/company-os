@@ -125,6 +125,45 @@ func (r *KnowledgeRepository) TransitionStatus(ctx context.Context, organization
 	return tx.Commit(ctx)
 }
 
+// QueryItems is the retrieval contract's read path — see
+// ports.KnowledgeRepository.QueryItems's doc comment for why "latest
+// version per item, filtered by status" (not "latest version overall, then
+// filtered") is the correct semantics. The DISTINCT ON subquery mirrors
+// FindDuplicateCandidates's pattern; it's wrapped because DISTINCT ON's own
+// ORDER BY must start with its DISTINCT ON columns, so the final
+// created_at-descending order and LIMIT have to happen one level up.
+func (r *KnowledgeRepository) QueryItems(ctx context.Context, organizationID uuid.UUID, statuses []knowledge.Status, limit int) ([]knowledge.KnowledgeItem, error) {
+	statusStrings := make([]string, len(statuses))
+	for i, s := range statuses {
+		statusStrings[i] = string(s)
+	}
+
+	rows, err := r.p.pool.Query(ctx, `
+		SELECT `+knowledgeItemColumns+` FROM (
+			SELECT DISTINCT ON (knowledge_item_id) `+knowledgeItemColumns+`
+			FROM knowledge_items
+			WHERE organization_id=$1 AND status = ANY($2::text[])
+			ORDER BY knowledge_item_id, version DESC
+		) latest
+		ORDER BY created_at DESC
+		LIMIT $3`,
+		organizationID, statusStrings, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []knowledge.KnowledgeItem
+	for rows.Next() {
+		item, err := scanKnowledgeItem(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 type rowScanner interface {
 	Scan(dest ...any) error
 }

@@ -265,6 +265,7 @@ func main() {
 				// ingestion/versioning flow.
 				mux.HandleFunc("POST /v1/knowledge/items/capture", withAuth(httpapi.CaptureKnowledgeCandidateHandler(app)))
 				mux.HandleFunc("POST /v1/knowledge/items/{knowledgeItemId}/request-approval", withAuth(httpapi.RequestKnowledgeApprovalHandler(app)))
+				mux.HandleFunc("GET /v1/knowledge/items", withAuth(httpapi.QueryKnowledgeItemsHandler(app)))
 				mux.HandleFunc("GET /v1/knowledge/items/{knowledgeItemId}", withAuth(httpapi.GetKnowledgeItemHandler(app)))
 			} else {
 				log.Println("companyd: Supabase Auth verifier unavailable — /v1/workflows and /v1/approvals routes not mounted")

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/application"
 	knowledgedomain "github.com/Node-Features/company-os/apps/companyd/internal/domain/knowledge"
@@ -84,6 +86,50 @@ func RequestKnowledgeApprovalHandler(app *application.Application) http.HandlerF
 			ContentDigest:   body.ContentDigest,
 		})
 		writeDepartmentResult(w, requestID, res)
+	}
+}
+
+// QueryKnowledgeItemsHandler handles GET /v1/knowledge/items — Phase 5
+// Slice 3's retrieval contract. Query params: statuses (comma-separated,
+// e.g. "APPROVED,DRAFT"; omitted means the APPROVED-only default), purpose
+// (required for anything but APPROVED-only), limit.
+func QueryKnowledgeItemsHandler(app *application.Application) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var statuses []knowledgedomain.Status
+		if raw := r.URL.Query().Get("statuses"); raw != "" {
+			for _, s := range strings.Split(raw, ",") {
+				statuses = append(statuses, knowledgedomain.Status(strings.TrimSpace(s)))
+			}
+		}
+		var purpose *string
+		if raw := r.URL.Query().Get("purpose"); raw != "" {
+			purpose = &raw
+		}
+		limit := 0
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid limit")
+				return
+			}
+			limit = n
+		}
+
+		items, err := app.QueryKnowledge(r.Context(), application.QueryKnowledgeRequest{
+			Statuses: statuses,
+			Purpose:  purpose,
+			Limit:    limit,
+		})
+		if err != nil {
+			if errors.Is(err, application.ErrKnowledgeQueryPurposeRequired) || errors.Is(err, application.ErrKnowledgeQueryInvalidStatus) {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(items)
 	}
 }
 

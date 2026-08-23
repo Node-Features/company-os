@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -400,5 +401,115 @@ func TestIntegration_Knowledge_RequestApproval_StaleVersionRejected(t *testing.T
 	}
 	if latest.Status != knowledgedomain.StatusDraft {
 		t.Fatalf("latest version Status = %s, want DRAFT (never transitioned)", latest.Status)
+	}
+}
+
+// TestIntegration_Knowledge_QueryDefaultReturnsOnlyApproved_LatestApprovedVersionPerItem
+// proves the key retrieval-contract scenario: an item with an APPROVED
+// version and a newer, not-yet-reviewed DRAFT version must still surface at
+// its latest APPROVED version under the default (APPROVED-only) query — not
+// be skipped, and not return the DRAFT one.
+func TestIntegration_Knowledge_QueryDefaultReturnsOnlyApproved_LatestApprovedVersionPerItem(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+	requesterID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Query-default test claim, unique per run: "+uuid.New().String())
+
+	reqRes := app.RequestKnowledgeApproval(ctx, RequestKnowledgeApprovalRequest{
+		RequestID: uuid.New(), PrincipalID: requesterID,
+		KnowledgeItemID: item.KnowledgeItemID, Version: item.Version, ContentDigest: item.ContentDigest,
+	})
+	if reqRes.Outcome != ApprovalRequired || reqRes.ApprovalID == nil {
+		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
+	}
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	if decideRes.Outcome != Accepted {
+		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", decideRes.Outcome, decideRes.Reasons)
+	}
+
+	// Simulate a newer, not-yet-reviewed version alongside the approved one
+	// — bypasses Application, same pattern used throughout this file.
+	if err := app.Knowledge.CaptureItem(ctx, &knowledgedomain.KnowledgeItem{
+		KnowledgeItemID:       item.KnowledgeItemID,
+		OrganizationID:        item.OrganizationID,
+		Version:               item.Version + 1,
+		Claim:                 "a newer, not-yet-reviewed revision",
+		ContentDigest:         "a-different-digest-for-the-newer-revision",
+		Classification:        knowledgedomain.ClassificationInternal,
+		SourceType:            item.SourceType,
+		SourceID:              item.SourceID,
+		ProducedByPrincipalID: producerID,
+		ProducedByMethod:      knowledgedomain.MethodSourceVerbatim,
+		Status:                knowledgedomain.StatusDraft,
+		CreatedAt:              time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed newer draft version: %v", err)
+	}
+
+	results, err := app.QueryKnowledge(ctx, QueryKnowledgeRequest{})
+	if err != nil {
+		t.Fatalf("QueryKnowledge: %v", err)
+	}
+	var found *knowledgedomain.KnowledgeItem
+	for i := range results {
+		if results[i].KnowledgeItemID == item.KnowledgeItemID {
+			found = &results[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("item %v not found in default query results", item.KnowledgeItemID)
+	}
+	if found.Version != item.Version || found.Status != knowledgedomain.StatusApproved {
+		t.Fatalf("found version/status = %d/%s, want %d/APPROVED (the approved version, not the newer draft)", found.Version, found.Status, item.Version)
+	}
+}
+
+// TestIntegration_Knowledge_QueryDraftInclusiveWithoutPurposeRejected proves
+// a draft-inclusive query without a purpose is rejected, not silently
+// widened.
+func TestIntegration_Knowledge_QueryDraftInclusiveWithoutPurposeRejected(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+
+	_, err := app.QueryKnowledge(ctx, QueryKnowledgeRequest{Statuses: []knowledgedomain.Status{knowledgedomain.StatusDraft}})
+	if !errors.Is(err, ErrKnowledgeQueryPurposeRequired) {
+		t.Fatalf("err = %v, want ErrKnowledgeQueryPurposeRequired", err)
+	}
+}
+
+// TestIntegration_Knowledge_QueryDraftInclusiveWithPurposeReturnsDraft
+// proves a properly-labeled draft-inclusive query (a non-empty purpose)
+// succeeds and returns the DRAFT item with its real Status visible — the
+// "label."
+func TestIntegration_Knowledge_QueryDraftInclusiveWithPurposeReturnsDraft(t *testing.T) {
+	app := requireRealApp(t)
+	ctx := context.Background()
+	producerID := uuid.New()
+
+	item := captureKnowledgeItem(t, app, ctx, producerID, "Query-draft-inclusive test claim, unique per run: "+uuid.New().String())
+
+	purpose := "editorial review dashboard"
+	results, err := app.QueryKnowledge(ctx, QueryKnowledgeRequest{
+		Statuses: []knowledgedomain.Status{knowledgedomain.StatusDraft},
+		Purpose:  &purpose,
+	})
+	if err != nil {
+		t.Fatalf("QueryKnowledge: %v", err)
+	}
+	var found *knowledgedomain.KnowledgeItem
+	for i := range results {
+		if results[i].KnowledgeItemID == item.KnowledgeItemID {
+			found = &results[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("item %v not found in draft-inclusive query results", item.KnowledgeItemID)
+	}
+	if found.Status != knowledgedomain.StatusDraft {
+		t.Fatalf("Status = %s, want DRAFT", found.Status)
 	}
 }

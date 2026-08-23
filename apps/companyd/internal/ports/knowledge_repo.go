@@ -30,4 +30,15 @@ type KnowledgeRepository interface {
 	TransitionStatus(ctx context.Context, organizationID, knowledgeItemID uuid.UUID, version int,
 		expectedCurrentStatus, newStatus knowledge.Status, reviewerPrincipalID, governanceDecisionID uuid.UUID,
 		closePendingCommand, consumeApproval *uuid.UUID) error
+
+	// QueryItems is Phase 5 Slice 3's retrieval contract. Returns, per
+	// KnowledgeItemID, the latest version whose status is in statuses — not
+	// the item's overall-latest version filtered afterward. That
+	// distinction matters: docs/architecture/knowledge.md says "Approval of
+	// one version does not approve... other versions," so an item can have
+	// an older APPROVED version alongside a newer, not-yet-reviewed DRAFT
+	// one — an APPROVED-only query must still surface that item at its
+	// latest APPROVED version, not skip it or return the DRAFT one.
+	// Ordered by created_at descending, bounded by limit.
+	QueryItems(ctx context.Context, organizationID uuid.UUID, statuses []knowledge.Status, limit int) ([]knowledge.KnowledgeItem, error)
 }

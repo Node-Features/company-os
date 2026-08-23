@@ -84,8 +84,6 @@ main {
   padding: 0.6rem 1.1rem;
   border-radius: 2px;
   cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 

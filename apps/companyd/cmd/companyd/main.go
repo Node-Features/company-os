@@ -231,7 +231,6 @@ func main() {
 				mux.HandleFunc("POST /v1/workflows/{workflowId}/cancel", withAuth(httpapi.CancelWorkflowHandler(app)))
 				mux.HandleFunc("GET /v1/workflows/{workflowId}", withAuth(httpapi.GetWorkflowHandler(app)))
 				mux.HandleFunc("POST /v1/approvals/{approvalId}/decide", withAuth(httpapi.ResolveApprovalHandler(app)))
-				mux.HandleFunc("GET /v1/approvals", withAuth(httpapi.ListPendingApprovalsHandler(app)))
 
 				// ROADMAP.md Phase 4 Slice 1 — docs/workflows/research-loop.md.
 				mux.HandleFunc("POST /v1/research/signals", withAuth(httpapi.SubmitSignalHandler(app)))

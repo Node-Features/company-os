@@ -107,27 +107,3 @@ func (r *PendingCommandRepository) ResolveApproval(ctx context.Context, approval
 	}
 	return &pc, &appr, nil
 }
-
-func (r *PendingCommandRepository) ListPendingApprovals(ctx context.Context, organizationID uuid.UUID) ([]approval.Approval, error) {
-	rows, err := r.p.pool.Query(ctx, `
-		SELECT approval_id, organization_id, pending_command_id, requesting_principal_id, action,
-		       resource_type, resource_id, proposal_digest, status, decided_by_principal_id, decided_at, reason, created_at
-		FROM approvals WHERE organization_id=$1 AND status='PENDING'
-		ORDER BY created_at ASC`,
-		organizationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var approvals []approval.Approval
-	for rows.Next() {
-		var appr approval.Approval
-		if err := rows.Scan(&appr.ApprovalID, &appr.OrganizationID, &appr.PendingCommandID, &appr.RequestingPrincipalID, &appr.Action,
-			&appr.ResourceType, &appr.ResourceID, &appr.ProposalDigest, &appr.Status, &appr.DecidedByPrincipalID, &appr.DecidedAt, &appr.Reason, &appr.CreatedAt); err != nil {
-			return nil, err
-		}
-		approvals = append(approvals, appr)
-	}
-	return approvals, rows.Err()
-}

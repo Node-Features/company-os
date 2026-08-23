@@ -138,6 +138,25 @@ export async function resolveApproval(
   return res.json();
 }
 
+// One row in the Approval inbox (ROADMAP.md Phase 10 Slice 1). See
+// apps/companyd/internal/adapters/httpapi/approvals.go's pendingApprovalView.
+export type PendingApproval = {
+  approvalId: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  requestingPrincipalId: string;
+  createdAt: string;
+};
+
+export async function listPendingApprovals(accessToken: string): Promise<PendingApproval[]> {
+  const res = await fetch(`${COMPANYD_URL}/v1/approvals?status=PENDING`, {
+    cache: "no-store",
+    headers: authHeaders(accessToken),
+  });
+  return res.json();
+}
+
 export async function getWorkflowStatus(
   workflowId: string,
   accessToken: string,

@@ -25,8 +25,8 @@ document in this repo follows.
 This document coordinates references to already-approved contracts without changing them:
 [Governance](governance.md) (`Outcome`/`Reasons` vocabulary every screen must render faithfully),
 [Approval](../domain/approval.md), [Knowledge](knowledge.md) (retrieval contract, draft/approved
-distinction), [Departments](departments.md), [Agent](../domain/agent.md) (currently `DRAFT`, see
-below), [Objective](../domain/objective.md), [Resource](../domain/resource.md),
+distinction), [Departments](departments.md), [Agent](../domain/agent.md),
+[Objective](../domain/objective.md), [Resource](../domain/resource.md),
 [Finance department](../departments/finance.md), [Research department](../departments/research.md),
 and [Monitoring & Evaluation department](../departments/monitoring-evaluation.md).
 
@@ -36,7 +36,7 @@ and [Monitoring & Evaluation department](../departments/monitoring-evaluation.md
 |---|---|---|
 | Workflow console | `POST/GET /v1/workflows*`, realtime `workflow:<id>` channel | Built (Phase 1) |
 | Login | Supabase Auth session | Built (Phase 3 Slice 4) |
-| **Approval inbox** — every pending `REQUIRE_APPROVAL` across Workflow cancel, Objective proposals, Knowledge approvals in one list | `POST /v1/approvals/{id}/decide` exists; a **list**-pending endpoint does not | `BLOCKED` — needs new `GET /v1/approvals?status=PENDING` (backend, not just UI) |
+| Approval inbox — every pending `REQUIRE_APPROVAL` across Workflow cancel, Objective proposals, Knowledge approvals in one list | `GET /v1/approvals?status=PENDING`, `POST /v1/approvals/{id}/decide` | Built (Phase 10 Slice 1, 2026-08-23) |
 | Knowledge library (browse `APPROVED` items) | `GET /v1/knowledge/items` (Slice 3) | Backend ready, UI missing |
 | Knowledge review queue (see `DRAFT`, approve/reject) | `POST /v1/knowledge/items/capture`, `.../request-approval`, `GET /v1/knowledge/items?statuses=DRAFT&purpose=...` | Backend ready, UI missing |
 | Research report view (Signal → Question → Evidence → Finding → Recommendation) | `GET /v1/research/questions/{id}` | Backend ready, UI missing |
@@ -45,7 +45,7 @@ and [Monitoring & Evaluation department](../departments/monitoring-evaluation.md
 | Governance decision/audit trail | `governance_decisions` table has every decision | `BLOCKED` — no read endpoint exists yet |
 | Objective / mission view | `GET /v1/objectives/{id}` | Backend ready (read-only), UI missing |
 | **Objective / mission authoring** (human directly writes one, not only via the Finding/Recommendation/Evaluation proposal gate) | none | `BLOCKED` — no such use case exists; today an Objective can only be *proposed* from a Finding/Recommendation/Evaluation/ResourceEvaluation (Phase 4 Slice 4) |
-| Department & Agent directory — each Agent shown with its name and AI-generated avatar | none | `BLOCKED` — `docs/domain/agent.md` (reopened `DRAFT` 2026-08-23 for the avatar field) / `department.md` (`APPROVED`) are unimplemented (ROADMAP.md Phase 11) |
+| Department & Agent directory — each Agent shown with its name and AI-generated avatar | none | `BLOCKED` — `docs/domain/agent.md`/`department.md` (both `APPROVED`) are unimplemented (ROADMAP.md Phase 11) |
 | "My departments" management view | none | `BLOCKED` — depends on `DepartmentMembership`, unimplemented |
 | Policy administration (view/edit governed-action rules) | none | `BLOCKED` — policy is hardcoded Go (`governance/policy.go`), not persisted data |
 | AI provider registration | none | `BLOCKED` — providers are env vars read once at boot; needs `ADR-0003`'s Router plus secrets management (`ROADMAP.md` Phase 9 Slice 3) |

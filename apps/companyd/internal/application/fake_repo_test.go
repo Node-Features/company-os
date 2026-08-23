@@ -170,3 +170,7 @@ func (fakePending) CreatePendingApproval(context.Context, *command.PendingComman
 func (fakePending) ResolveApproval(context.Context, uuid.UUID, uuid.UUID, bool, *string) (*command.PendingCommand, *approval.Approval, error) {
 	return nil, nil, ports.ErrConflict
 }
+
+func (fakePending) ListPendingApprovals(context.Context, uuid.UUID) ([]approval.Approval, error) {
+	return nil, nil
+}

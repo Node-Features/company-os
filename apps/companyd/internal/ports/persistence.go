@@ -146,4 +146,11 @@ type PendingCommandRepository interface {
 	// Approval affects zero rows and returns ErrConflict, preventing
 	// double-resolution/double-resumption without a separate lock.
 	ResolveApproval(ctx context.Context, approvalID, decidedByPrincipalID uuid.UUID, approve bool, reason *string) (*command.PendingCommand, *approval.Approval, error)
+
+	// ListPendingApprovals returns every PENDING Approval for an
+	// organization, oldest first — the Approval inbox's data source
+	// (ROADMAP.md Phase 10 Slice 1). No new join: Approval already carries
+	// Action/ResourceType/ResourceID, everything a list view needs, without
+	// touching PendingCommand.
+	ListPendingApprovals(ctx context.Context, organizationID uuid.UUID) ([]approval.Approval, error)
 }

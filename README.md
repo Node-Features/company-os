@@ -208,7 +208,7 @@ Detailed architecture lives under:
 
 **[`docs/architecture/`](docs/architecture/)**
 
-> All 14 `docs/architecture/` documents, all 20 `docs/domain/` documents, and `ADR-0001` through `ADR-0004` are **approved** (`ADR-0001`–`ADR-0003` on 2026-08-20, `ADR-0004` on 2026-08-21).  
+> 17 of 18 `docs/architecture/` documents (all but `node.md`, still `DRAFT`), all 20 `docs/domain/` documents, and every ADR but `ADR-0005` are **approved** (`ADR-0001`–`ADR-0004`, `ADR-0006`–`ADR-0010`; `ADR-0005`'s Kernel Go-contract-shape decision remains `PROPOSED` — its own acceptance checklist has two substantive prerequisites still unmet, not just a sign-off — see [`docs/audit/backlog-p2-p4.md`](docs/audit/backlog-p2-p4.md)). Note: an `APPROVED` `docs/domain/` document records doc-review approval, not Go implementation — seven of the 20 (`artifact`, `department`, `evaluation`, `evidence`, `metric`, `resource`, `workspace`) have no implementation yet; each says so in its own "Implementation status" note.  
 > The first-slice technology stack — Go (`companyd`) for Kernel, Application, Governance, Identity, Runtime, and Daemon; Next.js for UI and APIs; Supabase for persistence — is fixed in **[ADR-0004](docs/adr/ADR-0004-first-slice-technology-stack.md)**. Its LLM provider, Next.js↔`companyd` transport, Supabase RLS design, and Retry policy defaults remain open implementation questions within that decision.
 
 ---
@@ -608,13 +608,13 @@ Security design and reporting guidance live in **[SECURITY.md](SECURITY.md)**.
 ## Project status
 
 > [!WARNING]
-> **CompanyOS is currently pre-alpha. A first vertical slice works end to end; most of the organization — departments, real authentication, production deployment — does not exist yet.**
+> **CompanyOS is currently pre-alpha.** Governed execution, the adaptive-organization departments (Research, Monitoring & Evaluation, Finance), and organizational knowledge (Phases 1–5 of [`ROADMAP.md`](ROADMAP.md)) run end to end against a real database with real authentication. Engineering workspaces, the remaining departments (Design, Engineering, Deployment, Education & Engagement), and production deployment do not exist yet — see the Roadmap section above for what "complete" covers.
 >
-> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, `ADR-0001`–`ADR-0004`). Security and testing foundations are also approved (`docs/security/`, `docs/testing/`).
+> Architecture, domain semantics, and governance boundaries are approved (`ARCHITECTURE.md`, `docs/architecture/`, `docs/domain/`, every ADR but `ADR-0005`). Security and testing foundations are also approved (`docs/security/`, `docs/testing/`).
 >
-> `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT`/`CANCEL_WORKFLOW` runs end to end against a real database and a real LLM call, triggered from `web`, with live push updates over Supabase Realtime: real Kernel legality checks, a real (if minimal) Governance decision, atomic Postgres persistence, and Runtime dispatch to Gemini/OpenAI/Anthropic with automatic fallback on rate-limit or outage. All first-slice commands are implemented.
+> `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT_WORKFLOW_RESULT`/`REJECT_WORKFLOW_RESULT`/`CANCEL_WORKFLOW` runs end to end against a real database and a real LLM call, triggered from `web`, with live push updates over Supabase Realtime: real Kernel legality checks, a real Governance decision — all four outcomes (`AUTOMATIC`, `HUMAN_ONLY`, `REQUIRE_APPROVAL`, `DENIED`) are implemented and exercised against real traffic, not just `AUTOMATIC` — atomic Postgres persistence, and Runtime dispatch to Gemini/OpenAI/Anthropic with automatic fallback on rate-limit or outage. Real Human sign-in via Supabase Auth (JWT verification, durable Principal resolution) is implemented, as are Research, Monitoring & Evaluation, and Finance as real, database-persisted vertical slices — not fixture data.
 >
-> Not yet implemented: real human authentication (Runtime currently uses one hardcoded fixture Principal and Organization), Supabase Row-Level Security (zero policies today, safe only because there's a single hardcoded organization), the `REQUIRE_APPROVAL`/`DENY` Governance paths, every department beyond fixture data, and production deployment. See [`ROADMAP.md`](ROADMAP.md) for the full sequencing to production.
+> Not yet implemented or still partial: Workflow commands and Approval decisions still evaluate Governance using a fixed fixture Principal as the acting identity rather than the authenticated caller (tracked: [`docs/audit/gap-approval-principal-attribution.md`](docs/audit/gap-approval-principal-attribution.md)); Supabase Row-Level Security (zero policies today, safe only because there's a single hardcoded organization); seven domain contracts (`artifact`, `department`, `evaluation`, `evidence`, `metric`, `resource`, `workspace`) are approved documents with no Go implementation yet; the Design, Engineering, Deployment, and Education & Engagement departments; and production deployment. See [`ROADMAP.md`](ROADMAP.md) for the full sequencing to production.
 >
 > Documentation marked **DRAFT** or **PROPOSED** is not an accepted contract until the project owner explicitly approves it.
 

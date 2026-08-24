@@ -116,12 +116,32 @@ type AuthoritativeStateRepository interface {
 	// able to ask "was this action's decision recorded?" without it.
 	GovernanceDecisionExists(ctx context.Context, orgID uuid.UUID, action, resourceType, resourceID string) (bool, error)
 
-	// IdempotencyLookup and IdempotencyStore implement the replay guard
+	// IdempotencyReserve and IdempotencyFinalize implement the replay guard
 	// application.md requires: retrying the same logical request returns
-	// the original outcome rather than creating a second transition.
-	IdempotencyLookup(ctx context.Context, orgID uuid.UUID, key string) (found bool, outcome string, err error)
-	IdempotencyStore(ctx context.Context, orgID, requestID uuid.UUID, key, outcome string) error
+	// the original outcome rather than creating a second transition, even
+	// under real concurrency (two requests racing on the same key). Reserve
+	// atomically claims the key (or reclaims an abandoned one older than
+	// ttl) in one round trip — see workflow_repo.go's IdempotencyReserve for
+	// the exact upsert this must implement; a lookup-then-write split here
+	// reintroduces the TOCTOU window this port exists to prevent.
+	//
+	// won=true means the caller must eventually call IdempotencyFinalize
+	// with the real outcome; won=false means existingOutcome is either a
+	// terminal outcome to replay verbatim, or the sentinel in-progress
+	// value another concurrent caller should see as "retry with this key
+	// later" rather than a real outcome.
+	IdempotencyReserve(ctx context.Context, orgID, requestID uuid.UUID, key string, ttl time.Duration) (won bool, existingOutcome string, err error)
+	IdempotencyFinalize(ctx context.Context, orgID uuid.UUID, key, outcome string) error
 }
+
+// IdempotencyInProgress is the sentinel existingOutcome value
+// IdempotencyReserve returns while a reservation is still live (won=false,
+// not yet reclaimable): another request is genuinely in flight for this
+// key, as opposed to existingOutcome holding a real, terminal
+// application.Outcome to replay. Shared here, rather than duplicated by
+// each implementation and by application.reserveOrReplay, since both sides
+// of the port must agree on it exactly.
+const IdempotencyInProgress = "IN_PROGRESS"
 
 // ExecutionRepository is the Runtime execution-mechanics port: claiming
 // due ExecutionIntents under a lease, recording attempt status, and

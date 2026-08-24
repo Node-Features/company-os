@@ -5,29 +5,370 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  # A job can never silently rewrite go.mod/go.sum — a real dependency
+  # change must be committed, not discovered as a CI-only diff.
+  GOFLAGS: -mod=readonly
+  GOLANGCI_LINT_VERSION: v2.13.1
+  POSTGRES_IMAGE: postgres:17
+
 jobs:
-  companyd:
+  # ---------------------------------------------------------------------
+  # Fast PR checks: no database, target well under 5 minutes, run first.
+  # Categories: 1 (formatting), 2 (static analysis), 3 (unit tests),
+  # 12 (build verification, companyd half).
+  # ---------------------------------------------------------------------
+  go-fast:
+    name: go / format, vet, lint, build, unit tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/companyd
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
-      - run: go vet ./...
-      - run: go test ./...
+          go-version-file: apps/companyd/go.mod
 
-  web:
+      - name: docs/code consistency (scripts/check-docs-sync.sh)
+        working-directory: .
+        run: bash scripts/check-docs-sync.sh
+
+      - name: gofmt (fails on any unformatted file)
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: apps/companyd
+          args: --timeout=5m
+          # This codebase has never run golangci-lint before — a local run
+          # this session found ~14+ pre-existing findings (errcheck on
+          # deferred tx.Rollback/json.Encode calls, a few staticcheck style
+          # suggestions, 3 unused symbols in kernel/workflow/transitions.go).
+          # only-new-issues scopes blocking to issues introduced by the
+          # current PR/push's own diff, not a pre-existing baseline no
+          # author of an unrelated PR should be blocked by — the standard,
+          # documented way to adopt a new linter into an existing codebase.
+          # The pre-existing findings are a real, visible backlog item (not
+          # silently ignored), tracked for separate cleanup.
+          only-new-issues: true
+
+      - name: go build (compile check)
+        run: go build ./...
+
+      - name: go test (unit only — DB-gated tests self-skip without DATABASE_URL)
+        run: go test ./... -count=1
+
+  web-fast:
+    name: web / lint, typecheck, build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/web
+    env:
+      # GitHub Actions already sets CI=true for every job; set explicitly
+      # anyway so these steps behave identically under a local runner
+      # emulator (e.g. `act`) that might not. NEXT_TELEMETRY_DISABLED keeps
+      # the run non-interactive and deterministic — no first-run prompt.
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
-      - run: npm install
-      - run: npm run build
+          node-version: "20.18.1"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: npm ci (fails on lockfile/package.json drift, unlike npm install)
+        run: npm ci
+
+      - name: eslint (eslint.config.mjs; eslint pinned to 9.39.5 — see known limitations)
+        run: npm run lint
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: next build (also re-verifies types in production mode)
+        run: npm run build
+
+  # ---------------------------------------------------------------------
+  # Full PR checks: real Postgres, gate merge, run in parallel after
+  # db-migrate. Categories: 4, 6, 7, 8, 9, 10.
+  # ---------------------------------------------------------------------
+  db-migrate:
+    name: db / migration verification
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+
+      - name: Apply migrations to a fresh database
+        run: go run ./cmd/migrate
+
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  go-integration:
+    name: go / integration tests (real database)
+    needs: db-migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      - name: go test (full suite, real Postgres)
+        run: go test ./... -count=1 -v -timeout=15m
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  contract-tests:
+    name: go / API contract tests
+    needs: db-migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      # Scope note (docs/testing/contract-tests.md): the full per-port
+      # conformance-suite design isn't implemented yet — this runs today's
+      # real API-surface tests (HTTP auth/principal-resolution contract).
+      # See this run's "known limitations" in the PR/README for the gap.
+      - name: go test ./internal/adapters/httpapi/...
+        run: go test ./internal/adapters/httpapi/... -count=1 -v
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  governance-security:
+    name: go / governance & security tests
+    needs: db-migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      # Test-name convention (not a build tag): every governance/authority/
+      # approval-decision denial test in this repo names itself with one of
+      # these terms. This job highlights that subset explicitly; the full
+      # suite in go-integration already runs every one of them too — see
+      # docs/testing/concurrency-guarantees.md's "named-pattern test
+      # selection" rationale.
+      - name: go test -run 'Deny|Denied|SelfApproval|SelfReview|NonHuman|NonInitiator'
+        run: go test ./... -run 'Deny|Denied|SelfApproval|SelfReview|NonHuman|NonInitiator' -count=1 -v
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  concurrency:
+    name: go / concurrency tests (race detector)
+    needs: db-migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      # -race here (not just on main/nightly): this subset is small enough
+      # to afford the overhead on every PR, and it is exactly the subset
+      # most likely to hide a real race. -count=3: real, unsynchronized
+      # races (e.g. TestIntegration_Runtime_CompletionRacesLeaseExpiry_ExactlyOneWins)
+      # benefit from more than one scheduling opportunity per run.
+      - name: go test -run 'Concurrent|Race' -race -count=3
+        run: go test ./... -run 'Concurrent|Race' -race -count=3 -v -timeout=15m
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  failure-recovery:
+    name: go / failure & recovery tests
+    needs: db-migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      - name: go test -run 'Crash|Reclaim|Restart|Sweeper|Exhaust' -count=3
+        run: go test ./... -run 'Crash|Reclaim|Restart|Sweeper|Exhaust' -count=3 -v -timeout=15m
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200
+
+  # ---------------------------------------------------------------------
+  # Main-branch-only: everything above already ran (this workflow's other
+  # jobs also trigger on push to main); this adds the one thing too slow
+  # to afford on every PR.
+  # ---------------------------------------------------------------------
+  race-full:
+    name: go / full suite under race detector (main only)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: go-integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+      - run: go run ./cmd/migrate
+      - name: go test ./... -race -count=1
+        run: go test ./... -race -count=1 -v -timeout=30m
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -200

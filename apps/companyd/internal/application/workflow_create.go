@@ -17,7 +17,7 @@ import (
 func (a *Application) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest) Result {
 	reg := a.Fixtures
 
-	if cached, ok := a.replay(ctx, reg.Organization().OrganizationID, req.IdempotencyKey); ok {
+	if cached, ok := a.reserveOrReplay(ctx, reg.Organization().OrganizationID, req.RequestID, req.IdempotencyKey); ok {
 		return cached
 	}
 
@@ -32,7 +32,7 @@ func (a *Application) CreateWorkflow(ctx context.Context, req CreateWorkflowRequ
 		ObjectiveID:           reg.Objective().ObjectiveID,
 		DefinitionID:          reg.WorkflowDefinition().DefinitionID,
 		DefinitionVersion:     reg.WorkflowDefinition().Version,
-		RequestingPrincipalID: reg.TriggerPrincipal().PrincipalID,
+		RequestingPrincipalID: req.RequestingPrincipalID,
 		Inputs:                map[string]any{"prompt": "Say hello to CompanyOS in one short sentence.", "maxOutputTokens": 128},
 		DeclaredTime:          time.Now().UTC(),
 		CorrelationID:         req.RequestID,
@@ -40,24 +40,24 @@ func (a *Application) CreateWorkflow(ctx context.Context, req CreateWorkflowRequ
 
 	// Step 2: verify the explicit aggregate absence CREATE_WORKFLOW requires.
 	if _, err := a.Repo.LoadWorkflow(ctx, cmd.OrganizationID, cmd.WorkflowID); err == nil {
-		return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonWorkflowAlreadyExists}})
+		return a.finalize(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonWorkflowAlreadyExists}})
 	} else if !errors.Is(err, ports.ErrNotFound) {
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
 	proposal, reasons := kernelwf.ValidateCreateProposal(cmd, reg)
 	if proposal == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{})
 	if !ok {
-		return a.store(ctx, cmd, denyResult)
+		return a.finalize(ctx, cmd, denyResult)
 	}
 
 	kd, reasons := kernelwf.FinalizeCreate(cmd, *proposal, decision, cmd.DeclaredTime)
 	if kd == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	w := &workflow.Workflow{
@@ -77,10 +77,11 @@ func (a *Application) CreateWorkflow(ctx context.Context, req CreateWorkflowRequ
 
 	if err := a.Repo.CreateWorkflow(ctx, w, kd.Events, kd.GovernanceDecisionID); err != nil {
 		if errors.Is(err, ports.ErrConflict) {
-			return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonWorkflowAlreadyExists}})
+			return a.finalize(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonWorkflowAlreadyExists}})
 		}
+
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
-	return a.store(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(w)})
+	return a.finalize(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(w)})
 }

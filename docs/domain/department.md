@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/department` has no Go types yet, and no `DepartmentRegistry`/`DepartmentMembership` exists anywhere in the codebase. Today's real pattern is three independent, hand-duplicated package sets (`internal/domain/{research,monitoringevaluation,finance}` + `internal/departments/{research,monitoringevaluation,finance}`) with no shared registry binding them (`ROADMAP.md` Phase 11 Slice 0 is the first slice that would build one; `docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented.
+
 ## Definition
 
 A Department is a stable, organization-scoped unit of responsibility. It owns a bounded mission and participates in CompanyOS through registered contracts. It is not an agent, team chat, provider, package, process, database, workflow, or deployment.

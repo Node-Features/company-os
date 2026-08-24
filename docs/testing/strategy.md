@@ -33,13 +33,34 @@ A module's own in-memory fake, if it needs one, follows `fakeRepo`/`fakeExec`'s 
 
 ## CI gates
 
-Today (per `.github/workflows/ci.yml`): `companyd` runs `go vet ./...` and `go test ./...` — the latter includes both unit and integration-level tests in the same run, which requires a reachable `DATABASE_URL` in CI. `web` runs `npm install` and `npm run build`. There is no database service in CI yet, no contract-test job, and no e2e job.
+**Updated 2026-08-24 — Phase 8 Slice 1 implemented, Slice 2 partially.** Per
+`.github/workflows/ci.yml` (rewritten) and the new `.github/workflows/nightly.yml`:
 
-This document does not implement CI changes — that is [`ROADMAP.md`](../../ROADMAP.md) Phase 8's scope (`testing/strategy.md` and `testing/contract-tests.md` are its named prerequisites). It fixes the target shape Phase 8 builds toward:
+- **Fast PR checks** (`go-fast`, `web-fast`, no database): `gofmt -l`, `go vet`, `golangci-lint`,
+  `go build ./...`, `go test ./...` (DB-gated tests self-skip, exactly as before) for `companyd`;
+  `npm ci`, `next lint`, `tsc --noEmit`, `next build` for `web`.
+- **Full PR checks** (gate merge, real `postgres:17` service container per job): `db-migrate`
+  (category 6, runs first, gates the rest), `go-integration` (`go test ./...` with a real
+  `DATABASE_URL` — the actual gap this closes: every `requireRealApp`/`requireRealRuntime`/
+  `requirePool`-gated test now runs for real on every PR, not just locally), `contract-tests`
+  (`internal/adapters/httpapi` — see the contract-tests.md scope note below), `governance-security`
+  and `failure-recovery` (named test-pattern subsets, not new code — see
+  [`concurrency-guarantees.md`](concurrency-guarantees.md)'s "named-pattern test selection"
+  rationale), `concurrency` (same pattern-subset approach, run with `-race -count=3`).
+- **Main-branch-only**: `race-full` — the entire suite under `-race`, once per merge (too slow for
+  every PR push).
+- **Nightly** (`nightly.yml`, cron + `workflow_dispatch`, never blocks anything): the same full
+  suite at `-race -count=5`, plus a repeated fresh-database migration-apply check.
 
-- Phase 8 Slice 1 adds an ephemeral Postgres/Supabase service so integration tests run in CI, not only against a developer's local `DATABASE_URL`.
-- Phase 8 Slice 2 adds a contract-test CI job per [`contract-tests.md`](contract-tests.md).
-- Phase 8 Slice 3 adds web e2e tests per this document's end-to-end row.
+**Phase 8 Slice 2, partial**: a `contract-tests` job exists and runs real tests, but the
+port-conformance-suite pattern this document's own [`contract-tests.md`](contract-tests.md)
+describes (one suite per port, run against every implementation) is not built yet — that remains
+separate, not-yet-authorized work. **Phase 8 Slice 3 (web e2e) is not started** — `web` has no test
+runner at all yet (only lint/typecheck/build), a known limitation, not silently assumed away.
+
+No `SUPABASE_URL` is set in CI — `verifier_live_test.go`'s live-JWKS-fetch test stays intentionally
+skipped, since a live external Supabase project is exactly the non-deterministic dependency CI
+must not have. No real LLM provider key is needed — every test fakes `Provider`.
 
 ## Responsibilities by owner
 

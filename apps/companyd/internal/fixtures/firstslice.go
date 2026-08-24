@@ -4,10 +4,18 @@
 // not organizational logic — persisted domain tables for these concepts
 // are out of scope this slice (first-slice plan decision #6); Kernel and
 // Application read them through Registry instead.
+//
+// internal/kernel imports this package for Registry, so it must import
+// nothing beyond domain types and the stdlib — no internal/ports, no
+// context, no persistence/network of any kind (docs/architecture/kernel.md:
+// the Kernel "cannot depend on their concrete implementations"). Loading a
+// Registry from a real store (e.g. WithOrganization over a repository
+// call) is the caller's job, not this package's — see
+// cmd/companyd/main.go's boot stage 4c. Enforced by
+// internal/kernel/kernel_boundary_test.go.
 package fixtures
 
 import (
-	"context"
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/capability"
@@ -16,7 +24,6 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/organization"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
-	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
 
@@ -49,12 +56,24 @@ type Registry struct {
 
 // NewRegistry builds the fixed first-slice fixture set, Organization
 // included as a Go literal. Used by tests and fakes that don't have a real
-// database to load from — cmd/companyd/main.go uses NewRegistryFromDB
-// instead (ROADMAP.md Phase 3 Slice 6), since the DB-backed value the
-// migration seeds is identical to this literal, switching every test to
+// database to load from — cmd/companyd/main.go calls WithOrganization on
+// top of it instead (ROADMAP.md Phase 3 Slice 6), since the DB-backed value
+// the migration seeds is identical to this literal, switching every test to
 // hit a real table wouldn't prove anything new.
 func NewRegistry() Registry {
 	return newFixedFixtures()
+}
+
+// WithOrganization returns a copy of r with its Organization replaced by
+// org — used by callers that load the real, persisted Organization instead
+// of trusting the hardcoded literal (ROADMAP.md Phase 3 Slice 6). Loading
+// org is the caller's job: this package holds fixed fixture data only and
+// must not depend on how or where a real Organization is fetched from
+// (docs/architecture/kernel.md's "cannot depend on their concrete
+// implementations" — internal/kernel imports this package for Registry).
+func (r Registry) WithOrganization(org organization.Organization) Registry {
+	r.org = org
+	return r
 }
 
 // NewRegistryWithOrganization builds the same fixture set as NewRegistry,
@@ -78,21 +97,6 @@ func NewRegistryWithOrganization(orgID uuid.UUID) Registry {
 	reg.trig.OrganizationID = orgID
 	reg.approver.OrganizationID = orgID
 	return reg
-}
-
-// NewRegistryFromDB builds the same fixture set as NewRegistry, except the
-// Organization is loaded from the real organizations table instead of a Go
-// literal (ROADMAP.md Phase 3 Slice 6 — "replace fixtures.Registry's
-// hardcoded Organization with real persistence"). Fails loudly if the row
-// is missing rather than silently falling back to the literal.
-func NewRegistryFromDB(ctx context.Context, orgRepo ports.OrganizationRepository) (Registry, error) {
-	reg := newFixedFixtures()
-	org, err := orgRepo.GetOrganization(ctx, OrganizationID)
-	if err != nil {
-		return Registry{}, err
-	}
-	reg.org = org
-	return reg, nil
 }
 
 func newFixedFixtures() Registry {

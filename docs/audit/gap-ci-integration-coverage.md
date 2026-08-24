@@ -1,6 +1,14 @@
 # Gap: CI Never Runs Database-Backed Integration Tests
 
-Status: APPROVED (2026-08-24) — problem statement and remediation plan approved. Implementation still requires the project owner to explicitly select and authorize this slice before any code changes, per this repository's doc-gate convention.
+Status: **IMPLEMENTED 2026-08-24** — project-owner-authorized and implemented; read
+[`fixed-ci-integration-coverage.md`](fixed-ci-integration-coverage.md) first for the full evidence
+record (every command run and its output, the two unrelated bugs found along the way, known
+limitations). Short version: `.github/workflows/ci.yml` (rewritten) now provisions a real
+`postgres:17` service container and runs the full `requireRealApp`/`requireRealRuntime`/
+`requirePool` suite on every PR, plus dedicated contract/governance/concurrency/failure-recovery
+lanes and a new `.github/workflows/nightly.yml`. The `npm run lint` step this doc also flagged is
+added too (`web-fast` job). Left below unedited as the original problem record, per this repo's
+practice of not rewriting history once a fix lands.
 
 Severity: P1 — threatens runtime reliability (ambient, compounding risk on every future change). See [`findings.md`](findings.md) §1 ("CI"), §3.
 

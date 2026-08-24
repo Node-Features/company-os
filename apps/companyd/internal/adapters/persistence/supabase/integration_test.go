@@ -175,6 +175,62 @@ func TestWorkflowRepository_CommitTransition_AtomicWithEvents(t *testing.T) {
 	}
 }
 
+// TestWorkflowRepository_CreateWorkflow_RollbackLeavesNoOrphanEvents proves
+// scenario 9 of docs/testing/concurrency-guarantees.md: notification can
+// never race a DB commit into an inconsistent state, because insertEvents
+// (event_outbox included) already runs inside CreateWorkflow's own
+// transaction, before tx.Commit — not as a separate step that could
+// observe a domain write the transaction later abandons. Rather than
+// racing two goroutines (there is nothing to race — same-transaction
+// placement makes the ordering structural, not probabilistic), this
+// forces the transaction to fail *after* one of its two events has already
+// been inserted (but not committed) and asserts that "already inserted
+// within an active transaction" is not the same as "durable": the
+// still-uncommitted event, and the Workflow row itself, are gone once the
+// second event's primary-key collision aborts the transaction.
+func TestWorkflowRepository_CreateWorkflow_RollbackLeavesNoOrphanEvents(t *testing.T) {
+	pool := requirePool(t)
+	repo := NewWorkflowRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	// An independently committed event, so a later transaction has a real,
+	// already-taken event_id to collide with.
+	w1 := newTestWorkflow(orgID)
+	committedEvent := newTestEvent(w1.OrganizationID, w1.WorkflowID, 1)
+	if err := repo.CreateWorkflow(ctx, w1, []event.DomainEvent{committedEvent}, uuid.New()); err != nil {
+		t.Fatalf("seed CreateWorkflow: %v", err)
+	}
+
+	// A second, otherwise-independent Workflow whose CreateWorkflow call
+	// carries two events: freshEvent inserts cleanly first, then
+	// collidingEvent (committedEvent's own event_id, already PRIMARY KEY'd
+	// from the seed above) aborts the transaction mid-insertEvents.
+	w2 := newTestWorkflow(orgID)
+	freshEvent := newTestEvent(w2.OrganizationID, w2.WorkflowID, 1)
+	collidingEvent := committedEvent
+	collidingEvent.SubjectID = w2.WorkflowID
+
+	if err := repo.CreateWorkflow(ctx, w2, []event.DomainEvent{freshEvent, collidingEvent}, uuid.New()); err == nil {
+		t.Fatal("CreateWorkflow with a colliding event_id succeeded, want a primary-key violation")
+	}
+
+	if _, loadErr := repo.LoadWorkflow(ctx, w2.OrganizationID, w2.WorkflowID); loadErr != ports.ErrNotFound {
+		t.Fatalf("LoadWorkflow after rolled-back CreateWorkflow: err = %v, want ports.ErrNotFound (the Workflow insert must have rolled back too)", loadErr)
+	}
+
+	var eventCount, outboxCount int
+	if err := pool.pool.QueryRow(ctx, `SELECT count(*) FROM domain_events WHERE event_id = $1`, freshEvent.EventID).Scan(&eventCount); err != nil {
+		t.Fatalf("count domain_events: %v", err)
+	}
+	if err := pool.pool.QueryRow(ctx, `SELECT count(*) FROM event_outbox WHERE event_id = $1`, freshEvent.EventID).Scan(&outboxCount); err != nil {
+		t.Fatalf("count event_outbox: %v", err)
+	}
+	if eventCount != 0 || outboxCount != 0 {
+		t.Fatalf("orphan rows for the fresh event that preceded the collision: domain_events=%d event_outbox=%d, want 0/0 — insertEvents's per-event inserts must be atomic with the rest of the transaction, not committed piecemeal", eventCount, outboxCount)
+	}
+}
+
 func TestExecutionRepository_ClaimDueIntents_NoDuplicateUnderConcurrency(t *testing.T) {
 	pool := requirePool(t)
 	wfRepo := NewWorkflowRepository(pool)

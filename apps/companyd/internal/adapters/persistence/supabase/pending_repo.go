@@ -129,14 +129,16 @@ func (r *PendingCommandRepository) ResolveApproval(ctx context.Context, approval
 	if approve {
 		status = approval.StatusApproved
 	}
+	decidedAt := time.Now().UTC()
 	if _, err := tx.Exec(ctx, `
-		UPDATE approvals SET status=$1, decided_by_principal_id=$2, decided_at=now(), reason=$3
-		WHERE approval_id=$4`,
-		status, decidingPrincipal.PrincipalID, reason, approvalID); err != nil {
+		UPDATE approvals SET status=$1, decided_by_principal_id=$2, decided_at=$3, reason=$4
+		WHERE approval_id=$5`,
+		status, decidingPrincipal.PrincipalID, decidedAt, reason, approvalID); err != nil {
 		return nil, nil, err
 	}
 	appr.Status = status
 	appr.DecidedByPrincipalID = &decidingPrincipal.PrincipalID
+	appr.DecidedAt = &decidedAt
 	appr.Reason = reason
 
 	if !approve {

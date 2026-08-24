@@ -9,6 +9,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/policy"
 	"github.com/Node-Features/company-os/apps/companyd/internal/governance"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/google/uuid"
 )
 
@@ -48,6 +49,7 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 		decision.PolicyVersion, string(decision.AutonomyLevel), string(decision.Outcome), decision.MatchedRuleID, decision.Reason); err != nil {
 		return decision, Result{Outcome: Unavailable, Reasons: []string{err.Error()}}, false
 	}
+	observability.RecordGovernanceDecision(ctx, a.Metrics, decision)
 
 	switch decision.Outcome {
 	case policy.DecisionDenied:

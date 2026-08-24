@@ -35,7 +35,7 @@ func TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict(t *testing.T
 	app, _ := newTestApp()
 	repo := app.Repo.(*fakeRepo)
 
-	created := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: uuid.New()})
 	if created.Outcome != Accepted {
 		t.Fatalf("setup: create outcome = %s", created.Outcome)
 	}
@@ -74,7 +74,7 @@ func TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict(t *testing.T
 			defer wg.Done()
 			results[i] = app.StartWorkflow(context.Background(), StartWorkflowRequest{
 				RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-				WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+				WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: uuid.New(),
 			})
 		}(i)
 	}
@@ -99,7 +99,7 @@ func TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict(t *testing.T
 func TestStartWorkflow_NotifiesOnlyAfterCommit(t *testing.T) {
 	app, notify := newTestApp()
 
-	created := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: uuid.New()})
 	workflowID := uuid.MustParse(created.Workflow.WorkflowID)
 
 	// CREATE_WORKFLOW causes no ExecutionIntent (only START_WORKFLOW does),
@@ -112,7 +112,7 @@ func TestStartWorkflow_NotifiesOnlyAfterCommit(t *testing.T) {
 
 	res := app.StartWorkflow(context.Background(), StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: uuid.New(),
 	})
 	if res.Outcome != Accepted {
 		t.Fatalf("start outcome = %s, want ACCEPTED (reasons: %v)", res.Outcome, res.Reasons)

@@ -1,0 +1,70 @@
+name: Nightly
+
+# Scheduled deep-verification pass: never gates a PR or a merge to main —
+# ci.yml's fast/full/race-full jobs already do that. This exists for the
+# repetition/duration budget no human should have to wait on: a much higher
+# -count under the race detector, catching a rare interleaving that
+# ci.yml's per-PR -count=3 (concurrency job) or -count=1 (main-branch
+# race-full) might not hit.
+on:
+  schedule:
+    # 03:17 UTC daily — off-peak, deliberately not on a round hour (avoids
+    # the top-of-hour scheduling thundering-herd many other repos' cron
+    # jobs create, which can delay a same-minute run).
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+env:
+  GOFLAGS: -mod=readonly
+
+jobs:
+  nightly-full:
+    name: go / full suite, race detector, high repetition
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: companyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: apps/companyd
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/companyos_ci?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/companyd/go.mod
+
+      - name: Apply migrations to a fresh database
+        run: go run ./cmd/migrate
+
+      - name: go test ./... -race -count=5
+        run: go test ./... -race -count=5 -v -timeout=60m
+
+      - name: Re-verify migrations apply cleanly against three independent fresh databases
+        # cmd/migrate is deliberately non-idempotent (safe only against a
+        # fresh DB); this loop is the closest deterministic proxy for "does
+        # this stay true" without relying on real time or real crashes,
+        # matching docs/testing/failure-injection.md's construction pattern.
+        run: |
+          for i in 1 2 3; do
+            docker exec "$(docker ps -aqf ancestor=postgres:17)" \
+              psql -U postgres -c "DROP DATABASE IF EXISTS companyos_ci_repeat_${i}; CREATE DATABASE companyos_ci_repeat_${i};"
+            DATABASE_URL="postgresql://postgres:postgres@localhost:5432/companyos_ci_repeat_${i}?sslmode=disable" \
+              go run ./cmd/migrate
+          done
+
+      - name: Dump Postgres container logs
+        if: failure()
+        run: docker logs "$(docker ps -aqf ancestor=postgres:17)" 2>&1 | tail -300

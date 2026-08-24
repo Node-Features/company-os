@@ -1,6 +1,6 @@
 # Gap: Approval and Workflow-Command Principal Attribution
 
-Status: APPROVED (2026-08-24) — problem statement and remediation plan approved. Implementation still requires the project owner to explicitly select and authorize this slice before any code changes, per this repository's doc-gate convention.
+Status: IMPLEMENTED (2026-08-25) — implemented and verified as part of the 2026-08-25 hardening-milestone session (project-owner-directed, selected via that session's approved plan). See [`fixed-approval-principal-attribution.md`](fixed-approval-principal-attribution.md) for the implementation record.
 
 Severity: P1 — threatens runtime reliability and the correctness of the authorization model as soon as more than one human operator exists. See [`findings.md`](findings.md) §1 ("Identity/Authorization"), §2 (invariant 2 in the "does not hold" list).
 

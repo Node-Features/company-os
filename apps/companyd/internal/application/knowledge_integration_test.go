@@ -237,7 +237,7 @@ func TestIntegration_Knowledge_RequestApproval_ThenApprove(t *testing.T) {
 		t.Fatalf("Status = %s, want DRAFT while pending", stillDraft.Status)
 	}
 
-	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if decideRes.Outcome != Accepted || decideRes.ResourceID == nil {
 		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", decideRes.Outcome, decideRes.Reasons)
 	}
@@ -274,7 +274,7 @@ func TestIntegration_Knowledge_RequestApproval_ThenReject(t *testing.T) {
 		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
 	}
 
-	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: false})
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: false, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if decideRes.Outcome != Rejected {
 		t.Fatalf("ResolveApproval(reject) outcome = %s, want REJECTED", decideRes.Outcome)
 	}
@@ -287,7 +287,7 @@ func TestIntegration_Knowledge_RequestApproval_ThenReject(t *testing.T) {
 		t.Fatalf("Status = %s, want REJECTED", rejected.Status)
 	}
 
-	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if again.Outcome != Conflict {
 		t.Fatalf("second resolution outcome = %s, want CONFLICT", again.Outcome)
 	}
@@ -364,7 +364,7 @@ func TestIntegration_Knowledge_RequestApproval_StaleVersionRejected(t *testing.T
 		t.Fatalf("seed newer version: %v", err)
 	}
 
-	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if decideRes.Outcome != Rejected {
 		t.Fatalf("ResolveApproval(approve) outcome = %s, want REJECTED (stale)", decideRes.Outcome)
 	}
@@ -401,7 +401,7 @@ func TestIntegration_Knowledge_QueryDefaultReturnsOnlyApproved_LatestApprovedVer
 	if reqRes.Outcome != ApprovalRequired || reqRes.ApprovalID == nil {
 		t.Fatalf("RequestKnowledgeApproval outcome = %s (reasons: %v)", reqRes.Outcome, reqRes.Reasons)
 	}
-	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true})
+	decideRes := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *reqRes.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if decideRes.Outcome != Accepted {
 		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", decideRes.Outcome, decideRes.Reasons)
 	}

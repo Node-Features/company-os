@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
@@ -173,23 +174,58 @@ func (r *WorkflowRepository) GovernanceDecisionExists(ctx context.Context, orgID
 	return exists, err
 }
 
-func (r *WorkflowRepository) IdempotencyLookup(ctx context.Context, orgID uuid.UUID, key string) (bool, string, error) {
+// IdempotencyReserve atomically claims (organization_id, key) for this
+// caller, or reclaims it if the existing reservation is older than ttl
+// (an abandoned reservation — the reserving request crashed before calling
+// IdempotencyFinalize). One round trip: the INSERT ... ON CONFLICT DO
+// UPDATE ... WHERE ... RETURNING form either inserts the row or applies
+// the update atomically, per Postgres's upsert semantics — a row comes
+// back from RETURNING in both "own" cases (fresh insert, or a reclaim that
+// satisfied the WHERE), and no row comes back otherwise. There is no
+// separate SELECT-then-branch step for the two "make me the owner" cases,
+// which is what closes the TOCTOU window a naive lookup-then-insert would
+// have. Only the fallback path (row already held by someone else, live or
+// terminal) needs a second, purely informational read.
+func (r *WorkflowRepository) IdempotencyReserve(ctx context.Context, orgID, requestID uuid.UUID, key string, ttl time.Duration) (bool, string, error) {
+	staleBefore := time.Now().UTC().Add(-ttl)
+
 	var outcome string
-	err := r.p.pool.QueryRow(ctx, `SELECT outcome FROM idempotency_keys WHERE organization_id=$1 AND idempotency_key=$2`, orgID, key).Scan(&outcome)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, "", nil
+	err := r.p.pool.QueryRow(ctx, `
+		INSERT INTO idempotency_keys (organization_id, idempotency_key, request_id, outcome, created_at)
+		VALUES ($1, $2, $3, $4, now())
+		ON CONFLICT (organization_id, idempotency_key) DO UPDATE
+		  SET request_id = EXCLUDED.request_id, created_at = EXCLUDED.created_at
+		  WHERE idempotency_keys.outcome = $4 AND idempotency_keys.created_at < $5
+		RETURNING outcome`,
+		orgID, key, requestID, ports.IdempotencyInProgress, staleBefore).Scan(&outcome)
+	if err == nil {
+		// A row was returned: either freshly inserted or freshly reclaimed.
+		// Either way we now own it and outcome is always our own sentinel.
+		return true, "", nil
 	}
-	if err != nil {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return false, "", err
 	}
-	return true, outcome, nil
+
+	// No row returned: a live (not-yet-stale IN_PROGRESS) or terminal
+	// reservation already exists and wasn't reclaimable. This second read
+	// is safe to be a separate statement — it only decides what to tell
+	// the caller, never who owns the key.
+	if err := r.p.pool.QueryRow(ctx,
+		`SELECT outcome FROM idempotency_keys WHERE organization_id=$1 AND idempotency_key=$2`,
+		orgID, key).Scan(&outcome); err != nil {
+		return false, "", err
+	}
+	return false, outcome, nil
 }
 
-func (r *WorkflowRepository) IdempotencyStore(ctx context.Context, orgID, requestID uuid.UUID, key, outcome string) error {
-	_, err := r.p.pool.Exec(ctx, `
-		INSERT INTO idempotency_keys (organization_id, idempotency_key, request_id, outcome)
-		VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id, idempotency_key) DO NOTHING`,
-		orgID, key, requestID, outcome)
+// IdempotencyFinalize overwrites a reservation this caller won with the
+// use case's real, terminal outcome. Only the reservation holder ever
+// calls this, so no additional CAS guard is needed on the UPDATE itself.
+func (r *WorkflowRepository) IdempotencyFinalize(ctx context.Context, orgID uuid.UUID, key, outcome string) error {
+	_, err := r.p.pool.Exec(ctx,
+		`UPDATE idempotency_keys SET outcome=$1 WHERE organization_id=$2 AND idempotency_key=$3`,
+		outcome, orgID, key)
 	return err
 }
 

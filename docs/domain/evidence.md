@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/evidence` has no Go types yet. The real equivalent is `internal/domain/research.Evidence`, scoped to the Research department only — no generic, cross-department Evidence type exists (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented as written here.
+
 ## Definition
 
 `Evidence` is an immutable, attributable observation used to support or challenge a claim, decision, evaluation, metric, or transition. Evidence informs reasoning but does not grant authority, establish causality by itself, or become approved Knowledge automatically.

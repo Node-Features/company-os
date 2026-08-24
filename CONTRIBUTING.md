@@ -2,7 +2,7 @@
 
 Status: DRAFT
 
-CompanyOS is in its architecture and documentation-control phase (see [README.md — Roadmap](README.md#roadmap) and [current state](.companyos/agent-memory/current-state.md)). It does not yet accept production code contributions; the highest-value contribution right now is architectural, domain, and documentation work.
+CompanyOS's core architecture and domain documents are approved and Phases 1–5 of the roadmap (first vertical slice, security/testing foundations, governed execution, the adaptive-organization departments, and organizational knowledge) are implemented and running against a real database (see [README.md — Roadmap](README.md#roadmap) and [current state](.companyos/agent-memory/current-state.md)). Code contributions are accepted; the contribution workflow itself (this document) is still evolving, so expect it to change.
 
 ## Before proposing a change
 
@@ -25,7 +25,7 @@ CompanyOS is in its architecture and documentation-control phase (see [README.md
 
 ## Architecture and domain changes
 
-- `ARCHITECTURE.md` and `docs/architecture/*.md` remain `DRAFT` until the project owner (`Node-Features`) explicitly approves them; see [docs/architecture/README.md — Approval authority](docs/architecture/README.md#approval-authority).
+- `ARCHITECTURE.md` and each `docs/architecture/*.md` document start `DRAFT` and require the project owner (`Node-Features`) to explicitly approve them before they're an accepted contract — most already are `APPROVED` (check the document's own `Status:` line, not this note); see [docs/architecture/README.md — Approval authority](docs/architecture/README.md#approval-authority).
 - A change to a Kernel, Runtime, Daemon, or Governance boundary should go through the ADR process; see [docs/adr/README.md](docs/adr/README.md) for acceptance criteria.
 
 ## Before requesting review

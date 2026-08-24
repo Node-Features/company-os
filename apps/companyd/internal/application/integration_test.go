@@ -146,7 +146,7 @@ func TestIntegration_CreateStartAccept_FullPipelineToCompleted(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -157,7 +157,7 @@ func TestIntegration_CreateStartAccept_FullPipelineToCompleted(t *testing.T) {
 
 	started := app.StartWorkflow(ctx, StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if started.Outcome != Accepted {
 		t.Fatalf("StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
@@ -195,7 +195,7 @@ func TestIntegration_CreateWorkflow_PersistsGovernanceDecision(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -219,7 +219,7 @@ func TestIntegration_CreateStartReject_FullPipelineToFailed(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -227,7 +227,7 @@ func TestIntegration_CreateStartReject_FullPipelineToFailed(t *testing.T) {
 
 	started := app.StartWorkflow(ctx, StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if started.Outcome != Accepted {
 		t.Fatalf("StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
@@ -246,7 +246,7 @@ func TestIntegration_StartWorkflow_ConflictOnStaleVersion(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -255,7 +255,7 @@ func TestIntegration_StartWorkflow_ConflictOnStaleVersion(t *testing.T) {
 	staleVersion := created.Workflow.Version + 99
 	res := app.StartWorkflow(ctx, StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: staleVersion,
+		WorkflowID: workflowID, ExpectedVersion: staleVersion, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if res.Outcome != Rejected {
 		t.Fatalf("StartWorkflow with stale version outcome = %s, want REJECTED (Kernel proposal validation catches it before any write)", res.Outcome)
@@ -266,7 +266,7 @@ func TestIntegration_CancelWorkflow_PlannedToCancelled(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -274,7 +274,7 @@ func TestIntegration_CancelWorkflow_PlannedToCancelled(t *testing.T) {
 
 	cancelled := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if cancelled.Outcome != Accepted {
 		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v)", cancelled.Outcome, cancelled.Reasons)
@@ -305,13 +305,13 @@ func TestIntegration_CancelWorkflow_ReadyToCancelled_ClosesOutstandingIntent(t *
 
 	pending := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if pending.Outcome != ApprovalRequired || pending.ApprovalID == nil {
 		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED with an ApprovalID", pending.Outcome, pending.Reasons)
 	}
 
-	cancelled := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true})
+	cancelled := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if cancelled.Outcome != Accepted {
 		t.Fatalf("ResolveApproval(approve=true) outcome = %s (reasons: %v)", cancelled.Outcome, cancelled.Reasons)
 	}
@@ -343,7 +343,7 @@ func TestIntegration_CreateWorkflow_IdempotentReplayReturnsSameOutcome(t *testin
 	ctx := context.Background()
 	key := uuid.New().String()
 
-	first := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
+	first := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if first.Outcome != Accepted {
 		t.Fatalf("first call outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
 	}
@@ -353,7 +353,7 @@ func TestIntegration_CreateWorkflow_IdempotentReplayReturnsSameOutcome(t *testin
 	// cheap — so idempotency is verified by confirming no second
 	// transition was applied, not by comparing a Workflow field replay
 	// never populates.
-	second := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key})
+	second := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: key, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if second.Outcome != first.Outcome {
 		t.Fatalf("replayed outcome = %s, want %s (same as first call)", second.Outcome, first.Outcome)
 	}
@@ -371,16 +371,23 @@ func TestIntegration_CreateWorkflow_IdempotentReplayReturnsSameOutcome(t *testin
 // TestIntegration_CancelWorkflow_NonInitiatorDenied proves ROADMAP.md Phase
 // 3 Slice 1's governed DENY path end-to-end against the real database and
 // the real HTTP-reachable Application.CancelWorkflow entry point: a
-// Workflow whose InitiatingPrincipalID differs from the fixture's trigger
-// Principal (seeded directly through the real ports.AuthoritativeStateRepository.CreateWorkflow,
-// the same bypass-the-use-case seeding pattern submitFakeResult already
-// uses for Results — no HTTP endpoint lets a caller assert a different
-// Principal yet, since that's Phase 3 Slice 3/4's job) is DENIED, not
-// executed: the Workflow must remain PLANNED at its original version.
+// Workflow initiated by one real, distinct Principal, cancelled by a
+// different real, distinct Principal (docs/audit/gap-approval-principal-attribution.md,
+// fixed 2026-08-25 — previously requester attribution was always the
+// fixture regardless of what RequestingPrincipalID this test set, so this
+// case could only ever prove "the fixture != a fabricated ID", not "two
+// real Principals". Now RequestingPrincipalID flows through to Governance's
+// ownership check for real). The Workflow is seeded directly through the
+// real ports.AuthoritativeStateRepository.CreateWorkflow (same
+// bypass-the-use-case pattern submitFakeResult uses for Results) since
+// nothing here needs the CREATE_WORKFLOW pipeline itself. Must be DENIED,
+// not executed: the Workflow stays PLANNED at its original version.
 func TestIntegration_CancelWorkflow_NonInitiatorDenied(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 	reg := app.Fixtures
+	initiator := uuid.New()
+	nonInitiatingRequester := uuid.New()
 
 	w := &workflow.Workflow{
 		OrganizationID:        reg.Organization().OrganizationID,
@@ -390,7 +397,7 @@ func TestIntegration_CancelWorkflow_NonInitiatorDenied(t *testing.T) {
 		DefinitionVersion:     reg.WorkflowDefinition().Version,
 		ObjectiveID:           reg.Objective().ObjectiveID,
 		State:                 workflow.StatePlanned,
-		InitiatingPrincipalID: uuid.New(), // deliberately not the fixture trigger Principal
+		InitiatingPrincipalID: initiator,
 		CorrelationID:         uuid.New(),
 		Inputs:                map[string]any{"prompt": "owned by someone else"},
 		CreatedAt:             time.Now().UTC(),
@@ -402,7 +409,7 @@ func TestIntegration_CancelWorkflow_NonInitiatorDenied(t *testing.T) {
 
 	denied := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: w.WorkflowID, ExpectedVersion: w.Version,
+		WorkflowID: w.WorkflowID, ExpectedVersion: w.Version, RequestingPrincipalID: nonInitiatingRequester,
 	})
 	if denied.Outcome != Denied {
 		t.Fatalf("CancelWorkflow by a non-initiating Principal outcome = %s (reasons: %v), want DENIED", denied.Outcome, denied.Reasons)
@@ -434,7 +441,7 @@ func startedReadyWorkflow(t *testing.T, app *Application) (workflowID uuid.UUID,
 	t.Helper()
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("setup CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -442,7 +449,7 @@ func startedReadyWorkflow(t *testing.T, app *Application) (workflowID uuid.UUID,
 
 	started := app.StartWorkflow(ctx, StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if started.Outcome != Accepted {
 		t.Fatalf("setup StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
@@ -465,7 +472,7 @@ func TestIntegration_CancelWorkflow_ReadyRequiresApproval(t *testing.T) {
 
 	res := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if res.Outcome != ApprovalRequired {
 		t.Fatalf("CancelWorkflow on a READY Workflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED", res.Outcome, res.Reasons)
@@ -496,13 +503,13 @@ func TestIntegration_ResolveApproval_ApprovedResumesAndCancels(t *testing.T) {
 
 	pending := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if pending.Outcome != ApprovalRequired || pending.ApprovalID == nil {
 		t.Fatalf("setup: CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED with an ApprovalID", pending.Outcome, pending.Reasons)
 	}
 
-	resolved := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true})
+	resolved := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolved.Outcome != Accepted {
 		t.Fatalf("ResolveApproval(approve=true) outcome = %s (reasons: %v), want ACCEPTED", resolved.Outcome, resolved.Reasons)
 	}
@@ -518,7 +525,7 @@ func TestIntegration_ResolveApproval_ApprovedResumesAndCancels(t *testing.T) {
 		t.Fatalf("final state = %s, want CANCELLED", status.Workflow.State)
 	}
 
-	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true})
+	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if again.Outcome != Conflict {
 		t.Fatalf("resolving an already-consumed Approval again outcome = %s, want CONFLICT (no double execution)", again.Outcome)
 	}
@@ -534,14 +541,14 @@ func TestIntegration_ResolveApproval_RejectedLeavesWorkflowReady(t *testing.T) {
 
 	pending := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if pending.Outcome != ApprovalRequired || pending.ApprovalID == nil {
 		t.Fatalf("setup: CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED with an ApprovalID", pending.Outcome, pending.Reasons)
 	}
 
 	reason := "not today"
-	resolved := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: false, Reason: &reason})
+	resolved := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: false, Reason: &reason, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolved.Outcome != Rejected {
 		t.Fatalf("ResolveApproval(approve=false) outcome = %s (reasons: %v), want REJECTED", resolved.Outcome, resolved.Reasons)
 	}
@@ -562,7 +569,7 @@ func TestIntegration_ResolveApproval_UnknownApprovalConflict(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: uuid.New(), Approve: true})
+	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: uuid.New(), Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if res.Outcome != Conflict {
 		t.Fatalf("ResolveApproval on an unknown ApprovalID outcome = %s, want CONFLICT", res.Outcome)
 	}
@@ -576,7 +583,7 @@ func TestIntegration_CancelWorkflow_PlannedStaysAutomatic(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -584,7 +591,7 @@ func TestIntegration_CancelWorkflow_PlannedStaysAutomatic(t *testing.T) {
 
 	res := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if res.Outcome != Accepted {
 		t.Fatalf("CancelWorkflow on a PLANNED Workflow outcome = %s (reasons: %v), want ACCEPTED (no approval needed)", res.Outcome, res.Reasons)
@@ -601,7 +608,7 @@ func TestIntegration_CancelWorkflow_AlreadyTerminalRejected(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != Accepted {
 		t.Fatalf("CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -609,7 +616,7 @@ func TestIntegration_CancelWorkflow_AlreadyTerminalRejected(t *testing.T) {
 
 	first := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if first.Outcome != Accepted {
 		t.Fatalf("setup: first cancel outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
@@ -617,7 +624,7 @@ func TestIntegration_CancelWorkflow_AlreadyTerminalRejected(t *testing.T) {
 
 	second := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: first.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: first.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if second.Outcome != Rejected {
 		t.Fatalf("cancelling an already-CANCELLED workflow outcome = %s, want REJECTED", second.Outcome)

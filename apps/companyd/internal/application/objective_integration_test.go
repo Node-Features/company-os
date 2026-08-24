@@ -115,7 +115,7 @@ func TestIntegration_ProposeObjective_RequiresApprovalThenCreatesOnResolve(t *te
 		t.Fatalf("ProposeObjective outcome = %s (reasons: %v), want APPROVAL_REQUIRED with an ApprovalID", propose.Outcome, propose.Reasons)
 	}
 
-	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: true})
+	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolve.Outcome != Accepted || resolve.ResourceID == nil {
 		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", resolve.Outcome, resolve.Reasons)
 	}
@@ -139,7 +139,7 @@ func TestIntegration_ProposeObjective_RequiresApprovalThenCreatesOnResolve(t *te
 	// silently succeed or create a second Objective — same guard
 	// TestIntegration_ResolveApproval_UnknownApprovalConflict proves for
 	// CANCEL_WORKFLOW's approval path.
-	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: true})
+	again := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if again.Outcome != Conflict {
 		t.Fatalf("second ResolveApproval outcome = %s, want CONFLICT", again.Outcome)
 	}
@@ -165,7 +165,7 @@ func TestIntegration_ProposeObjective_RejectLeavesNoObjective(t *testing.T) {
 		t.Fatalf("ProposeObjective outcome = %s (reasons: %v), want APPROVAL_REQUIRED", propose.Outcome, propose.Reasons)
 	}
 
-	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: false})
+	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: false, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolve.Outcome != Rejected {
 		t.Fatalf("ResolveApproval(reject) outcome = %s, want REJECTED", resolve.Outcome)
 	}
@@ -197,7 +197,7 @@ func TestIntegration_ProposeObjective_DuplicateSourceRejected(t *testing.T) {
 	if first.Outcome != ApprovalRequired || first.ApprovalID == nil {
 		t.Fatalf("first ProposeObjective outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
 	}
-	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *first.ApprovalID, Approve: true})
+	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *first.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolve.Outcome != Accepted {
 		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", resolve.Outcome, resolve.Reasons)
 	}

@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/workspace` has no Go types yet, and no equivalent exists elsewhere in the codebase. `ROADMAP.md` Phase 6 Slice 1 (Workspace lifecycle) is the first slice that would build one (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented.
+
 ## Definition
 
 A `Workspace` is a leased, organization-scoped execution boundary assigned to one declared purpose. An `EngineeringWorkspace` is the Workspace specialization assigned to one EngineeringTask attempt. This contract owns Workspace identity, lifecycle vocabulary, legal transitions, and invariants; architecture owns provider mechanisms, isolation controls, and operational coordination.

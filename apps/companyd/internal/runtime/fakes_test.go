@@ -88,13 +88,26 @@ type fakeNotifier struct {
 	mu      sync.Mutex
 	calls   int
 	failAll bool
+
+	// notified, if non-nil, is closed (exactly once) on the first
+	// NotifyWorkflowChanged call — lets a test block deterministically
+	// until a real notification has fired (e.g. proving RecordDispatched
+	// already committed, since notifyChanged only runs after it) without
+	// sleeping or polling, the same rendezvous role fakeProvider.block
+	// plays for Generate.
+	notified     chan struct{}
+	notifiedOnce sync.Once
 }
 
 func (f *fakeNotifier) NotifyWorkflowChanged(context.Context, uuid.UUID) error {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.calls++
-	if f.failAll {
+	failAll := f.failAll
+	f.mu.Unlock()
+	if f.notified != nil {
+		f.notifiedOnce.Do(func() { close(f.notified) })
+	}
+	if failAll {
 		return errNotifyFailed
 	}
 	return nil

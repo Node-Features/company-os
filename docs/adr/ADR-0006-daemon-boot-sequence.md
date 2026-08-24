@@ -1,6 +1,6 @@
 # ADR-0006: Daemon Responsibilities and Boot Sequence
 
-Status: PROPOSED
+Status: APPROVED (2026-08-24, project owner `Node-Features`)
 
 ## Context
 
@@ -48,7 +48,7 @@ Grounded in the real, already-shipped `apps/companyd/cmd/companyd/main.go`, corr
 1. **OS starts the `companyd` process.** systemd in production (`ADR-0004`); `air` hot-reload in local development.
 2. **Signal context established.** `SIGINT`/`SIGTERM` handled via `signal.NotifyContext` before any dependency is touched, so shutdown is cooperative from the first line of `main`.
 3. **Config loading.** `.env` best-effort locally (`godotenv.Load`); production sets real environment variables (`DATABASE_URL`, `PORT`, provider API keys, Supabase credentials).
-4. **Logging bootstrap.** Standard-library `log` only today — see Open Questions; daemon.md's "observability wiring" is broader than what exists.
+4. **Logging bootstrap.** `internal/observability.Init` configures structured `log/slog` output, per [`docs/architecture/observability.md`](../architecture/observability.md) — resolves the prior "stdlib `log` only" gap named in Open Questions below.
 5. **Adapter construction.** Persistence pool (Supabase/Postgres) connects first; intelligence provider adapters (Gemini, OpenAI, Anthropic behind one `fallback.ProviderAdapter`) construct only if that connection succeeded.
 6. **Application construction.** Wires persistence repositories, fixtures, and the Runtime wake-up channel. This is what will invoke Kernel decision functions later, per governed request — this step does not "start" Kernel; there is nothing to start.
 7. **Runtime construction — the runtime subsystems stage.** Dispatch loop, poll interval, lease duration, provider handle.
@@ -83,11 +83,11 @@ No step is "start Kernel." The original request's proposed sequence — OS → d
 ## Acceptance criteria
 
 - [x] Cross-checked against `daemon.md`, `ADR-0001`, `ADR-0004`, and `kernel.md` for contradictions — none found. Single-session review, not a dedicated audit.
-- [ ] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`.
+- [x] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`. (2026-08-24)
 
 ## Open questions
 
-- OPEN QUESTION: daemon.md claims "observability wiring" as owned, but `main.go` uses only stdlib `log` — no structured logging, metrics, or tracing exists today. Is this in scope before Phase 9's "production-ready" checklist (`ROADMAP.md`), or deferred further?
+- ~~OPEN QUESTION: daemon.md claims "observability wiring" as owned, but `main.go` uses only stdlib `log` — no structured logging, metrics, or tracing exists today. Is this in scope before Phase 9's "production-ready" checklist (`ROADMAP.md`), or deferred further?~~ **RESOLVED 2026-08-24** — see [`docs/architecture/observability.md`](../architecture/observability.md): structured logging (`log/slog`) and operational metrics (`ports.MetricsRecorder` over Prometheus `client_golang`) are now implemented, ahead of Phase 9, as boot stage 3 of the sequence below. Distributed tracing remains out of scope until a second process exists (`node.md`'s open question).
 - Carried forward from daemon.md, unresolved by this ADR: "Is the first Daemon a single process with in-process components or a coordinator for separate worker processes?" and "Which deployment mechanism provides external restart and singleton/leader guarantees?"
 
 ## Dependencies

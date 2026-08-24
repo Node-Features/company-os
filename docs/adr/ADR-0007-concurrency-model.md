@@ -1,6 +1,6 @@
 # ADR-0007: Concurrency Model
 
-Status: PROPOSED
+Status: APPROVED (2026-08-24, project owner `Node-Features`)
 
 ## Context
 
@@ -55,7 +55,7 @@ Both choices are justified in the code itself (`safestate.go`'s doc comments), n
 
 - [x] Cross-checked against `runtime.md`, `kernel.md`, `governance.md`, `events.md`, and `persistence.md`; the `CommitTransition`/`workflow_repo.go` compare-and-write claim was verified directly against the implementation, not inferred from its interface comment.
 - [x] `safestate.go` and `safestate_test.go` compile and pass (100-goroutine contention test: 4,855 version conflicts observed and correctly retried, zero lost updates). `-race` could not be run in this environment — its CGo toolchain isn't currently working here — so this is a strong functional proof, not a formally race-detector-verified one.
-- [ ] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`.
+- [x] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`. (2026-08-24)
 
 ## Open questions
 

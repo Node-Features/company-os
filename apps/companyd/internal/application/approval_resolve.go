@@ -11,27 +11,26 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/governance"
 	kernelwf "github.com/Node-Features/company-os/apps/companyd/internal/kernel/workflow"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 )
 
 // ResolveApproval is the human-decision use case for a PENDING Approval
-// (docs/domain/approval.md's lifecycle step 3). The deciding Principal is
-// always fixtures.Registry.ApproverPrincipal() (Kind HUMAN) today — never
-// client-asserted, same as every other Principal reference this slice.
+// (docs/domain/approval.md's lifecycle step 3). req.DecidingPrincipal is
+// the real, context-authenticated Principal the HTTP handler resolved
+// (docs/audit/gap-approval-principal-attribution.md, fixed 2026-08-25) —
+// never client-asserted, and no longer a fixture stand-in.
 //
 // docs/domain/approval.md's "only a human, not the requester, may approve"
-// invariant is now a real runtime check
-// (docs/adr/ADR-0010-authority-model-formalization.md), not merely true by
-// construction: a.Pending.ResolveApproval verifies decidingPrincipal.Kind
-// == HUMAN and decidingPrincipal.PrincipalID != the Approval's
-// RequestingPrincipalID unconditionally, for every CommandType, inside the
-// same transaction as the status write (ports.ErrNonHumanDecider /
-// ErrSelfApproval). This holds trivially today (the fixture pairing
-// already made both facts true by construction, same as before), but is
-// no longer *only* true by construction — once
-// docs/audit/gap-approval-principal-attribution.md wires a real resolved
-// Principal in as decidingPrincipal, this check is what actually protects
-// the invariant, not luck of which fixtures happened to be wired where.
+// invariant is a real runtime check
+// (docs/adr/ADR-0010-authority-model-formalization.md): a.Pending.ResolveApproval
+// verifies decidingPrincipal.Kind == HUMAN and decidingPrincipal.PrincipalID
+// != the Approval's RequestingPrincipalID unconditionally, for every
+// CommandType, inside the same transaction as the status write
+// (ports.ErrNonHumanDecider / ErrSelfApproval). Now that decidingPrincipal
+// is the real caller rather than a fixed fixture, this check is what
+// actually protects the invariant for distinct real humans, not merely
+// true by construction of which fixtures happened to be wired where.
 //
 // On reject, the PendingCommand is closed (by the repository, in the same
 // transaction as the Approval status write) and nothing else happens. On
@@ -40,7 +39,7 @@ import (
 // and resumption as sequential steps of one resolution, not two separate
 // client-triggered actions.
 func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRequest) Result {
-	pc, appr, err := a.Pending.ResolveApproval(ctx, req.ApprovalID, a.Fixtures.ApproverPrincipal(), req.Approve, req.Reason)
+	pc, appr, err := a.Pending.ResolveApproval(ctx, req.ApprovalID, req.DecidingPrincipal, req.Approve, req.Reason)
 	switch {
 	case errors.Is(err, ports.ErrConflict):
 		return Result{Outcome: Conflict, Reasons: []string{command.ReasonApprovalAlreadyResolved}}
@@ -52,6 +51,17 @@ func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRe
 		return Result{Outcome: Denied, Reasons: []string{command.ReasonApproverNotAuthorized}}
 	case err != nil:
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
+	}
+
+	if appr.DecidedAt != nil {
+		if a.Metrics != nil {
+			a.Metrics.ObserveHistogram("approval_latency_seconds", appr.DecidedAt.Sub(pc.CreatedAt).Seconds(), nil)
+		}
+		observability.Logger(observability.WithExecutionContext(ctx, observability.ExecutionContext{
+			CorrelationID:  pc.CorrelationID,
+			OrganizationID: pc.OrganizationID,
+			CommandID:      pc.PendingCommandID,
+		})).Info("approval resolved", "approve", req.Approve, "command_type", string(pc.CommandType))
 	}
 
 	if !req.Approve {

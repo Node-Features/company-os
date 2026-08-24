@@ -4,7 +4,7 @@ Status: DRAFT
 
 ## Project state
 
-CompanyOS is pre-alpha, documentation-foundation software. No production runtime is implemented yet, so there is currently no deployed CompanyOS instance, hosted service, or released package with a live attack surface. This policy governs the repository (documentation, and any code as it is added) until a first runtime exists, at which point it must be revised.
+CompanyOS is pre-alpha. A real runtime (`companyd`) implementing governed execution exists and runs against a real database in development (see [README.md — Project status](README.md#project-status)), but nothing is deployed to production or otherwise publicly reachable yet (`ROADMAP.md` Phase 9, unstarted) — so there is currently no hosted service, released package, or live attack surface an external party could reach. This policy governs the repository (documentation and code) until a first production deployment exists, at which point it must be revised.
 
 ## Reporting a vulnerability
 

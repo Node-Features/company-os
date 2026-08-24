@@ -1,6 +1,5 @@
-// Package httpapi is the thin HTTP adapter companyd exposes today: a single
-// health endpoint. It performs no governed decisions — see
-// docs/architecture/application.md.
+// Package httpapi is the thin HTTP adapter companyd exposes today. It
+// performs no governed decisions — see docs/architecture/application.md.
 package httpapi
 
 import (
@@ -16,15 +15,29 @@ type DBPinger interface {
 	Ping(ctx context.Context) error
 }
 
-type HealthResponse struct {
-	Status string `json:"status"`
-	DB     string `json:"db"`
+// Diagnostics is satisfied by internal/adapters/notify/realtime.Sweeper.
+// Read-only, side-effect-free values (docs/architecture/daemon.md:
+// "Health probes are side-effect free") — never authoritative, per
+// docs/architecture/observability.md's non-authority invariant; a nil
+// Diagnostics simply omits these fields from the response.
+type Diagnostics interface {
+	Diagnostics() (backlog int, lastReconcileAt time.Time)
 }
 
-// HealthHandler reports process liveness plus database reachability. Pass a
-// nil DBPinger when no DATABASE_URL is configured — the response then reports
-// db: "not_configured" instead of attempting a connection.
-func HealthHandler(db DBPinger) http.HandlerFunc {
+type HealthResponse struct {
+	Status          string `json:"status"`
+	DB              string `json:"db"`
+	OutboxBacklog   *int   `json:"outboxBacklog,omitempty"`
+	LastReconcileAt string `json:"lastReconcileAt,omitempty"`
+}
+
+// HealthHandler reports process liveness, database reachability, and
+// (when diag is non-nil) outbox-sweeper diagnostics. Pass a nil DBPinger
+// when no DATABASE_URL is configured — the response then reports db:
+// "not_configured" instead of attempting a connection. Pass a nil
+// Diagnostics when the sweeper isn't running (same degraded-mode shape as
+// a nil DBPinger) — the diagnostic fields are simply omitted.
+func HealthHandler(db DBPinger, diag Diagnostics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := HealthResponse{Status: "ok"}
 
@@ -39,6 +52,14 @@ func HealthHandler(db DBPinger) http.HandlerFunc {
 				resp.Status = "degraded"
 			} else {
 				resp.DB = "ok"
+			}
+		}
+
+		if diag != nil {
+			backlog, lastReconcileAt := diag.Diagnostics()
+			resp.OutboxBacklog = &backlog
+			if !lastReconcileAt.IsZero() {
+				resp.LastReconcileAt = lastReconcileAt.UTC().Format(time.RFC3339)
 			}
 		}
 

@@ -2,12 +2,15 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/persistence/supabase"
 	"github.com/Node-Features/company-os/apps/companyd/internal/application"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/execution"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/result"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
@@ -75,7 +78,7 @@ func startedReadyWorkflow(t *testing.T, app *application.Application) (workflowI
 	t.Helper()
 	ctx := context.Background()
 
-	created := app.CreateWorkflow(ctx, application.CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
+	created := app.CreateWorkflow(ctx, application.CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String(), RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID})
 	if created.Outcome != application.Accepted {
 		t.Fatalf("setup CreateWorkflow outcome = %s (reasons: %v)", created.Outcome, created.Reasons)
 	}
@@ -83,7 +86,7 @@ func startedReadyWorkflow(t *testing.T, app *application.Application) (workflowI
 
 	started := app.StartWorkflow(ctx, application.StartWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version,
+		WorkflowID: workflowID, ExpectedVersion: created.Workflow.Version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if started.Outcome != application.Accepted {
 		t.Fatalf("setup StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
@@ -299,6 +302,69 @@ func TestIntegration_Runtime_ConcurrentSweep_DispatchesExactlyOnce(t *testing.T)
 	}
 }
 
+// TestIntegration_Runtime_CompletionRacesLeaseExpiry_ExactlyOneWins is
+// scenario 7 of docs/testing/concurrency-guarantees.md. Unlike the
+// worker-crash/lease-reclaim tests above (which construct a specific
+// sequential ordering — crash, then reclaim), this launches RecordTerminal
+// and ReclaimExpiredLeases as two genuinely unsynchronized goroutines
+// against the same already-expired attempt, no gate between them: the only
+// invariant worth proving is "whichever wins, never both, never neither" —
+// forcing a specific interleaving would hide exactly the race this exists
+// to exercise.
+func TestIntegration_Runtime_CompletionRacesLeaseExpiry_ExactlyOneWins(t *testing.T) {
+	provider := &fakeProvider{}
+	notifier := &fakeNotifier{}
+	rt, app := requireRealRuntime(t, provider, notifier)
+	startedReadyWorkflow(t, app)
+	orgID := app.Fixtures.Organization().OrganizationID
+	ctx := context.Background()
+
+	claims, err := rt.Exec.ClaimDueIntents(ctx, orgID, 10, -time.Minute, "worker")
+	if err != nil {
+		t.Fatalf("ClaimDueIntents: %v", err)
+	}
+	if len(claims) != 1 {
+		t.Fatalf("claimed %d intents, want 1", len(claims))
+	}
+	attempt := claims[0].Attempt
+	if attempt.LeaseFencingToken == nil {
+		t.Fatal("claimed attempt has no LeaseFencingToken")
+	}
+	fencingToken := *attempt.LeaseFencingToken
+
+	var wg sync.WaitGroup
+	var recordErr error
+	var reclaimed []execution.ClaimedExecution
+	var reclaimErr error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		recordErr = rt.Exec.RecordTerminal(ctx, attempt.AttemptID, fencingToken, execution.StatusSucceeded, nil)
+	}()
+	go func() {
+		defer wg.Done()
+		reclaimed, reclaimErr = rt.Exec.ReclaimExpiredLeases(ctx, orgID, 10)
+	}()
+	wg.Wait()
+
+	if reclaimErr != nil {
+		t.Fatalf("ReclaimExpiredLeases: %v", reclaimErr)
+	}
+	reclaimedThisAttempt := false
+	for _, c := range reclaimed {
+		if c.Attempt.AttemptID == attempt.AttemptID {
+			reclaimedThisAttempt = true
+		}
+	}
+	completed := recordErr == nil
+	if completed == reclaimedThisAttempt {
+		t.Fatalf("completion succeeded=%v, reclaimed=%v — want exactly one to win, never both and never neither", completed, reclaimedThisAttempt)
+	}
+	if !completed && !errors.Is(recordErr, ports.ErrConflict) {
+		t.Fatalf("RecordTerminal lost the race with err = %v, want ports.ErrConflict (stale fencing token)", recordErr)
+	}
+}
+
 // --- 6. Retry -------------------------------------------------------------
 
 func TestIntegration_Runtime_ProviderRetryableFailure_SchedulesRetryNotFailure(t *testing.T) {
@@ -436,12 +502,12 @@ func TestIntegration_Runtime_CancellationDuringDispatch_LateResultRejected(t *te
 	// requires approval, so drive it through that path to a real CANCELLED.
 	pending := app.CancelWorkflow(ctx, application.CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if pending.Outcome != application.ApprovalRequired || pending.ApprovalID == nil {
 		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED", pending.Outcome, pending.Reasons)
 	}
-	resolved := app.ResolveApproval(ctx, application.ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true})
+	resolved := app.ResolveApproval(ctx, application.ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if resolved.Outcome != application.Accepted || resolved.Workflow.State != "CANCELLED" {
 		t.Fatalf("ResolveApproval outcome = %s, workflow state = %s, want ACCEPTED/CANCELLED", resolved.Outcome, resolved.Workflow.State)
 	}
@@ -495,6 +561,68 @@ func TestIntegration_Runtime_CancellationDuringDispatch_LateResultRejected(t *te
 	w := loadWorkflow(t, app, workflowID)
 	if w.State != "CANCELLED" {
 		t.Fatalf("workflow state after rejected late result = %s, want still CANCELLED (must not be overwritten)", w.State)
+	}
+}
+
+// TestIntegration_Runtime_CancellationRacesInFlightDispatch_LateResultRejected
+// strengthens TestIntegration_Runtime_CancellationDuringDispatch_LateResultRejected
+// above to a genuine race: that test's own comment says "it isn't even a
+// race, since the cancellation is fully sequenced before this call" —
+// dispatch is never attempted at all. Here dispatch genuinely starts
+// (AuthorizeDispatch and RecordDispatched both run for real) and
+// Provider.Generate blocks mid-call, so CancelWorkflow/ResolveApproval run
+// while the dispatch is provably still in flight — the same
+// blocking-channel technique TestIntegration_Runtime_StopWork_CancelsInFlightDispatch
+// uses for the identical reason: a channel proves concurrency
+// deterministically, a sleep only makes it likely.
+func TestIntegration_Runtime_CancellationRacesInFlightDispatch_LateResultRejected(t *testing.T) {
+	block := make(chan struct{})
+	provider := &fakeProvider{block: block, result: ports.IntelligenceResult{Text: "arrived too late", ModelID: "fake-model", Provider: "fake-provider"}}
+	notifier := &fakeNotifier{notified: make(chan struct{})}
+	rt, app := requireRealRuntime(t, provider, notifier)
+	workflowID, version := startedReadyWorkflow(t, app)
+	ctx := context.Background()
+
+	rt.Sweep(ctx) // spawns the dispatch goroutine
+
+	// Wait for a real signal that AuthorizeDispatch+RecordDispatched
+	// already committed and Generate has been entered (notifyChanged only
+	// runs after RecordDispatched succeeds, immediately before Generate) —
+	// not just that Sweep returned, which only guarantees claiming
+	// happened, not dispatch. Without this, the cancellation below could
+	// race ahead of dispatch entirely and this test would only be
+	// "probably" concurrent, exactly the sleep-shaped gap this matrix is
+	// supposed to close.
+	select {
+	case <-notifier.notified:
+	case <-time.After(10 * time.Second):
+		t.Fatal("dispatch never notified — RecordDispatched must commit before cancellation races it")
+	}
+
+	// Cancellation runs synchronously on this goroutine while the dispatch
+	// goroutine sits blocked inside Generate — genuinely concurrent with an
+	// in-flight dispatch, not sequenced around one that never started.
+	pending := app.CancelWorkflow(ctx, application.CancelWorkflowRequest{
+		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
+	})
+	if pending.Outcome != application.ApprovalRequired || pending.ApprovalID == nil {
+		t.Fatalf("CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED", pending.Outcome, pending.Reasons)
+	}
+	resolved := app.ResolveApproval(ctx, application.ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
+	if resolved.Outcome != application.Accepted || resolved.Workflow.State != "CANCELLED" {
+		t.Fatalf("ResolveApproval outcome = %s, workflow state = %s, want ACCEPTED/CANCELLED", resolved.Outcome, resolved.Workflow.State)
+	}
+
+	// Let the still-in-flight dispatch finish; execute()'s own SubmitResult
+	// call must be rejected against the by-then-CANCELLED workflow, not
+	// silently applied on top of it.
+	close(block)
+	rt.Wait()
+
+	w := loadWorkflow(t, app, workflowID)
+	if w.State != "CANCELLED" {
+		t.Fatalf("workflow state after an in-flight dispatch completed post-cancellation = %s, want still CANCELLED (must not be overwritten)", w.State)
 	}
 }
 
@@ -566,6 +694,119 @@ func TestIntegration_Runtime_RecoveryAfterRestart_SecondRuntimeReclaimsAndComple
 	w := loadWorkflow(t, appA, workflowID)
 	if w.State != workflow.StateCompleted {
 		t.Fatalf("workflow state = %s, want COMPLETED (recovered by process B after process A's crash)", w.State)
+	}
+}
+
+// TestIntegration_Runtime_RestartMidDispatch_FencedOffAfterSecondProcessCompletes
+// strengthens the recovery test above to the harder case it doesn't cover:
+// process A's dispatch genuinely starts — AuthorizeDispatch and
+// RecordDispatched both commit for real, a notification fires — before
+// being abandoned mid-Generate (Go cannot kill a goroutine; not waiting on
+// it is the closest analogue to a process dying mid-call, same technique as
+// the cancellation-race test above). This also folds in scenario 11
+// (notification succeeds, then the worker crashes before completion):
+// notifierA.callCount() > 0 proves a real notification already fired
+// before process B ever gets involved, and the assertions below prove that
+// stale notification never causes a second side effect.
+func TestIntegration_Runtime_RestartMidDispatch_FencedOffAfterSecondProcessCompletes(t *testing.T) {
+	block := make(chan struct{})
+	providerA := &fakeProvider{block: block}
+	notifierA := &fakeNotifier{notified: make(chan struct{})}
+	rtA, appA := requireRealRuntime(t, providerA, notifierA)
+	workflowID, _ := startedReadyWorkflow(t, appA)
+	orgID := appA.Fixtures.Organization().OrganizationID
+
+	// Force an immediately-expired lease at claim time (the same
+	// negative-duration idiom every other test in this file uses), so
+	// reclaim below can act on this DISPATCHED attempt without waiting out
+	// LeaseDuration for real. RecordDispatched itself doesn't touch
+	// lease_expires_at (no renewal mechanism exists — scenario 6), so the
+	// lease set at claim carries through dispatch unchanged.
+	rtA.LeaseDuration = -time.Second
+
+	// "Process A" dispatches for real and is then abandoned mid-Generate —
+	// its goroutine is deliberately never Wait()ed on here; it stays parked
+	// on <-block until this test unblocks it at the very end. Sweep itself
+	// only claims synchronously; RecordDispatched/notifyChanged/Generate run
+	// in dispatchBounded's asynchronous goroutine, so this test must not
+	// assume they've happened just because Sweep returned — it blocks on
+	// notifierA.notified instead, a real signal (not a sleep or poll) that
+	// notifyChanged actually ran, which only happens after RecordDispatched
+	// committed. This is exactly scenario 11's precondition: the
+	// notification must have genuinely fired before process B ever gets
+	// involved, not merely be assumed to have.
+	rtA.Sweep(context.Background())
+	select {
+	case <-notifierA.notified:
+	case <-time.After(10 * time.Second):
+		t.Fatal("process A's dispatch never notified — RecordDispatched must commit (and notify) before reclaim runs")
+	}
+
+	units, err := rtA.Exec.ListExecutionUnits(context.Background(), orgID, workflowID)
+	if err != nil {
+		t.Fatalf("ListExecutionUnits: %v", err)
+	}
+	if len(units) != 1 || len(units[0].Attempts) != 1 {
+		t.Fatalf("units = %+v, want exactly 1 unit with 1 attempt", units)
+	}
+	intentID := units[0].IntentID
+
+	// "Process B": independent Runtime/Application, same database, zero
+	// shared Go state — the same pattern
+	// TestIntegration_Runtime_RecoveryAfterRestart_SecondRuntimeReclaimsAndCompletes
+	// uses, applied to a mid-dispatch abandonment instead of a pre-dispatch
+	// one.
+	providerB := &fakeProvider{result: ports.IntelligenceResult{Text: "recovered", ModelID: "fake-model", Provider: "fake-provider"}}
+	notifierB := &fakeNotifier{}
+	pool, err := supabase.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		t.Fatalf("connect (process B): %v", err)
+	}
+	t.Cleanup(pool.Close)
+	appB := &application.Application{
+		Repo: appA.Repo, Pending: appA.Pending, Exec: supabase.NewExecutionRepository(pool),
+		Fixtures: appA.Fixtures, Notify: make(chan uuid.UUID, 8),
+	}
+	rtB := &Runtime{
+		Exec: supabase.NewExecutionRepository(pool), App: appB, Provider: providerB,
+		ProviderName: "fake-provider-b", ModelID: "fake-model", Fixtures: appA.Fixtures,
+		PollInterval: time.Hour, LeaseDuration: time.Minute, Wakeup: make(chan uuid.UUID, 8), Notifier: notifierB,
+	}
+	rtB.ensureWorkContext()
+
+	rtB.reclaimAbandoned(context.Background())
+	if err := rtB.Exec.ScheduleRetry(context.Background(), orgID, intentID, time.Now().UTC().Add(-time.Second)); err != nil {
+		t.Fatalf("ScheduleRetry override: %v", err)
+	}
+	rtB.Sweep(context.Background())
+	rtB.Wait()
+
+	if got := providerB.callCount(); got != 1 {
+		t.Fatalf("process B's provider called %d times, want exactly 1 (it recovered process A's mid-dispatch abandonment)", got)
+	}
+	w := loadWorkflow(t, appA, workflowID)
+	if w.State != workflow.StateCompleted {
+		t.Fatalf("workflow state = %s, want COMPLETED after process B's recovery", w.State)
+	}
+
+	// Now let process A's stuck dispatch finish. Its fencing token is
+	// stale — reclaim already bumped it — so its own completion must be
+	// fenced off (ports.ErrConflict inside submitResult's RecordTerminal
+	// call, logged not fatal), never double-applied on top of process B's
+	// already-COMPLETED workflow. providerA itself still gets called once
+	// (Generate finally returns) — that's expected and fine; what matters
+	// is the workflow state afterward.
+	close(block)
+	waitDone := make(chan struct{})
+	go func() { rtA.Wait(); close(waitDone) }()
+	select {
+	case <-waitDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("process A's abandoned dispatch never finished after unblocking")
+	}
+	w = loadWorkflow(t, appA, workflowID)
+	if w.State != workflow.StateCompleted {
+		t.Fatalf("workflow state after process A's late completion = %s, want still COMPLETED (must not be double-applied)", w.State)
 	}
 }
 

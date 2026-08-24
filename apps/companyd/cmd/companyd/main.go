@@ -5,10 +5,11 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,11 +20,13 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/gemini"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/intelligence/openai"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/notify/realtime"
+	obsprometheus "github.com/Node-Features/company-os/apps/companyd/internal/adapters/observability/prometheus"
 	"github.com/Node-Features/company-os/apps/companyd/internal/adapters/persistence/supabase"
 	"github.com/Node-Features/company-os/apps/companyd/internal/application"
 	"github.com/Node-Features/company-os/apps/companyd/internal/daemon"
 	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
 	"github.com/Node-Features/company-os/apps/companyd/internal/identity"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/runtime"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
@@ -33,6 +36,21 @@ import (
 // rate-limit/outage failure before internal/adapters/intelligence/fallback
 // tries it again.
 const providerCooldown = 60 * time.Second
+
+// logLevel reads LOG_LEVEL (debug|info|warn|error, default info) —
+// docs/architecture/observability.md's structured-logging decision.
+func logLevel() slog.Level {
+	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
 
 // buildProviders constructs one fallback.Provider per configured API key,
 // in priority order Gemini, OpenAI, Anthropic. Priority order is a
@@ -47,7 +65,7 @@ func buildProviders(ctx context.Context) []fallback.Provider {
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		p, err := gemini.New(ctx, key)
 		if err != nil {
-			log.Printf("companyd: gemini adapter: %v", err)
+			slog.Error("companyd: gemini adapter construction failed", "error", err.Error())
 		} else {
 			providers = append(providers, fallback.Provider{Name: "gemini", Adapter: p})
 		}
@@ -60,7 +78,7 @@ func buildProviders(ctx context.Context) []fallback.Provider {
 	}
 
 	if len(providers) == 0 {
-		log.Println("companyd: no GEMINI_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY set — Runtime dispatch will fail every attempt")
+		slog.Warn("companyd: no GEMINI_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY set — Runtime dispatch will fail every attempt")
 	}
 	return providers
 }
@@ -75,15 +93,20 @@ func main() {
 	// configuration loading").
 	_ = godotenv.Load() // best-effort local dev convenience; production sets real env vars
 
-	// Boot stage 3: logging bootstrap. stdlib log only today — no
-	// structured logging, metrics, or tracing exists yet (ADR-0006 open
-	// question).
-	log.Println("companyd: starting")
+	// Boot stage 3: logging bootstrap (docs/architecture/observability.md).
+	// Structured JSON via log/slog, level from LOG_LEVEL (default info).
+	observability.Init(os.Stdout, logLevel())
+	slog.Info("companyd: starting")
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+
+	// Boot stage 3b: metrics bootstrap (docs/architecture/observability.md).
+	// Application/Runtime/Sweeper depend only on ports.MetricsRecorder;
+	// this is the one place the concrete Prometheus adapter is constructed.
+	metrics := obsprometheus.New()
 
 	// Boot stage 4: adapter construction — persistence. Connects first;
 	// everything below this point depends on it.
@@ -94,7 +117,7 @@ func main() {
 	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
 		p, err := supabase.Connect(ctx, dsn)
 		if err != nil {
-			log.Printf("companyd: failed to connect to database: %v", err)
+			slog.Error("companyd: failed to connect to database", "error", err.Error())
 		} else {
 			defer p.Close()
 			db = p
@@ -103,7 +126,11 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", httpapi.HealthHandler(db))
+	mux.Handle("GET /metrics", metrics.Handler())
+	// /health is registered once every dependency it can report on
+	// (DB, outbox sweeper) is known — see boot stage 10 below. diag stays
+	// nil (diagnostics simply omitted) unless the sweeper starts.
+	var diag httpapi.Diagnostics
 
 	// Kernel, Application, Governance, Identity, Runtime, and Daemon are
 	// co-located in this one process per ADR-0004. They require a database
@@ -128,12 +155,12 @@ func main() {
 		if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
 			a, err := supabaseauth.New(ctx, supabaseURL)
 			if err != nil {
-				log.Printf("companyd: failed to construct Supabase Auth verifier: %v", err)
+				slog.Error("companyd: failed to construct Supabase Auth verifier", "error", err.Error())
 			} else {
 				authn = a
 			}
 		} else {
-			log.Println("companyd: no SUPABASE_URL — cannot verify Human authentication")
+			slog.Warn("companyd: no SUPABASE_URL — cannot verify Human authentication")
 		}
 
 		// Boot stage 4c: adapter construction — Identity, Principal
@@ -143,19 +170,24 @@ func main() {
 		// migration's seed row is missing — same fail-closed shape as the
 		// authn block above. principalResolver turns verified Human
 		// evidence into a durable Principal on first sign-in; not consumed
-		// by Application this slice, see fixtures.NewRegistryFromDB's doc.
+		// by Application this slice. The database read happens here, in the
+		// Daemon composition root, rather than inside internal/fixtures —
+		// that package is also imported by internal/kernel, which must not
+		// depend on internal/ports or any persistence mechanism (see
+		// internal/kernel/kernel_boundary_test.go).
 		orgRepo := supabase.NewOrganizationRepository(pool)
-		reg, err := fixtures.NewRegistryFromDB(ctx, orgRepo)
+		org, err := orgRepo.GetOrganization(ctx, fixtures.OrganizationID)
 		if err != nil {
-			log.Printf("companyd: failed to load Organization from database: %v — Application/Runtime not started", err)
+			slog.Error("companyd: failed to load Organization from database — Application/Runtime not started", "error", err.Error())
 		} else {
+			reg := fixtures.NewRegistry().WithOrganization(org)
 			principalResolver := identity.NewResolver(supabase.NewPrincipalRepository(pool), fixtures.OrganizationID)
 
 			// Boot stage 5: adapter construction — intelligence providers.
 			providers := buildProviders(ctx)
 			provider := fallback.New(providers, providerCooldown)
 			if len(providers) > 0 {
-				log.Printf("companyd: intelligence providers (priority order, %s cooldown on rate-limit/outage): %s", providerCooldown, provider)
+				slog.Info("companyd: intelligence providers configured", "priority_order", provider.String(), "cooldown", providerCooldown.String())
 			}
 
 			// Boot stage 6: Application construction. This is what invokes
@@ -174,6 +206,7 @@ func main() {
 				Finance:              supabase.NewFinanceRepository(pool),
 				Objective:            supabase.NewObjectiveRepository(pool),
 				Knowledge:            supabase.NewKnowledgeRepository(pool),
+				Metrics:              metrics,
 			}
 			// Boot stage 7: Runtime construction — the "runtime subsystems"
 			// stage (dispatch loop, leases, retries).
@@ -188,6 +221,7 @@ func main() {
 				Wakeup:                wakeup,
 				Notifier:              realtimePublisher,
 				MaxConcurrentDispatch: 10,
+				Metrics:               metrics,
 			}
 			// Boot stage 8: Daemon construction and start — supervises
 			// Runtime's dispatch loop (daemon.md's process-lifecycle
@@ -212,9 +246,11 @@ func main() {
 				OrgID:        fixtures.OrganizationID,
 				PollInterval: time.Second,
 				BatchSize:    50,
+				Metrics:      metrics,
 			}
+			diag = sweeper
 			go sweeper.Start(ctx)
-			log.Println("companyd: realtime sweeper started (event_outbox -> Supabase Realtime Broadcast)")
+			slog.Info("companyd: realtime sweeper started (event_outbox -> Supabase Realtime Broadcast)")
 
 			// Boot stage 9: agent/workflow-layer entry points. Only
 			// reachable once stages 4-8 above succeeded. Every route here
@@ -223,7 +259,7 @@ func main() {
 			// trusts a client-asserted Principal.
 			if authn != nil {
 				withAuth := func(h http.HandlerFunc) http.HandlerFunc {
-					return httpapi.RequireHumanAuth(authn, httpapi.ResolvePrincipal(principalResolver, h))
+					return httpapi.WithObservability(httpapi.RequireHumanAuth(authn, httpapi.ResolvePrincipal(principalResolver, h)))
 				}
 				mux.HandleFunc("POST /v1/workflows", withAuth(httpapi.CreateWorkflowHandler(app)))
 				mux.HandleFunc("POST /v1/workflows/{workflowId}/start", withAuth(httpapi.StartWorkflowHandler(app)))
@@ -269,42 +305,49 @@ func main() {
 				mux.HandleFunc("GET /v1/knowledge/items", withAuth(httpapi.QueryKnowledgeItemsHandler(app)))
 				mux.HandleFunc("GET /v1/knowledge/items/{knowledgeItemId}", withAuth(httpapi.GetKnowledgeItemHandler(app)))
 			} else {
-				log.Println("companyd: Supabase Auth verifier unavailable — /v1/workflows and /v1/approvals routes not mounted")
+				slog.Warn("companyd: Supabase Auth verifier unavailable — /v1/workflows and /v1/approvals routes not mounted")
 			}
 
 			if err := d.Start(ctx); err != nil {
-				log.Printf("companyd: daemon start error: %v", err)
+				slog.Error("companyd: daemon start error", "error", err.Error())
 			} else {
-				log.Println("companyd: daemon started (Runtime dispatch loop running)")
+				slog.Info("companyd: daemon started (Runtime dispatch loop running)")
 			}
 		}
 	} else {
-		log.Println("companyd: no DATABASE_URL — Kernel/Application/Runtime/Daemon not started, /v1/workflows routes unavailable")
+		slog.Warn("companyd: no DATABASE_URL — Kernel/Application/Runtime/Daemon not started, /v1/workflows routes unavailable")
 	}
+
+	// Boot stage 9 (cont'd): /health is always registered, even in degraded
+	// mode — deferred to here (rather than immediately after boot stage 4)
+	// only so its diag argument can reflect whether the boot stage 8b
+	// sweeper actually started; this changes nothing observable, since no
+	// route is reachable until boot stage 10 below calls ListenAndServe.
+	mux.HandleFunc("GET /health", httpapi.HealthHandler(db, diag))
 
 	// Boot stage 10: HTTP server starts listening.
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
-		log.Printf("companyd: listening on :%s", port)
+		slog.Info("companyd: listening", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("companyd: http server error: %v", err)
+			slog.Error("companyd: http server error", "error", err.Error())
 		}
 	}()
 
 	// Boot stage 11: block until shutdown signal, then drain and stop in
 	// dependency-reverse order (daemon.md's supervision model).
 	<-ctx.Done()
-	log.Println("companyd: shutdown signal received, draining")
+	slog.Info("companyd: shutdown signal received, draining")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("companyd: http server shutdown error: %v", err)
+		slog.Error("companyd: http server shutdown error", "error", err.Error())
 	}
 
 	if d != nil {
 		if err := d.Shutdown(shutdownCtx); err != nil {
-			log.Printf("companyd: daemon shutdown error: %v", err)
+			slog.Error("companyd: daemon shutdown error", "error", err.Error())
 		}
 	}
 }

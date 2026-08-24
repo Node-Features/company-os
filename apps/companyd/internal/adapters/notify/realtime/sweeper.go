@@ -2,9 +2,10 @@ package realtime
 
 import (
 	"context"
-	"log"
+	"sync/atomic"
 	"time"
 
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
@@ -22,6 +23,17 @@ type Sweeper struct {
 	OrgID        uuid.UUID
 	PollInterval time.Duration
 	BatchSize    int
+
+	// Metrics is an optional operational-metrics sink
+	// (docs/architecture/observability.md). A nil Metrics is never an
+	// error — every emission call site checks it first.
+	Metrics ports.MetricsRecorder
+
+	// lastBacklog/lastReconcileAtUnixNano back Diagnostics(), read from a
+	// different goroutine than Sweep runs on (health.go's HTTP handler),
+	// hence atomic rather than plain fields.
+	lastBacklog             atomic.Int64
+	lastReconcileAtUnixNano atomic.Int64
 }
 
 // Start runs the poll loop until ctx is cancelled. There is no wake-up fast
@@ -41,12 +53,39 @@ func (s *Sweeper) Start(ctx context.Context) {
 	}
 }
 
+// Diagnostics reports the outbox backlog observed on the most recent Sweep
+// and when that Sweep ran — read-only, side-effect-free values for
+// health.go, per docs/architecture/daemon.md's "Health probes are
+// side-effect free." Never authoritative: a fresh call to Sweep may
+// immediately supersede these values.
+func (s *Sweeper) Diagnostics() (backlog int, lastReconcileAt time.Time) {
+	backlog = int(s.lastBacklog.Load())
+	if ns := s.lastReconcileAtUnixNano.Load(); ns != 0 {
+		lastReconcileAt = time.Unix(0, ns)
+	}
+	return backlog, lastReconcileAt
+}
+
+func (s *Sweeper) incrCounter(name string, labels map[string]string) {
+	if s.Metrics == nil {
+		return
+	}
+	s.Metrics.IncrCounter(name, labels)
+}
+
 // Sweep runs exactly one load-publish-mark pass.
 func (s *Sweeper) Sweep(ctx context.Context) {
+	s.lastReconcileAtUnixNano.Store(time.Now().UnixNano())
+	s.incrCounter("reconciliation_runs_total", nil)
+
 	events, err := s.Outbox.LoadUnpublished(ctx, s.OrgID, s.BatchSize)
 	if err != nil {
-		log.Printf("realtime: load unpublished events: %v", err)
+		observability.Logger(ctx).Error("realtime: load unpublished events failed", "error", err.Error())
 		return
+	}
+	s.lastBacklog.Store(int64(len(events)))
+	if s.Metrics != nil {
+		s.Metrics.SetGauge("outbox_backlog", float64(len(events)), nil)
 	}
 	if len(events) == 0 {
 		return
@@ -58,14 +97,14 @@ func (s *Sweeper) Sweep(ctx context.Context) {
 	}
 
 	if err := s.Publisher.Publish(ctx, events); err != nil {
-		log.Printf("realtime: publish %d event(s): %v", len(events), err)
+		observability.Logger(ctx).Error("realtime: publish events failed", "count", len(events), "error", err.Error())
 		if err := s.Outbox.MarkPublishFailed(ctx, ids, err.Error()); err != nil {
-			log.Printf("realtime: mark publish failed: %v", err)
+			observability.Logger(ctx).Error("realtime: mark publish failed error", "error", err.Error())
 		}
 		return
 	}
 
 	if err := s.Outbox.MarkPublished(ctx, ids); err != nil {
-		log.Printf("realtime: mark published: %v", err)
+		observability.Logger(ctx).Error("realtime: mark published failed", "error", err.Error())
 	}
 }

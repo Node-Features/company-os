@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/resource` has no Go types yet. The real, partial equivalent is `internal/domain/finance.CostConstraint` plus `finance.Budget`/`PriceProfile`/`ResourceUsage`/`ResourceEvaluation` — only one of this contract's five named specializations (`CostConstraint`); `ComputeConstraint`, `TimeConstraint`, `StorageConstraint`, and `ConcurrencyConstraint` have no implementation anywhere (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented as written here.
+
 ## Ownership
 
 Finance is the organizational owner of `ResourceConstraint` and its specializations. This document is their canonical domain contract. Governance, Runtime, workspaces, Intelligence, Coding Agents, departments, and providers may enforce or consume constraints; they cannot redefine their meaning, units, lifecycle, or overrun behavior.

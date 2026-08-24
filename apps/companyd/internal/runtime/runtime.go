@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"runtime/debug"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/result"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
@@ -55,6 +55,12 @@ type Runtime struct {
 	// an error; the receiver's reconciliation poll is the durable
 	// fallback, same as Application.Notify's in-process wake-up hint.
 	Notifier ports.ChangeNotifier
+
+	// Metrics is an optional operational-metrics sink
+	// (docs/architecture/observability.md). A nil Metrics is never an
+	// error — every emission call site checks it first, the same nil-safe
+	// pattern Notifier already establishes.
+	Metrics ports.MetricsRecorder
 
 	// MaxConcurrentDispatch bounds how many execute() calls may run at once,
 	// across all Sweeps combined — independent of PollInterval/batch size,
@@ -98,6 +104,37 @@ func (r *Runtime) ensureWorkContext() {
 	})
 }
 
+// incrCounter/observeHistogram are nil-safe wrappers around Metrics, the
+// same nil-check-per-call pattern notifyChanged already uses for Notifier.
+func (r *Runtime) incrCounter(name string, labels map[string]string) {
+	if r.Metrics == nil {
+		return
+	}
+	r.Metrics.IncrCounter(name, labels)
+}
+
+func (r *Runtime) observeHistogram(name string, seconds float64, labels map[string]string) {
+	if r.Metrics == nil {
+		return
+	}
+	r.Metrics.ObserveHistogram(name, seconds, labels)
+}
+
+// attemptContext builds the ExecutionContext an execute() call and
+// everything it logs/records metrics for should carry — the identity known
+// as soon as an attempt is claimed (docs/architecture/observability.md).
+func attemptContext(attempt execution.ExecutionAttempt, intent workflow.ExecutionIntent) observability.ExecutionContext {
+	retryCount := attempt.AttemptNumber
+	return observability.ExecutionContext{
+		OrganizationID:     intent.OrganizationID,
+		WorkflowID:         intent.WorkflowID,
+		ExecutionIntentID:  intent.IntentID,
+		ExecutionAttemptID: attempt.AttemptID,
+		RetryCount:         &retryCount,
+		LifecycleState:     string(attempt.Status),
+	}
+}
+
 // dispatchBounded runs fn on its own goroutine, tracked by r.wg (so Wait
 // drains it) and gated by r.sem (so no more than MaxConcurrentDispatch run
 // concurrently, regardless of how many Sweeps overlap). The slot is
@@ -122,7 +159,8 @@ func (r *Runtime) dispatchBounded(fn func()) {
 		defer func() { <-r.sem }()
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Printf("runtime: recovered panic in dispatch: %v\n%s", rec, debug.Stack())
+				observability.Logger(context.Background()).Error("runtime: recovered panic in dispatch",
+					"panic", rec, "stack", string(debug.Stack()))
 			}
 		}()
 		fn()
@@ -148,7 +186,7 @@ func (r *Runtime) notifyChanged(ctx context.Context, workflowID uuid.UUID) {
 		return
 	}
 	if err := r.Notifier.NotifyWorkflowChanged(ctx, workflowID); err != nil {
-		log.Printf("runtime: notify workflow changed: %v", err)
+		observability.Logger(ctx).Warn("runtime: notify workflow changed failed", "error", err.Error())
 	}
 }
 
@@ -187,13 +225,17 @@ func (r *Runtime) Sweep(ctx context.Context) {
 
 	claims, err := r.Exec.ClaimDueIntents(ctx, r.Fixtures.Organization().OrganizationID, 10, r.LeaseDuration, workerID)
 	if err != nil {
-		log.Printf("runtime: claim due intents: %v", err)
+		observability.Logger(ctx).Error("runtime: claim due intents failed", "error", err.Error())
 		return
 	}
 	for _, c := range claims {
-		r.notifyChanged(ctx, c.Intent.WorkflowID)
 		c := c
-		r.dispatchBounded(func() { r.execute(r.workCtx, c.Attempt, c.Intent) })
+		ec := attemptContext(c.Attempt, c.Intent)
+		claimCtx := observability.WithExecutionContext(ctx, ec)
+		r.incrCounter("executions_total", map[string]string{"state": string(c.Attempt.Status)})
+		observability.Logger(claimCtx).Info("runtime: claimed execution attempt")
+		r.notifyChanged(claimCtx, c.Intent.WorkflowID)
+		r.dispatchBounded(func() { r.execute(observability.WithExecutionContext(r.workCtx, ec), c.Attempt, c.Intent) })
 	}
 }
 
@@ -211,23 +253,28 @@ func (r *Runtime) Sweep(ctx context.Context) {
 func (r *Runtime) reclaimAbandoned(ctx context.Context) {
 	reclaimed, err := r.Exec.ReclaimExpiredLeases(ctx, r.Fixtures.Organization().OrganizationID, 10)
 	if err != nil {
-		log.Printf("runtime: reclaim expired leases: %v", err)
+		observability.Logger(ctx).Error("runtime: reclaim expired leases failed", "error", err.Error())
 		return
 	}
 	capDef := r.Fixtures.Capability()
 	for _, c := range reclaimed {
-		log.Printf("runtime: reclaimed lease-expired attempt %s (intent %s, workflow %s, attempt #%d)",
-			c.Attempt.AttemptID, c.Intent.IntentID, c.Intent.WorkflowID, c.Attempt.AttemptNumber)
+		ec := attemptContext(c.Attempt, c.Intent)
+		ec.LeaseState = "expired"
+		reclaimCtx := observability.WithExecutionContext(ctx, ec)
+		r.incrCounter("lease_expirations_total", nil)
+		observability.Logger(reclaimCtx).Warn("runtime: reclaimed lease-expired attempt")
 		if c.Attempt.AttemptNumber < capDef.Retry.MaxAttempts {
 			backoff := computeBackoff(c.Attempt.AttemptNumber, capDef.Retry)
 			dueAt := time.Now().UTC().Add(backoff)
 			if err := r.Exec.ScheduleRetry(ctx, c.Intent.OrganizationID, c.Intent.IntentID, dueAt); err != nil {
-				log.Printf("runtime: schedule retry after lease reclaim: %v", err)
+				observability.Logger(reclaimCtx).Error("runtime: schedule retry after lease reclaim failed", "error", err.Error())
+			} else {
+				r.incrCounter("retries_total", nil)
 			}
-			r.notifyChanged(ctx, c.Intent.WorkflowID)
+			r.notifyChanged(reclaimCtx, c.Intent.WorkflowID)
 			continue
 		}
-		r.failExhausted(ctx, c.Attempt, c.Intent)
+		r.failExhausted(reclaimCtx, c.Attempt, c.Intent)
 	}
 }
 
@@ -246,6 +293,7 @@ func (r *Runtime) reclaimAbandoned(ctx context.Context) {
 // attempt didn't fail, it was never heard from again, which LEASE_EXPIRED
 // says truthfully and FAILED_TERMINAL would not.
 func (r *Runtime) failExhausted(ctx context.Context, attempt execution.ExecutionAttempt, intent workflow.ExecutionIntent) {
+	r.incrCounter("abandoned_total", nil)
 	now := time.Now().UTC()
 	resultID := uuid.New()
 	errClass := "lease_expired_max_attempts"
@@ -271,7 +319,7 @@ func (r *Runtime) failExhausted(ctx context.Context, attempt execution.Execution
 		ReportedAt:           now,
 	}
 	if err := r.Exec.SaveResult(ctx, res); err != nil {
-		log.Printf("runtime: save result for exhausted lease-expired intent %s: %v", intent.IntentID, err)
+		observability.Logger(ctx).Error("runtime: save result for exhausted lease-expired intent failed", "error", err.Error())
 		return
 	}
 	r.notifyChanged(ctx, intent.WorkflowID)
@@ -282,14 +330,15 @@ func (r *Runtime) failExhausted(ctx context.Context, attempt execution.Execution
 		ExpectedVersion: intent.WorkflowVersion,
 	})
 	if outcome.Outcome != application.Accepted {
-		log.Printf("runtime: submit result for exhausted lease-expired workflow %s: %s %v", intent.WorkflowID, outcome.Outcome, outcome.Reasons)
+		observability.Logger(ctx).Warn("runtime: submit result for exhausted lease-expired workflow not accepted",
+			"outcome", string(outcome.Outcome), "reasons", outcome.Reasons)
 	}
 }
 
 func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttempt, intent workflow.ExecutionIntent) {
 	decision, err := r.App.AuthorizeDispatch(ctx, intent)
 	if err != nil {
-		log.Printf("runtime: authorize dispatch: %v", err)
+		observability.Logger(ctx).Error("runtime: authorize dispatch failed", "error", err.Error())
 		return
 	}
 	if !decision.Outcome.Allows() {
@@ -297,14 +346,15 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 		// (application.md#dispatch-time-governance). This slice's
 		// always-AUTOMATIC policy makes this a rare race (a stale version),
 		// so it's treated as terminal rather than looping.
-		log.Printf("runtime: dispatch not authorized for intent %s: %s", intent.IntentID, decision.Outcome)
+		observability.Logger(ctx).Warn("runtime: dispatch not authorized", "governance_outcome", string(decision.Outcome))
 		_ = r.Exec.RecordTerminal(ctx, attempt.AttemptID, *attempt.LeaseFencingToken, execution.StatusFailedTerminal, nil)
+		r.incrCounter("executions_total", map[string]string{"state": string(execution.StatusFailedTerminal)})
 		r.notifyChanged(ctx, intent.WorkflowID)
 		return
 	}
 
 	if err := r.Exec.RecordDispatched(ctx, attempt.AttemptID, *attempt.LeaseFencingToken, attempt.AttemptID.String()); err != nil {
-		log.Printf("runtime: record dispatched: %v", err)
+		observability.Logger(ctx).Error("runtime: record dispatched failed", "error", err.Error())
 		return
 	}
 	r.notifyChanged(ctx, intent.WorkflowID)
@@ -321,12 +371,15 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 		maxTokens = v
 	}
 
+	dispatchStart := time.Now()
 	genResult, genErr := r.Provider.Generate(dispatchCtx, ports.IntelligenceRequest{Prompt: prompt, MaxOutputTokens: maxTokens})
+	dispatchSeconds := time.Since(dispatchStart).Seconds()
 
 	now := time.Now().UTC()
 	resultID := uuid.New()
 
 	if genErr == nil {
+		r.observeHistogram("provider_latency_seconds", dispatchSeconds, map[string]string{"provider": genResult.Provider, "outcome": "succeeded"})
 		res := &result.Result{
 			ResultID:             resultID,
 			OrganizationID:       intent.OrganizationID,
@@ -355,20 +408,26 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 	}
 
 	retryable := ports.IsRetryable(genErr)
+	r.observeHistogram("provider_latency_seconds", dispatchSeconds, map[string]string{"provider": r.ProviderName, "outcome": "failed"})
+	safeErr := observability.SafeProviderError(genErr, retryable)
 	if retryable && attempt.AttemptNumber < capDef.Retry.MaxAttempts {
 		if err := r.Exec.RecordTerminal(ctx, attempt.AttemptID, *attempt.LeaseFencingToken, execution.StatusFailedRetryable, nil); err != nil {
-			log.Printf("runtime: record failed_retryable: %v", err)
+			observability.Logger(ctx).Error("runtime: record failed_retryable failed", "error", err.Error())
 			return
 		}
+		r.incrCounter("executions_total", map[string]string{"state": string(execution.StatusFailedRetryable)})
+		observability.Logger(ctx).Warn("runtime: provider call failed, scheduling retry", "failure_reason", safeErr)
 		backoff := computeBackoff(attempt.AttemptNumber, capDef.Retry)
 		if err := r.Exec.ScheduleRetry(ctx, intent.OrganizationID, intent.IntentID, now.Add(backoff)); err != nil {
-			log.Printf("runtime: schedule retry: %v", err)
+			observability.Logger(ctx).Error("runtime: schedule retry failed", "error", err.Error())
+		} else {
+			r.incrCounter("retries_total", nil)
 		}
 		r.notifyChanged(ctx, intent.WorkflowID)
 		return
 	}
 
-	errClass := genErr.Error()
+	errClass := safeErr
 	res := &result.Result{
 		ResultID:             resultID,
 		OrganizationID:       intent.OrganizationID,
@@ -394,13 +453,14 @@ func (r *Runtime) execute(ctx context.Context, attempt execution.ExecutionAttemp
 
 func (r *Runtime) submitResult(ctx context.Context, attempt execution.ExecutionAttempt, intent workflow.ExecutionIntent, res *result.Result, terminal execution.AttemptStatus) {
 	if err := r.Exec.SaveResult(ctx, res); err != nil {
-		log.Printf("runtime: save result: %v", err)
+		observability.Logger(ctx).Error("runtime: save result failed", "error", err.Error())
 		return
 	}
 	if err := r.Exec.RecordTerminal(ctx, attempt.AttemptID, *attempt.LeaseFencingToken, terminal, &res.ResultID); err != nil {
-		log.Printf("runtime: record terminal: %v", err)
+		observability.Logger(ctx).Error("runtime: record terminal failed", "error", err.Error())
 		return
 	}
+	r.incrCounter("executions_total", map[string]string{"state": string(terminal)})
 	r.notifyChanged(ctx, intent.WorkflowID)
 	outcome := r.App.SubmitResult(ctx, application.SubmitResultRequest{
 		RequestID:       uuid.New(),
@@ -409,7 +469,8 @@ func (r *Runtime) submitResult(ctx context.Context, attempt execution.ExecutionA
 		ExpectedVersion: intent.WorkflowVersion,
 	})
 	if outcome.Outcome != application.Accepted {
-		log.Printf("runtime: submit result for workflow %s: %s %v", intent.WorkflowID, outcome.Outcome, outcome.Reasons)
+		observability.Logger(ctx).Warn("runtime: submit result not accepted",
+			"outcome", string(outcome.Outcome), "reasons", outcome.Reasons)
 	}
 }
 

@@ -2,13 +2,23 @@ package application
 
 import (
 	"context"
+	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
+
+// idempotencyReservationTTL bounds how long a reservation may sit
+// IN_PROGRESS before another request racing the same key is allowed to
+// treat it as abandoned (the original request crashed between winning the
+// reservation and calling finalize) and reclaim it. Long enough to cover a
+// real request's governance+persistence round trips; short enough that a
+// genuine crash doesn't wedge a key for long.
+const idempotencyReservationTTL = 30 * time.Second
 
 // Application is the orchestration boundary described in
 // docs/architecture/application.md: it coordinates Kernel, Governance, and
@@ -37,6 +47,10 @@ type Application struct {
 	// Knowledge persists KnowledgeItem versions (ROADMAP.md Phase 5 Slice 1,
 	// docs/architecture/knowledge.md's ingestion/versioning flow).
 	Knowledge ports.KnowledgeRepository
+	// Metrics is an optional operational-metrics sink
+	// (docs/architecture/observability.md). A nil Metrics is never an
+	// error — every emission call site checks it first.
+	Metrics ports.MetricsRecorder
 }
 
 func viewOf(w *workflow.Workflow) *WorkflowView {
@@ -49,19 +63,59 @@ func viewOf(w *workflow.Workflow) *WorkflowView {
 	}
 }
 
-// replay implements application.md's idempotent-replay guard: retrying the
-// same logical request must reuse its idempotency identity and cannot
-// create a second legal transition.
-func (a *Application) replay(ctx context.Context, orgID uuid.UUID, key string) (Result, bool) {
-	found, outcome, err := a.Repo.IdempotencyLookup(ctx, orgID, key)
-	if err != nil || !found {
+// reserveOrReplay implements application.md's idempotent-replay guard:
+// retrying the same logical request must reuse its idempotency identity
+// and cannot create a second legal transition — including when two
+// requests for the same key race each other concurrently. It atomically
+// reserves the key (see ports.AuthoritativeStateRepository.IdempotencyReserve
+// for why this must be one round trip, not a lookup-then-write). A true
+// (Result, true) means the caller must return Result immediately without
+// running the use case, whether that Result is a real replay of a terminal
+// outcome or Indeterminate (another request is still in flight — the
+// caller is expected to retry with the same key). A false ok means this
+// call won the reservation and must eventually call finalize. Takes orgID/
+// requestID/key directly rather than the use case's command.WorkflowCommandEnvelope
+// since every call site invokes this before that envelope is built (it
+// needs Workflow state this guard must run ahead of loading).
+func (a *Application) reserveOrReplay(ctx context.Context, orgID, requestID uuid.UUID, key string) (Result, bool) {
+	won, existingOutcome, err := a.Repo.IdempotencyReserve(ctx, orgID, requestID, key, idempotencyReservationTTL)
+	if err != nil {
+		// Fail open to "not reserved, proceed" — matches this guard's
+		// pre-existing posture on a transient lookup error: a false
+		// negative here means unnecessary re-execution, never a lost
+		// legal-transition guarantee, since every domain write downstream
+		// still goes through its own CAS.
 		return Result{}, false
 	}
-	return Result{Outcome: Outcome(outcome)}, true
+	if won {
+		return Result{}, false
+	}
+	if existingOutcome == ports.IdempotencyInProgress {
+		return Result{Outcome: Indeterminate, Reasons: []string{"request_in_progress_retry_with_same_idempotency_key"}}, true
+	}
+	return Result{Outcome: Outcome(existingOutcome)}, true
 }
 
-func (a *Application) store(ctx context.Context, cmd command.WorkflowCommandEnvelope, res Result) Result {
-	_ = a.Repo.IdempotencyStore(ctx, cmd.OrganizationID, cmd.RequestID, cmd.IdempotencyKey, string(res.Outcome))
+// finalize overwrites the reservation reserveOrReplay won with the use
+// case's real outcome. A finalize failure is logged, not swallowed — but
+// the use case still returns res, its already-committed real outcome,
+// since failing the response here would misrepresent state that already
+// changed. A stuck IN_PROGRESS row left by this failure is only recovered
+// after idempotencyReservationTTL, by whichever request next races this
+// key (see IdempotencyReserve) — a narrowed, not eliminated, crash window,
+// consistent with this codebase's other documented residual gaps.
+func (a *Application) finalize(ctx context.Context, cmd command.WorkflowCommandEnvelope, res Result) Result {
+	enriched := observability.WithExecutionContext(ctx, observability.ExecutionContext{
+		CorrelationID:  cmd.CorrelationID,
+		CommandID:      cmd.CommandID,
+		OrganizationID: cmd.OrganizationID,
+		WorkflowID:     cmd.WorkflowID,
+		PrincipalID:    cmd.RequestingPrincipalID,
+	})
+	if err := a.Repo.IdempotencyFinalize(ctx, cmd.OrganizationID, cmd.IdempotencyKey, string(res.Outcome)); err != nil {
+		observability.Logger(enriched).Error("idempotency finalize failed (result already committed; ledger entry may be stale until reclaimed)",
+			"idempotency_key", cmd.IdempotencyKey, "error", err.Error())
+	}
 	return res
 }
 

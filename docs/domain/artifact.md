@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/artifact` has no Go types yet, and no equivalent exists elsewhere in the codebase (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented.
+
 ## Definition
 
 An `Artifact` is an addressable, durable work product such as a document, patch, design, dataset, build, report, or deployment manifest. Storage does not imply acceptance, correctness, approval, or Knowledge status.

@@ -13,11 +13,11 @@ package fallback
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 )
 
@@ -89,11 +89,13 @@ func (a *Adapter) Generate(ctx context.Context, req ports.IntelligenceRequest) (
 		lastErr = err
 
 		if !ports.IsRetryable(err) {
-			log.Printf("intelligence/fallback: provider %q failed (terminal), not trying further providers: %v", e.Name, err)
+			observability.Logger(ctx).Error("intelligence/fallback: provider failed, not trying further providers",
+				"provider", e.Name, "failure_reason", observability.SafeProviderError(err, false))
 			return ports.IntelligenceResult{}, err
 		}
 
-		log.Printf("intelligence/fallback: provider %q failed (retryable), cooling down %s and trying next: %v", e.Name, a.cooldown, err)
+		observability.Logger(ctx).Warn("intelligence/fallback: provider failed, cooling down and trying next",
+			"provider", e.Name, "cooldown", a.cooldown.String(), "failure_reason", observability.SafeProviderError(err, true))
 		a.markUnhealthy(e)
 	}
 	return ports.IntelligenceResult{}, lastErr

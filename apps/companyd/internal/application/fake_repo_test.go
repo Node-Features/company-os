@@ -45,10 +45,20 @@ func (r *rendezvous) Arrive() {
 // ordering-specific tests only — it is never the sole evidence for a
 // state-transition correctness claim; integration_test.go's real-database
 // tests own that.
+// idempotencyRecord mirrors the two columns workflow_repo.go's real
+// IdempotencyReserve/IdempotencyFinalize actually need: the outcome (or
+// ports.IdempotencyInProgress while a reservation is live) and when that
+// value was set, for the same staleness-based reclaim the real
+// implementation does.
+type idempotencyRecord struct {
+	outcome   string
+	createdAt time.Time
+}
+
 type fakeRepo struct {
 	mu                  sync.Mutex
 	workflows           map[string]*workflow.Workflow
-	idempotency         map[string]string
+	idempotency         map[string]idempotencyRecord
 	results             map[uuid.UUID]*result.Result
 	governanceDecisions map[string]bool // keyed by governanceDecisionKey(orgID, action, resourceType, resourceID)
 
@@ -62,7 +72,7 @@ type fakeRepo struct {
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
 		workflows:           map[string]*workflow.Workflow{},
-		idempotency:         map[string]string{},
+		idempotency:         map[string]idempotencyRecord{},
 		results:             map[uuid.UUID]*result.Result{},
 		governanceDecisions: map[string]bool{},
 	}
@@ -146,20 +156,31 @@ func (f *fakeRepo) GovernanceDecisionExists(_ context.Context, orgID uuid.UUID, 
 	return f.governanceDecisions[governanceDecisionKey(orgID, action, resourceType, resourceID)], nil
 }
 
-func (f *fakeRepo) IdempotencyLookup(_ context.Context, orgID uuid.UUID, k string) (bool, string, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	v, ok := f.idempotency[orgID.String()+":"+k]
-	return ok, v, nil
-}
-
-func (f *fakeRepo) IdempotencyStore(_ context.Context, orgID, _ uuid.UUID, k, outcome string) error {
+// IdempotencyReserve mirrors workflow_repo.go's real atomic upsert: a
+// missing key or a stale (older than ttl) IN_PROGRESS reservation is won
+// by this caller; anything else returns won=false with the existing
+// outcome (which may itself be ports.IdempotencyInProgress, meaning
+// genuinely still in flight). f.mu makes the whole read-decide-write
+// sequence atomic with respect to every other fakeRepo caller, matching
+// what the real single-round-trip SQL statement guarantees against real
+// concurrent Postgres sessions.
+func (f *fakeRepo) IdempotencyReserve(_ context.Context, orgID, _ uuid.UUID, k string, ttl time.Duration) (bool, string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	ik := orgID.String() + ":" + k
-	if _, ok := f.idempotency[ik]; !ok {
-		f.idempotency[ik] = outcome
+	rec, ok := f.idempotency[ik]
+	if !ok || (rec.outcome == ports.IdempotencyInProgress && time.Since(rec.createdAt) >= ttl) {
+		f.idempotency[ik] = idempotencyRecord{outcome: ports.IdempotencyInProgress, createdAt: time.Now()}
+		return true, "", nil
 	}
+	return false, rec.outcome, nil
+}
+
+func (f *fakeRepo) IdempotencyFinalize(_ context.Context, orgID uuid.UUID, k, outcome string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ik := orgID.String() + ":" + k
+	f.idempotency[ik] = idempotencyRecord{outcome: outcome, createdAt: f.idempotency[ik].createdAt}
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/fixtures"
 	"github.com/Node-Features/company-os/apps/companyd/internal/governance"
 	kernelwf "github.com/Node-Features/company-os/apps/companyd/internal/kernel/workflow"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
@@ -20,7 +21,7 @@ import (
 func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowRequest) Result {
 	reg := a.Fixtures
 
-	if cached, ok := a.replay(ctx, reg.Organization().OrganizationID, req.IdempotencyKey); ok {
+	if cached, ok := a.reserveOrReplay(ctx, reg.Organization().OrganizationID, req.RequestID, req.IdempotencyKey); ok {
 		return cached
 	}
 
@@ -43,7 +44,7 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 		ObjectiveID:           current.ObjectiveID,
 		DefinitionID:          current.DefinitionID,
 		DefinitionVersion:     current.DefinitionVersion,
-		RequestingPrincipalID: reg.TriggerPrincipal().PrincipalID,
+		RequestingPrincipalID: req.RequestingPrincipalID,
 		Inputs:                current.Inputs,
 		DeclaredTime:          time.Now().UTC(),
 		CorrelationID:         current.CorrelationID,
@@ -51,17 +52,17 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 
 	proposal, reasons := kernelwf.ValidateStartProposal(cmd, reg, *current)
 	if proposal == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{})
 	if !ok {
-		return a.store(ctx, cmd, denyResult)
+		return a.finalize(ctx, cmd, denyResult)
 	}
 
 	kd, reasons := kernelwf.FinalizeStart(cmd, *proposal, decision, *current, reg, cmd.DeclaredTime)
 	if kd == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	next := *current
@@ -71,7 +72,7 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 
 	if err := a.Repo.CommitTransition(ctx, &next, req.ExpectedVersion, kd.Events, kd.GovernanceDecisionID, kd.Intent, nil, nil, nil, false); err != nil {
 		if errors.Is(err, ports.ErrConflict) {
-			return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
+			return a.finalize(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
 		}
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
@@ -82,7 +83,7 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 		a.notify(kd.Intent.IntentID)
 	}
 
-	return a.store(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
+	return a.finalize(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
 }
 
 // AuthorizeDispatch is the dispatch-time governance re-check
@@ -91,6 +92,11 @@ func (a *Application) StartWorkflow(ctx context.Context, req StartWorkflowReques
 // Governance against the intent's current authority/policy/version. Runtime
 // passes the intent it already claimed rather than this method reloading
 // it, since ClaimDueIntents already returned it — see first-slice plan.
+// Unlike StartWorkflow/CancelWorkflow (docs/audit/gap-approval-principal-attribution.md),
+// this re-check has no authenticated HTTP caller to attribute to — Runtime's
+// poll loop triggers it, not a human request — so reg.TriggerPrincipal()
+// here is a real system/service identity, not a stand-in for a missing
+// real one.
 func (a *Application) AuthorizeDispatch(ctx context.Context, intent workflow.ExecutionIntent) (policy.GovernanceDecision, error) {
 	reg := a.Fixtures
 	requestID := uuid.New()
@@ -120,6 +126,7 @@ func (a *Application) AuthorizeDispatch(ctx context.Context, intent workflow.Exe
 		decision.Reason = &reason
 		_ = a.Repo.SaveGovernanceDecision(ctx, decision.DecisionID, decision.OrganizationID, decision.RequestID, decision.RequestID, decision.PrincipalID,
 			decision.Action, decision.ResourceType, decision.ResourceID, decision.ProposalDigest, trustedContextDigest, decision.PolicyVersion, string(decision.AutonomyLevel), string(decision.Outcome), decision.MatchedRuleID, decision.Reason)
+		observability.RecordGovernanceDecision(ctx, a.Metrics, decision)
 		return decision, nil
 	}
 
@@ -141,5 +148,6 @@ func (a *Application) AuthorizeDispatch(ctx context.Context, intent workflow.Exe
 	_ = a.Repo.SaveGovernanceDecision(ctx, decision.DecisionID, decision.OrganizationID, decision.RequestID, decision.CorrelationID, decision.PrincipalID,
 		decision.Action, decision.ResourceType, decision.ResourceID, decision.ProposalDigest, decision.TrustedContextDigest,
 		decision.PolicyVersion, string(decision.AutonomyLevel), string(decision.Outcome), decision.MatchedRuleID, decision.Reason)
+	observability.RecordGovernanceDecision(ctx, a.Metrics, decision)
 	return decision, nil
 }

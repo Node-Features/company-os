@@ -20,7 +20,7 @@ import (
 func (a *Application) SubmitResult(ctx context.Context, req SubmitResultRequest) Result {
 	reg := a.Fixtures
 
-	if cached, ok := a.replay(ctx, reg.Organization().OrganizationID, req.IdempotencyKey); ok {
+	if cached, ok := a.reserveOrReplay(ctx, reg.Organization().OrganizationID, req.RequestID, req.IdempotencyKey); ok {
 		return cached
 	}
 
@@ -65,12 +65,12 @@ func (a *Application) SubmitResult(ctx context.Context, req SubmitResultRequest)
 
 	proposal, reasons := kernelwf.ValidateResultProposal(cmd, *current, *res, req.ExpectedVersion)
 	if proposal == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{})
 	if !ok {
-		return a.store(ctx, cmd, denyResult)
+		return a.finalize(ctx, cmd, denyResult)
 	}
 
 	var kd *command.KernelDecisionEnvelope
@@ -80,7 +80,7 @@ func (a *Application) SubmitResult(ctx context.Context, req SubmitResultRequest)
 		kd, reasons = kernelwf.FinalizeReject(cmd, *proposal, decision, *current, *res, cmd.DeclaredTime)
 	}
 	if kd == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	next := *current
@@ -97,10 +97,10 @@ func (a *Application) SubmitResult(ctx context.Context, req SubmitResultRequest)
 
 	if err := a.Repo.CommitTransition(ctx, &next, req.ExpectedVersion, kd.Events, kd.GovernanceDecisionID, nil, nil, nil, decideResult, false); err != nil {
 		if errors.Is(err, ports.ErrConflict) {
-			return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
+			return a.finalize(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
 		}
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
-	return a.store(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
+	return a.finalize(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
 }

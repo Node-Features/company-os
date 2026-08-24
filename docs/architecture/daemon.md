@@ -90,4 +90,5 @@ The detailed six-project evidence matrix is maintained in [Runtime: OSS evidence
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
 - [Runtime](runtime.md)
+- [Observability](observability.md) — implements this document's "observability wiring" line
 - Future security and deployment specifications

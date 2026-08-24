@@ -2,11 +2,11 @@ package httpapi
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/identity"
+	"github.com/Node-Features/company-os/apps/companyd/internal/observability"
 )
 
 // principalContextKey is unexported so only this package can populate the
@@ -35,19 +35,23 @@ func ResolvePrincipal(resolver *identity.Resolver, next http.HandlerFunc) http.H
 		if !ok {
 			// Programmer error, not a caller fault: ResolvePrincipal is only
 			// ever wired after RequireHumanAuth.
-			log.Println("httpapi: ResolvePrincipal called without prior RequireHumanAuth evidence")
+			observability.Logger(r.Context()).Error("httpapi: ResolvePrincipal called without prior RequireHumanAuth evidence")
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 
 		resolved, err := resolver.ResolveHuman(r.Context(), evidence)
 		if err != nil {
-			log.Printf("httpapi: resolve principal: %v", err)
+			observability.Logger(r.Context()).Error("httpapi: resolve principal failed", "error", err.Error())
 			writeError(w, http.StatusServiceUnavailable, "principal resolution unavailable")
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), principalContextKey{}, resolved)
+		ctx = observability.WithExecutionContext(ctx, observability.ExecutionContext{
+			OrganizationID: resolved.OrganizationID,
+			PrincipalID:    resolved.PrincipalID,
+		})
 		next(w, r.WithContext(ctx))
 	}
 }

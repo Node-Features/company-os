@@ -74,6 +74,10 @@ func writeError(w http.ResponseWriter, status int, message string) {
 // CreateWorkflowHandler handles POST /v1/workflows.
 func CreateWorkflowHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		principalID, ok := requirePrincipal(w, r)
+		if !ok {
+			return
+		}
 		var body struct {
 			IdempotencyKey string `json:"idempotencyKey"`
 		}
@@ -83,8 +87,9 @@ func CreateWorkflowHandler(app *application.Application) http.HandlerFunc {
 		}
 		requestID := uuid.New()
 		res := app.CreateWorkflow(r.Context(), application.CreateWorkflowRequest{
-			RequestID:      requestID,
-			IdempotencyKey: body.IdempotencyKey,
+			RequestID:             requestID,
+			IdempotencyKey:        body.IdempotencyKey,
+			RequestingPrincipalID: principalID,
 		})
 		writeResult(w, requestID, res)
 	}
@@ -93,6 +98,10 @@ func CreateWorkflowHandler(app *application.Application) http.HandlerFunc {
 // StartWorkflowHandler handles POST /v1/workflows/{workflowId}/start.
 func StartWorkflowHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		principalID, ok := requirePrincipal(w, r)
+		if !ok {
+			return
+		}
 		workflowID, err := uuid.Parse(r.PathValue("workflowId"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid workflowId")
@@ -111,10 +120,11 @@ func StartWorkflowHandler(app *application.Application) http.HandlerFunc {
 		}
 		requestID := uuid.New()
 		res := app.StartWorkflow(r.Context(), application.StartWorkflowRequest{
-			RequestID:       requestID,
-			IdempotencyKey:  body.IdempotencyKey,
-			WorkflowID:      workflowID,
-			ExpectedVersion: body.ExpectedVersion,
+			RequestID:             requestID,
+			IdempotencyKey:        body.IdempotencyKey,
+			WorkflowID:            workflowID,
+			ExpectedVersion:       body.ExpectedVersion,
+			RequestingPrincipalID: principalID,
 		})
 		writeResult(w, requestID, res)
 	}
@@ -168,6 +178,10 @@ func RejectResultHandler(app *application.Application) http.HandlerFunc {
 // CancelWorkflowHandler handles POST /v1/workflows/{workflowId}/cancel.
 func CancelWorkflowHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		principalID, ok := requirePrincipal(w, r)
+		if !ok {
+			return
+		}
 		workflowID, err := uuid.Parse(r.PathValue("workflowId"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid workflowId")
@@ -186,10 +200,11 @@ func CancelWorkflowHandler(app *application.Application) http.HandlerFunc {
 		}
 		requestID := uuid.New()
 		res := app.CancelWorkflow(r.Context(), application.CancelWorkflowRequest{
-			RequestID:       requestID,
-			IdempotencyKey:  body.IdempotencyKey,
-			WorkflowID:      workflowID,
-			ExpectedVersion: body.ExpectedVersion,
+			RequestID:             requestID,
+			IdempotencyKey:        body.IdempotencyKey,
+			WorkflowID:            workflowID,
+			ExpectedVersion:       body.ExpectedVersion,
+			RequestingPrincipalID: principalID,
 		})
 		writeResult(w, requestID, res)
 	}

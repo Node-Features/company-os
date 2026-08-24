@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/metric` has no Go types yet. The real, narrower equivalent is `internal/domain/monitoringevaluation.Metric`; there is no separate `MetricDefinition` type anywhere — M&E instead hardcodes one definition as a package-level `var MetricDefinitionID` (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented as written here.
+
 ## Ownership
 
 Monitoring & Evaluation (M&E) is the organizational owner of `MetricDefinition` and `Metric` lifecycle and quality. This document is their canonical domain contract. Departments, routers, Finance, providers, and adapters may produce observations or consume metrics; they cannot redefine metric meaning.

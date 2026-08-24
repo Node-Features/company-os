@@ -101,9 +101,12 @@ func TestIntegration_ResolveApproval_SelfApprovalDenied(t *testing.T) {
 
 	approvalID := fabricatePendingApproval(t, app, approverID, nil)
 
-	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: approvalID, Approve: true})
+	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: approvalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if res.Outcome != Denied {
 		t.Fatalf("self-approval attempt outcome = %s (reasons: %v), want DENIED", res.Outcome, res.Reasons)
+	}
+	if len(res.Reasons) != 1 || res.Reasons[0] != "self_approval_prohibited" {
+		t.Fatalf("reasons = %v, want [self_approval_prohibited] specifically (not e.g. a non-human-decider denial that happens to share Outcome=DENIED)", res.Reasons)
 	}
 
 	// The Approval must not have been burned by the illegitimate attempt —
@@ -155,7 +158,7 @@ func TestIntegration_ResolveApproval_ExpiredPendingCommandRejected(t *testing.T)
 
 	approvalID := fabricatePendingApproval(t, app, uuid.New(), &past)
 
-	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: approvalID, Approve: true})
+	res := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: approvalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 	if res.Outcome != Rejected {
 		t.Fatalf("resolving an expired approval outcome = %s (reasons: %v), want REJECTED", res.Outcome, res.Reasons)
 	}
@@ -181,7 +184,7 @@ func TestIntegration_ResolveApproval_ConcurrentResolutionOneWins(t *testing.T) {
 
 	pending := app.CancelWorkflow(ctx, CancelWorkflowRequest{
 		RequestID: uuid.New(), IdempotencyKey: uuid.New().String(),
-		WorkflowID: workflowID, ExpectedVersion: version,
+		WorkflowID: workflowID, ExpectedVersion: version, RequestingPrincipalID: app.Fixtures.TriggerPrincipal().PrincipalID,
 	})
 	if pending.Outcome != ApprovalRequired || pending.ApprovalID == nil {
 		t.Fatalf("setup: CancelWorkflow outcome = %s (reasons: %v), want APPROVAL_REQUIRED", pending.Outcome, pending.Reasons)
@@ -194,7 +197,7 @@ func TestIntegration_ResolveApproval_ConcurrentResolutionOneWins(t *testing.T) {
 	for i := 0; i < racers; i++ {
 		go func(i int) {
 			defer wg.Done()
-			results[i] = app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true})
+			results[i] = app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *pending.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
 		}(i)
 	}
 	wg.Wait()

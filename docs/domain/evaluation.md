@@ -2,6 +2,8 @@
 
 Status: APPROVED
 
+**Implementation status:** this contract is doc-only — `internal/domain/evaluation` has no Go types yet. The real, narrower equivalent is `internal/domain/monitoringevaluation.Evaluation`/`.PerformanceProfile`, whose own doc comment self-discloses a minimal field set "narrower than [this contract's] full aspirational contract" (`docs/audit/backlog-p2-p4.md`'s "doc-only stubs" row). `Status: APPROVED` records that this document's design was reviewed and accepted, not that it is implemented as written here.
+
 ## Ownership
 
 Monitoring & Evaluation (M&E) is the organizational owner of `Evaluation` and `PerformanceProfile` lifecycle, methodology, and quality. This document is their canonical domain contract. Model, coding-agent, department, workflow, and capability architectures may define typed specializations but cannot redefine evaluation confidence, provenance, validity, benchmark, or lifecycle semantics.

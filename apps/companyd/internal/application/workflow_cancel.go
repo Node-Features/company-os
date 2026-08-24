@@ -47,7 +47,7 @@ func cancelAutonomyRequirement(state workflow.State) *policy.AutonomyLevel {
 func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequest) Result {
 	reg := a.Fixtures
 
-	if cached, ok := a.replay(ctx, reg.Organization().OrganizationID, req.IdempotencyKey); ok {
+	if cached, ok := a.reserveOrReplay(ctx, reg.Organization().OrganizationID, req.RequestID, req.IdempotencyKey); ok {
 		return cached
 	}
 
@@ -70,7 +70,7 @@ func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequ
 		ObjectiveID:           current.ObjectiveID,
 		DefinitionID:          current.DefinitionID,
 		DefinitionVersion:     current.DefinitionVersion,
-		RequestingPrincipalID: reg.TriggerPrincipal().PrincipalID,
+		RequestingPrincipalID: req.RequestingPrincipalID,
 		Inputs:                current.Inputs,
 		DeclaredTime:          time.Now().UTC(),
 		CorrelationID:         current.CorrelationID,
@@ -78,7 +78,7 @@ func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequ
 
 	proposal, reasons := kernelwf.ValidateCancelProposal(cmd, *current)
 	if proposal == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	decision, denyResult, ok := a.evaluateGovernance(ctx, cmd, *proposal, true, governanceOptions{
@@ -86,12 +86,12 @@ func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequ
 		AdditionalAutonomyRequirement: cancelAutonomyRequirement(current.State),
 	})
 	if !ok {
-		return a.store(ctx, cmd, denyResult)
+		return a.finalize(ctx, cmd, denyResult)
 	}
 
 	kd, reasons := kernelwf.FinalizeCancel(cmd, *proposal, decision, *current, cmd.DeclaredTime)
 	if kd == nil {
-		return a.store(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
+		return a.finalize(ctx, cmd, Result{Outcome: Rejected, Reasons: reasons})
 	}
 
 	next := *current
@@ -107,10 +107,10 @@ func (a *Application) CancelWorkflow(ctx context.Context, req CancelWorkflowRequ
 
 	if err := a.Repo.CommitTransition(ctx, &next, req.ExpectedVersion, kd.Events, kd.GovernanceDecisionID, nil, nil, nil, nil, closeOutstandingIntent); err != nil {
 		if errors.Is(err, ports.ErrConflict) {
-			return a.store(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
+			return a.finalize(ctx, cmd, Result{Outcome: Conflict, Reasons: []string{command.ReasonVersionMismatch}})
 		}
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
-	return a.store(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
+	return a.finalize(ctx, cmd, Result{Outcome: Accepted, Workflow: viewOf(&next)})
 }

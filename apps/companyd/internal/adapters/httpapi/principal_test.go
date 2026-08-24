@@ -27,12 +27,12 @@ func TestResolvePrincipal(t *testing.T) {
 	evidence := principal.AuthenticatedEvidence{Subject: "user-123", PrincipalType: principal.KindHuman}
 
 	tests := []struct {
-		name           string
-		priorEvidence  bool
-		repo           fakePrincipalRepository
-		wantStatus     int
-		wantCalled     bool
-		wantPrincipal  bool
+		name          string
+		priorEvidence bool
+		repo          fakePrincipalRepository
+		wantStatus    int
+		wantCalled    bool
+		wantPrincipal bool
 	}{
 		{
 			name:          "no prior evidence in context (RequireHumanAuth not run first)",

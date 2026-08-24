@@ -34,15 +34,15 @@ func (s State) IsTerminal() bool {
 // (matching command.CommandType's underlying type) so this package has no
 // dependency on internal/domain/command. See docs/domain/workflow.md.
 type WorkflowDefinition struct {
-	DefinitionID                uuid.UUID
-	Version                     int
-	Name                        string
-	States                      []State
-	Commands                    []string
-	RequiredCapabilityID        uuid.UUID
-	RequiredCapabilityVersion   int
-	TerminalStates              []State
-	Active                      bool
+	DefinitionID              uuid.UUID
+	Version                   int
+	Name                      string
+	States                    []State
+	Commands                  []string
+	RequiredCapabilityID      uuid.UUID
+	RequiredCapabilityVersion int
+	TerminalStates            []State
+	Active                    bool
 }
 
 // Workflow is one versioned, organization-scoped instance of a

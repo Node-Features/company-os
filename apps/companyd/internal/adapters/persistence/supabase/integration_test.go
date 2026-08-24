@@ -2,12 +2,14 @@ package supabase
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/execution"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
@@ -234,6 +236,217 @@ func TestExecutionRepository_ClaimDueIntents_NoDuplicateUnderConcurrency(t *test
 	}
 	if total != 1 {
 		t.Fatalf("total claims across 5 concurrent sweeps = %d, want exactly 1", total)
+	}
+}
+
+// claimedAttemptFixture creates a Workflow with one due ExecutionIntent and
+// claims it with leaseDuration (pass a negative duration to get an
+// already-expired lease deterministically, with no need to sleep — the
+// same backdating trick claimedIntentFixture-adjacent tests above use for
+// due_at, applied here to lease_expires_at instead). Returns the single
+// claimed attempt.
+func claimedAttemptFixture(t *testing.T, ctx context.Context, wfRepo *WorkflowRepository, execRepo *ExecutionRepository, orgID uuid.UUID, leaseDuration time.Duration) execution.ExecutionAttempt {
+	t.Helper()
+	w := newTestWorkflow(orgID)
+	if err := wfRepo.CreateWorkflow(ctx, w, []event.DomainEvent{newTestEvent(w.OrganizationID, w.WorkflowID, 1)}, uuid.New()); err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+	intent := &workflow.ExecutionIntent{
+		IntentID: uuid.New(), OrganizationID: orgID, WorkflowID: w.WorkflowID, WorkflowVersion: 2,
+		CapabilityDefinitionID: uuid.New(), CapabilityDefinitionVersion: 1, GovernanceDecisionID: uuid.New(),
+		IdempotencyKey: uuid.New().String(),
+		DueAt:          time.Now().UTC().Add(-time.Second),
+		Inputs:         map[string]any{},
+	}
+	next := *w
+	next.Version = 2
+	next.State = workflow.StateReady
+	if err := wfRepo.CommitTransition(ctx, &next, 1, []event.DomainEvent{newTestEvent(orgID, w.WorkflowID, 2)}, uuid.New(), intent, nil, nil, nil, false); err != nil {
+		t.Fatalf("CommitTransition with intent: %v", err)
+	}
+
+	claims, err := execRepo.ClaimDueIntents(ctx, orgID, 10, leaseDuration, "worker")
+	if err != nil {
+		t.Fatalf("ClaimDueIntents: %v", err)
+	}
+	if len(claims) != 1 {
+		t.Fatalf("claimed %d intents, want exactly 1", len(claims))
+	}
+	return claims[0].Attempt
+}
+
+// TestExecutionRepository_ReclaimExpiredLeases_RecoversAbandonedAttempt is
+// the core proof for invariant 7 ("lost workers must not permanently
+// strand work"): an attempt whose lease has expired while still CLAIMED
+// (the worker crashed, was killed, or lost its process between claiming
+// and reporting back) is found, transitioned to LEASE_EXPIRED, and its
+// lease_fencing_token is changed — see the next test for why that specific
+// side effect matters.
+func TestExecutionRepository_ReclaimExpiredLeases_RecoversAbandonedAttempt(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	execRepo := NewExecutionRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	abandoned := claimedAttemptFixture(t, ctx, wfRepo, execRepo, orgID, -time.Minute)
+
+	reclaimed, err := execRepo.ReclaimExpiredLeases(ctx, orgID, 10)
+	if err != nil {
+		t.Fatalf("ReclaimExpiredLeases: %v", err)
+	}
+	if len(reclaimed) != 1 {
+		t.Fatalf("reclaimed %d attempts, want exactly 1", len(reclaimed))
+	}
+	got := reclaimed[0]
+	if got.Attempt.AttemptID != abandoned.AttemptID {
+		t.Fatalf("reclaimed attempt %s, want %s", got.Attempt.AttemptID, abandoned.AttemptID)
+	}
+	if got.Attempt.Status != execution.StatusLeaseExpired {
+		t.Fatalf("reclaimed attempt status = %s, want LEASE_EXPIRED", got.Attempt.Status)
+	}
+	if got.Intent.WorkflowID != abandoned.WorkflowID || got.Intent.IdempotencyKey == "" {
+		t.Fatalf("reclaimed ClaimedExecution's Intent not populated correctly: %+v", got.Intent)
+	}
+
+	// A second reclaim pass must find nothing — the attempt is now
+	// genuinely terminal (execution.StatusLeaseExpired.IsTerminal()),
+	// excluded from ReclaimExpiredLeases' own status filter, and must never
+	// be reclaimed twice.
+	again, err := execRepo.ReclaimExpiredLeases(ctx, orgID, 10)
+	if err != nil {
+		t.Fatalf("second ReclaimExpiredLeases: %v", err)
+	}
+	if len(again) != 0 {
+		t.Fatalf("second reclaim found %d attempts, want 0 (already-reclaimed attempt must not be reclaimed again)", len(again))
+	}
+}
+
+// TestExecutionRepository_ReclaimExpiredLeases_BumpsFencingTokenSoStaleWorkerFailsClosed
+// is the direct proof of the fencing-token safety argument documented on
+// ports.ExecutionRepository.ReclaimExpiredLeases: once an attempt is
+// reclaimed, the *original* worker's lease_fencing_token is no longer
+// valid, so if that worker eventually does call back (it was not actually
+// dead, just slow, or the process is a zombie that never got killed), its
+// report is rejected — never silently accepted as if it still held the
+// lease. This is what makes reclaim safe under invariant 8 even though Go
+// cannot forcibly stop the original goroutine.
+func TestExecutionRepository_ReclaimExpiredLeases_BumpsFencingTokenSoStaleWorkerFailsClosed(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	execRepo := NewExecutionRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	abandoned := claimedAttemptFixture(t, ctx, wfRepo, execRepo, orgID, -time.Minute)
+	originalToken := *abandoned.LeaseFencingToken
+
+	if _, err := execRepo.ReclaimExpiredLeases(ctx, orgID, 10); err != nil {
+		t.Fatalf("ReclaimExpiredLeases: %v", err)
+	}
+
+	// The zombie worker, unaware it has been reclaimed, tries to report in
+	// using its original (now-stale) fencing token.
+	err := execRepo.RecordDispatched(ctx, abandoned.AttemptID, originalToken, "zombie-provider-run")
+	if !errors.Is(err, ports.ErrConflict) {
+		t.Fatalf("RecordDispatched with pre-reclaim fencing token error = %v, want ports.ErrConflict", err)
+	}
+	err = execRepo.RecordTerminal(ctx, abandoned.AttemptID, originalToken, execution.StatusSucceeded, nil)
+	if !errors.Is(err, ports.ErrConflict) {
+		t.Fatalf("RecordTerminal with pre-reclaim fencing token error = %v, want ports.ErrConflict", err)
+	}
+
+	// Confirm the row genuinely wasn't touched by either stale call.
+	var status string
+	if err := pool.pool.QueryRow(ctx, `SELECT status FROM execution_attempts WHERE attempt_id=$1`, abandoned.AttemptID).Scan(&status); err != nil {
+		t.Fatalf("query attempt status: %v", err)
+	}
+	if status != string(execution.StatusLeaseExpired) {
+		t.Fatalf("attempt status = %s, want LEASE_EXPIRED (a stale-token write must never change it)", status)
+	}
+}
+
+// TestExecutionRepository_ReclaimExpiredLeases_LeavesNonExpiredAlone proves
+// ReclaimExpiredLeases doesn't reclaim work that's merely in progress —
+// only genuinely lease-expired attempts.
+func TestExecutionRepository_ReclaimExpiredLeases_LeavesNonExpiredAlone(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	execRepo := NewExecutionRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	stillActive := claimedAttemptFixture(t, ctx, wfRepo, execRepo, orgID, time.Hour)
+
+	reclaimed, err := execRepo.ReclaimExpiredLeases(ctx, orgID, 10)
+	if err != nil {
+		t.Fatalf("ReclaimExpiredLeases: %v", err)
+	}
+	for _, c := range reclaimed {
+		if c.Attempt.AttemptID == stillActive.AttemptID {
+			t.Fatalf("reclaimed an attempt with a lease still an hour from expiry")
+		}
+	}
+
+	// The still-active attempt's own fencing token must be untouched too —
+	// reclaim must not have side-effected a row it correctly excluded.
+	var token int64
+	if err := pool.pool.QueryRow(ctx, `SELECT lease_fencing_token FROM execution_attempts WHERE attempt_id=$1`, stillActive.AttemptID).Scan(&token); err != nil {
+		t.Fatalf("query fencing token: %v", err)
+	}
+	if token != *stillActive.LeaseFencingToken {
+		t.Fatalf("fencing token changed from %d to %d for an attempt that was never reclaimed", *stillActive.LeaseFencingToken, token)
+	}
+}
+
+// TestExecutionRepository_ReclaimExpiredLeases_ConcurrentReclaimersNoDuplicate
+// mirrors TestExecutionRepository_ClaimDueIntents_NoDuplicateUnderConcurrency
+// exactly, for the new claim path: FOR UPDATE SKIP LOCKED must make
+// concurrent reclaimers (e.g. two companyd processes, or overlapping Sweep
+// cycles) safe against each other the same way it already does for initial
+// claims.
+func TestExecutionRepository_ReclaimExpiredLeases_ConcurrentReclaimersNoDuplicate(t *testing.T) {
+	pool := requirePool(t)
+	wfRepo := NewWorkflowRepository(pool)
+	execRepo := NewExecutionRepository(pool)
+	ctx := context.Background()
+	orgID := testOrgID()
+
+	abandoned := claimedAttemptFixture(t, ctx, wfRepo, execRepo, orgID, -time.Minute)
+
+	var wg sync.WaitGroup
+	reclaimedBy := make([][]uuid.UUID, 5)
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			reclaimed, err := execRepo.ReclaimExpiredLeases(ctx, orgID, 10)
+			if err != nil {
+				t.Errorf("ReclaimExpiredLeases: %v", err)
+				return
+			}
+			for _, c := range reclaimed {
+				reclaimedBy[i] = append(reclaimedBy[i], c.Attempt.AttemptID)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	total := 0
+	sawIt := false
+	for _, ids := range reclaimedBy {
+		total += len(ids)
+		for _, id := range ids {
+			if id == abandoned.AttemptID {
+				if sawIt {
+					t.Fatal("attempt reclaimed more than once concurrently — FOR UPDATE SKIP LOCKED not preventing duplicate reclaim")
+				}
+				sawIt = true
+			}
+		}
+	}
+	if total != 1 {
+		t.Fatalf("total reclaims across 5 concurrent sweeps = %d, want exactly 1", total)
 	}
 }
 

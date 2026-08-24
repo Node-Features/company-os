@@ -156,10 +156,14 @@ func resultDecisionHandler(app *application.Application) http.HandlerFunc {
 }
 
 // AcceptResultHandler handles POST /v1/workflows/{workflowId}/results/accept.
-func AcceptResultHandler(app *application.Application) http.HandlerFunc { return resultDecisionHandler(app) }
+func AcceptResultHandler(app *application.Application) http.HandlerFunc {
+	return resultDecisionHandler(app)
+}
 
 // RejectResultHandler handles POST /v1/workflows/{workflowId}/results/reject.
-func RejectResultHandler(app *application.Application) http.HandlerFunc { return resultDecisionHandler(app) }
+func RejectResultHandler(app *application.Application) http.HandlerFunc {
+	return resultDecisionHandler(app)
+}
 
 // CancelWorkflowHandler handles POST /v1/workflows/{workflowId}/cancel.
 func CancelWorkflowHandler(app *application.Application) http.HandlerFunc {

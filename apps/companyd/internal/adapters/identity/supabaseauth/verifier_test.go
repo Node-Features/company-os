@@ -33,14 +33,14 @@ func testJWKSServer(t *testing.T, priv *ecdsa.PrivateKey) *httptest.Server {
 	body, err := json.Marshal(map[string]any{
 		"keys": []map[string]any{
 			{
-				"kty":    "EC",
-				"crv":    "P-256",
-				"alg":    "ES256",
-				"use":    "sig",
+				"kty":     "EC",
+				"crv":     "P-256",
+				"alg":     "ES256",
+				"use":     "sig",
 				"key_ops": []string{"verify"},
-				"kid":    testKID,
-				"x":      enc(xBytes),
-				"y":      enc(yBytes),
+				"kid":     testKID,
+				"x":       enc(xBytes),
+				"y":       enc(yBytes),
 			},
 		},
 	})

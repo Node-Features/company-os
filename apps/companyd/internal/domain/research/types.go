@@ -13,12 +13,12 @@ import (
 // Signal is a provenance-bearing indication that something may have
 // changed. This slice handles exactly one SourceType.
 type Signal struct {
-	SignalID            uuid.UUID
-	OrganizationID      uuid.UUID
-	SourceType          string
-	Description         string
+	SignalID               uuid.UUID
+	OrganizationID         uuid.UUID
+	SourceType             string
+	Description            string
 	SubmittedByPrincipalID uuid.UUID
-	SubmittedAt         time.Time
+	SubmittedAt            time.Time
 }
 
 // SourceTypeProviderModelChange is the one Signal type this slice handles —
@@ -71,13 +71,13 @@ const (
 // requiring at least one EvidenceID at creation
 // (internal/departments/research.ValidatePublishFinding).
 type Finding struct {
-	FindingID    uuid.UUID
+	FindingID      uuid.UUID
 	OrganizationID uuid.UUID
-	QuestionID   uuid.UUID
-	Claim        string
-	EvidenceIDs  []uuid.UUID
-	Status       FindingStatus
-	CreatedAt    time.Time
+	QuestionID     uuid.UUID
+	Claim          string
+	EvidenceIDs    []uuid.UUID
+	Status         FindingStatus
+	CreatedAt      time.Time
 }
 
 // RecommendationStatus is Recommendation's lifecycle.

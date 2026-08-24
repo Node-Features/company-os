@@ -31,8 +31,8 @@ Rather than enumerate every action (which belongs in department-specific policy,
 
 - **Read within own department scope** (e.g. `research.read_market_data`): eligible for `automatic`, subject to normal policy match.
 - **Write/create within own department scope** (e.g. `research.create_report`): eligible for `automatic` only when the action is reversible and does not commit external effect (no message sent, no payment issued, no code merged).
-- **External or irreversible effect** (e.g. `finance.transfer_funds`, `customer.send_message`, a merge in [Coding-agents](../architecture/coding-agents.md), a `knowledge.approve`): defaults to `approval_required` or `human_only`, never `automatic`, until a specific accepted ADR narrowly justifies otherwise — mirroring `governance.md`'s existing prohibition on deterministic automatic knowledge approval.
-- **Cross-department action:** defaults to `DENY` — an agent does not gain standing in another department merely by referencing its objective or workflow, per [Departments — Dependency rule](../architecture/departments.md#dependency-rule)'s "must not import another department's implementation."
+- **External or irreversible effect** (e.g. `finance.transfer_funds`, `customer.send_message`, a merge in [Coding-agents](../architecture/coding-agents.md), deciding a `knowledge.review.request`): defaults to `approval_required` or `human_only`, never `automatic`, until a specific accepted ADR narrowly justifies otherwise — mirroring `governance.md`'s existing prohibition on deterministic automatic knowledge approval.
+- **Cross-department action:** defaults to `DENIED` — an agent does not gain standing in another department merely by referencing its objective or workflow, per [Departments — Dependency rule](../architecture/departments.md#dependency-rule)'s "must not import another department's implementation."
 
 A department proposing a new action must classify it against this shape when writing its policy rules; a classification that deviates (e.g. an irreversible action marked `automatic`) requires its own reasoning recorded alongside the policy, not silent inclusion.
 

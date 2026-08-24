@@ -82,7 +82,7 @@ type KnowledgeItem struct {
 	// when approved." ReviewerPrincipalID is the actual decider (always
 	// fixtures.Registry.ApproverPrincipal() today), distinct from whichever
 	// Principal requested the review.
-	ReviewerPrincipalID *uuid.UUID
+	ReviewerPrincipalID  *uuid.UUID
 	GovernanceDecisionID *uuid.UUID
 	ApprovalID           *uuid.UUID
 	ReviewedAt           *time.Time

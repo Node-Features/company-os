@@ -25,12 +25,12 @@ import (
 // variant) keep them valid UUIDs by format, not just by accident of
 // google/uuid and Postgres both accepting arbitrary 128-bit values.
 var (
-	OrganizationID       = uuid.MustParse("00000000-0000-4000-8000-000000000001")
-	ObjectiveID          = uuid.MustParse("00000000-0000-4000-8000-000000000002")
-	DefinitionID         = uuid.MustParse("00000000-0000-4000-8000-000000000003")
-	CapabilityID         = uuid.MustParse("00000000-0000-4000-8000-000000000004")
-	PrincipalID          = uuid.MustParse("00000000-0000-4000-8000-000000000005")
-	ApproverPrincipalID  = uuid.MustParse("00000000-0000-4000-8000-000000000006")
+	OrganizationID      = uuid.MustParse("00000000-0000-4000-8000-000000000001")
+	ObjectiveID         = uuid.MustParse("00000000-0000-4000-8000-000000000002")
+	DefinitionID        = uuid.MustParse("00000000-0000-4000-8000-000000000003")
+	CapabilityID        = uuid.MustParse("00000000-0000-4000-8000-000000000004")
+	PrincipalID         = uuid.MustParse("00000000-0000-4000-8000-000000000005")
+	ApproverPrincipalID = uuid.MustParse("00000000-0000-4000-8000-000000000006")
 )
 
 // GovernanceActionDispatch is the Action capability.md requires every
@@ -55,6 +55,29 @@ type Registry struct {
 // hit a real table wouldn't prove anything new.
 func NewRegistry() Registry {
 	return newFixedFixtures()
+}
+
+// NewRegistryWithOrganization builds the same fixture set as NewRegistry,
+// except every fixture's OrganizationID uses orgID instead of the shared
+// OrganizationID constant. For real-database integration tests that need
+// isolation from other concurrently-running test processes sharing the same
+// database — ClaimDueIntents (internal/adapters/persistence/supabase) claims
+// due ExecutionIntents organization-wide, so two independent test runs (or
+// two packages, or two developers) racing against the same fixed org can
+// each see the other's due intents. internal/adapters/persistence/supabase's
+// own tests already avoid this via a fresh org per test; this gives
+// internal/application's real-database tests (internal/application/
+// integration_test.go's requireRealApp) the same isolation. No table
+// referenced by these tests has a foreign key to a real organizations row
+// (only principals/principal_organization_bindings do), so any orgID value
+// is valid here.
+func NewRegistryWithOrganization(orgID uuid.UUID) Registry {
+	reg := newFixedFixtures()
+	reg.org.OrganizationID = orgID
+	reg.obj.OrganizationID = orgID
+	reg.trig.OrganizationID = orgID
+	reg.approver.OrganizationID = orgID
+	return reg
 }
 
 // NewRegistryFromDB builds the same fixture set as NewRegistry, except the
@@ -145,12 +168,12 @@ func newFixedFixtures() Registry {
 	}
 }
 
-func (r Registry) Organization() organization.Organization       { return r.org }
-func (r Registry) Objective() objective.Objective                { return r.obj }
+func (r Registry) Organization() organization.Organization         { return r.org }
+func (r Registry) Objective() objective.Objective                  { return r.obj }
 func (r Registry) WorkflowDefinition() workflow.WorkflowDefinition { return r.def }
-func (r Registry) Capability() capability.CapabilityDefinition   { return r.cap }
-func (r Registry) TriggerPrincipal() principal.Principal         { return r.trig }
-func (r Registry) ApproverPrincipal() principal.Principal        { return r.approver }
+func (r Registry) Capability() capability.CapabilityDefinition     { return r.cap }
+func (r Registry) TriggerPrincipal() principal.Principal           { return r.trig }
+func (r Registry) ApproverPrincipal() principal.Principal          { return r.approver }
 
 // TriggerEvidence is the stub (unverified) AuthenticatedPrincipalEvidence
 // used as every command's requester this slice (decision #5 — real

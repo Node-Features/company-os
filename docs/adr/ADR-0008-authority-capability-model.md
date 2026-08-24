@@ -1,6 +1,6 @@
 # ADR-0008: Authority and Capability Model
 
-Status: PROPOSED
+Status: APPROVED (2026-08-24, alongside ADR-0010 which extends this ADR's Role×Action model with a real HUMAN_ONLY branch and formalizes the full Authority tuple — see `docs/adr/ADR-0010-authority-model-formalization.md` and `docs/architecture/authority-model.md`)
 
 ## Context
 
@@ -79,7 +79,7 @@ This table is illustrative, the same way `ADR-0005`'s Organization/Objective/Cap
 
 - [x] `go build ./...`, `go vet ./...`, and `go test ./...` pass across the whole module after the change, including the pre-existing `governance` and `application` test suites.
 - [x] Cross-checked against `governance.md`, `capability.md` (via its architecture summary), and `ADR-0005`'s Authority work from two turns ago — no contradiction found; one real gap (role-scoped matching) identified and closed.
-- [ ] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED`.
+- [x] the project owner reviews and explicitly changes `Status: PROPOSED` to `Status: APPROVED` — recorded 2026-08-24 together with `ADR-0010`.
 
 ## Open questions
 

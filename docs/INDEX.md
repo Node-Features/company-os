@@ -11,6 +11,7 @@ Use this map to load the smallest sufficient context for a task. Summaries route
 | Feature | Relevant feature directory in [`features/`](features/README.md), affected canonical documents | [Feature index](../.companyos/agent-memory/feature-index.json), relevant references and ADRs | Unaffected features and reference studies |
 | Reference research | Relevant files in [`references/`](references/README.md) | Architecture or domain owner affected by the research | Unrelated reference projects |
 | Status update | [Current state](../.companyos/agent-memory/current-state.md) | Changed canonical documents and accepted ADRs | Unrelated project documentation |
+| Known gap / remediation | [Audit index](audit/README.md), the specific `gap-*.md` doc being implemented | [Findings](audit/findings.md) for full evidence | Unrelated `gap-*.md` docs |
 
 ## Core areas
 
@@ -19,3 +20,4 @@ Use this map to load the smallest sufficient context for a task. Summaries route
 - [Architectural decisions](adr/README.md)
 - [Features](features/README.md)
 - [External references](references/README.md)
+- [Audit](audit/README.md)

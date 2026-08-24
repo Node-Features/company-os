@@ -13,9 +13,11 @@ import (
 
 // publishFindingWithClaim drives a real Signal -> ResearchQuestion ->
 // Finding chain (same shape as research_integration_test.go) and returns
-// the published Finding's ID, so Knowledge's ingestion tests have a real
-// source to capture from.
-func publishFindingWithClaim(t *testing.T, app *Application, ctx context.Context, principalID uuid.UUID, claim string) uuid.UUID {
+// the published Finding's ID plus the KnowledgeItemID that PublishFinding's
+// own automatic capture (ROADMAP.md Phase 5 Slice 4) produced for it, so
+// Knowledge's tests have both a real source and its already-captured DRAFT
+// candidate to work with.
+func publishFindingWithClaim(t *testing.T, app *Application, ctx context.Context, principalID uuid.UUID, claim string) (findingID, knowledgeItemID uuid.UUID) {
 	t.Helper()
 	signal := app.SubmitSignal(ctx, SubmitSignalRequest{
 		RequestID: uuid.New(), PrincipalID: principalID,
@@ -49,30 +51,28 @@ func publishFindingWithClaim(t *testing.T, app *Application, ctx context.Context
 	if finding.Outcome != Accepted || finding.ResourceID == nil {
 		t.Fatalf("PublishFinding outcome = %s (reasons: %v)", finding.Outcome, finding.Reasons)
 	}
-	return *finding.ResourceID
+	if finding.KnowledgeItemID == nil {
+		t.Fatalf("PublishFinding.KnowledgeItemID = nil (reasons: %v), want the automatically captured item's ID", finding.Reasons)
+	}
+	return *finding.ResourceID, *finding.KnowledgeItemID
 }
 
-// TestIntegration_Knowledge_CaptureFromFinding_CreatesDraftV1 proves Phase 5
-// Slice 1's ingestion use case against the real database: capturing a real
-// published Finding produces a DRAFT KnowledgeItem version 1 whose content
-// and digest match the source verbatim.
-func TestIntegration_Knowledge_CaptureFromFinding_CreatesDraftV1(t *testing.T) {
+// TestIntegration_Knowledge_PublishFinding_AutoCapturesDraftV1 proves
+// ROADMAP.md Phase 5 Slice 4's end-to-end wiring against the real database:
+// publishing a Finding, with no separate manual capture call, produces a
+// DRAFT KnowledgeItem version 1 whose content and digest match the source
+// verbatim. Before Slice 4 this required an explicit
+// CaptureKnowledgeCandidate call (Slice 1) — PublishFinding now performs it
+// automatically as a derived side effect.
+func TestIntegration_Knowledge_PublishFinding_AutoCapturesDraftV1(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 	principalID := uuid.New()
 
 	claim := "Provider X's model is 30% cheaper at comparable quality, unique per run: " + uuid.New().String()
-	findingID := publishFindingWithClaim(t, app, ctx, principalID, claim)
+	_, knowledgeItemID := publishFindingWithClaim(t, app, ctx, principalID, claim)
 
-	res := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
-		RequestID: uuid.New(), PrincipalID: principalID,
-		SourceType: knowledgedomain.SourceResearchFinding, SourceID: findingID,
-	})
-	if res.Outcome != Accepted || res.ResourceID == nil {
-		t.Fatalf("CaptureKnowledgeCandidate outcome = %s (reasons: %v)", res.Outcome, res.Reasons)
-	}
-
-	item, err := app.GetKnowledgeItem(ctx, *res.ResourceID)
+	item, err := app.GetKnowledgeItem(ctx, knowledgeItemID)
 	if err != nil {
 		t.Fatalf("GetKnowledgeItem: %v", err)
 	}
@@ -91,95 +91,77 @@ func TestIntegration_Knowledge_CaptureFromFinding_CreatesDraftV1(t *testing.T) {
 }
 
 // TestIntegration_Knowledge_RecaptureUnchangedContentRejected proves a
-// second capture from the same, unedited source is rejected rather than
-// creating a pointless identical version.
+// manual re-capture from the same, unedited source is rejected rather than
+// creating a pointless identical version. Since PublishFinding (Slice 4)
+// already auto-captures v1, the manual CaptureKnowledgeCandidate call this
+// test drives is itself the "recapture" under test — there's no separate
+// first manual call to make anymore.
 func TestIntegration_Knowledge_RecaptureUnchangedContentRejected(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 	principalID := uuid.New()
 
-	findingID := publishFindingWithClaim(t, app, ctx, principalID, "Recapture test claim, unique per test run: "+uuid.New().String())
+	findingID, _ := publishFindingWithClaim(t, app, ctx, principalID, "Recapture test claim, unique per test run: "+uuid.New().String())
 
-	first := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
+	recapture := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
 		RequestID: uuid.New(), PrincipalID: principalID,
 		SourceType: knowledgedomain.SourceResearchFinding, SourceID: findingID,
 	})
-	if first.Outcome != Accepted {
-		t.Fatalf("first capture outcome = %s (reasons: %v)", first.Outcome, first.Reasons)
+	if recapture.Outcome != Rejected {
+		t.Fatalf("recapture outcome = %s, want REJECTED", recapture.Outcome)
 	}
-
-	second := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
-		RequestID: uuid.New(), PrincipalID: principalID,
-		SourceType: knowledgedomain.SourceResearchFinding, SourceID: findingID,
-	})
-	if second.Outcome != Rejected {
-		t.Fatalf("second capture outcome = %s, want REJECTED", second.Outcome)
-	}
-	if len(second.Reasons) != 1 || second.Reasons[0] != "content_unchanged_since_last_capture" {
-		t.Fatalf("second capture reasons = %v, want [content_unchanged_since_last_capture]", second.Reasons)
+	if len(recapture.Reasons) != 1 || recapture.Reasons[0] != "content_unchanged_since_last_capture" {
+		t.Fatalf("recapture reasons = %v, want [content_unchanged_since_last_capture]", recapture.Reasons)
 	}
 }
 
 // TestIntegration_Knowledge_DuplicateAcrossSourcesFlagged proves the
 // exact-content-digest duplicate signal: two distinct Findings with
-// identical claim text produce two distinct KnowledgeItems, with the
-// second's DuplicateOfItemID pointing at the first — a review signal only,
-// never an automatic merge.
+// identical claim text produce two distinct, automatically captured
+// KnowledgeItems, with the second's DuplicateOfItemID pointing at the
+// first — a review signal only, never an automatic merge.
 func TestIntegration_Knowledge_DuplicateAcrossSourcesFlagged(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 	principalID := uuid.New()
 
 	sharedClaim := "Duplicate-detection test claim, unique per run: " + uuid.New().String()
-	finding1 := publishFindingWithClaim(t, app, ctx, principalID, sharedClaim)
-	finding2 := publishFindingWithClaim(t, app, ctx, principalID, sharedClaim)
+	_, knowledgeItemID1 := publishFindingWithClaim(t, app, ctx, principalID, sharedClaim)
+	_, knowledgeItemID2 := publishFindingWithClaim(t, app, ctx, principalID, sharedClaim)
 
-	res1 := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
-		RequestID: uuid.New(), PrincipalID: principalID,
-		SourceType: knowledgedomain.SourceResearchFinding, SourceID: finding1,
-	})
-	if res1.Outcome != Accepted || res1.ResourceID == nil {
-		t.Fatalf("capture 1 outcome = %s (reasons: %v)", res1.Outcome, res1.Reasons)
-	}
-
-	res2 := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
-		RequestID: uuid.New(), PrincipalID: principalID,
-		SourceType: knowledgedomain.SourceResearchFinding, SourceID: finding2,
-	})
-	if res2.Outcome != Accepted || res2.ResourceID == nil {
-		t.Fatalf("capture 2 outcome = %s (reasons: %v)", res2.Outcome, res2.Reasons)
-	}
-
-	item2, err := app.GetKnowledgeItem(ctx, *res2.ResourceID)
+	item2, err := app.GetKnowledgeItem(ctx, knowledgeItemID2)
 	if err != nil {
 		t.Fatalf("GetKnowledgeItem: %v", err)
 	}
-	if item2.DuplicateOfItemID == nil || *item2.DuplicateOfItemID != *res1.ResourceID {
-		t.Fatalf("DuplicateOfItemID = %v, want %v", item2.DuplicateOfItemID, *res1.ResourceID)
+	if item2.DuplicateOfItemID == nil || *item2.DuplicateOfItemID != knowledgeItemID1 {
+		t.Fatalf("DuplicateOfItemID = %v, want %v", item2.DuplicateOfItemID, knowledgeItemID1)
 	}
 }
 
 // TestIntegration_Knowledge_VersionIncrementsOnChangedContent proves
 // re-capture with genuinely different content increments Version rather
 // than creating a new KnowledgeItemID. A real Finding's claim can never
-// actually change once published, so this seeds a fabricated prior version
+// actually change once published, so this seeds a fabricated *next* version
 // directly through the repository first — the same
 // bypass-the-external-boundary-to-prove-the-mechanism pattern already used
 // by submitFakeResult and fabricated AuthenticatedEvidence elsewhere in
-// this suite.
+// this suite. Since Slice 4's auto-capture already claims v1 for real (under
+// the source's real KnowledgeItemID), the fabricated row here is v2 under
+// that same ID — fabricating a competing v1 under a fresh ID would produce
+// two different KnowledgeItemIDs both claiming "latest v1" for one source,
+// a state the real system never produces.
 func TestIntegration_Knowledge_VersionIncrementsOnChangedContent(t *testing.T) {
 	app := requireRealApp(t)
 	ctx := context.Background()
 	principalID := uuid.New()
 
-	findingID := publishFindingWithClaim(t, app, ctx, principalID, "Version-increment test claim, unique per run: "+uuid.New().String())
+	findingID, knowledgeItemID := publishFindingWithClaim(t, app, ctx, principalID, "Version-increment test claim, unique per run: "+uuid.New().String())
 
-	fabricatedItemID := uuid.New()
 	if err := app.Knowledge.CaptureItem(ctx, &knowledgedomain.KnowledgeItem{
-		KnowledgeItemID:       fabricatedItemID,
+		KnowledgeItemID:       knowledgeItemID,
 		OrganizationID:        app.Fixtures.Organization().OrganizationID,
-		Version:               1,
-		Claim:                 "fabricated prior-version content",
+		Version:               2,
+		Claim:                 "fabricated stale-version content",
 		ContentDigest:         "fabricated-digest-does-not-match-the-real-finding",
 		Classification:        knowledgedomain.ClassificationInternal,
 		SourceType:            knowledgedomain.SourceResearchFinding,
@@ -187,9 +169,9 @@ func TestIntegration_Knowledge_VersionIncrementsOnChangedContent(t *testing.T) {
 		ProducedByPrincipalID: principalID,
 		ProducedByMethod:      knowledgedomain.MethodSourceVerbatim,
 		Status:                knowledgedomain.StatusDraft,
-		CreatedAt:              time.Now().UTC(),
+		CreatedAt:             time.Now().UTC(),
 	}); err != nil {
-		t.Fatalf("seed fabricated v1: %v", err)
+		t.Fatalf("seed fabricated v2: %v", err)
 	}
 
 	res := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
@@ -199,33 +181,28 @@ func TestIntegration_Knowledge_VersionIncrementsOnChangedContent(t *testing.T) {
 	if res.Outcome != Accepted || res.ResourceID == nil {
 		t.Fatalf("capture outcome = %s (reasons: %v)", res.Outcome, res.Reasons)
 	}
-	if *res.ResourceID != fabricatedItemID {
-		t.Fatalf("ResourceID = %v, want the same KnowledgeItemID as the seeded row %v", *res.ResourceID, fabricatedItemID)
+	if *res.ResourceID != knowledgeItemID {
+		t.Fatalf("ResourceID = %v, want the same KnowledgeItemID as the auto-captured row %v", *res.ResourceID, knowledgeItemID)
 	}
 
-	item, err := app.GetKnowledgeItem(ctx, fabricatedItemID)
+	item, err := app.GetKnowledgeItem(ctx, knowledgeItemID)
 	if err != nil {
 		t.Fatalf("GetKnowledgeItem: %v", err)
 	}
-	if item.Version != 2 {
-		t.Fatalf("Version = %d, want 2", item.Version)
+	if item.Version != 3 {
+		t.Fatalf("Version = %d, want 3", item.Version)
 	}
 }
 
 // captureKnowledgeItem publishes a real Finding with producerPrincipalID as
-// the driving Principal, captures it, and returns the resulting DRAFT
-// KnowledgeItem — the fixture Slice 2's approval-flow tests build on.
+// the driving Principal and returns the resulting DRAFT KnowledgeItem that
+// PublishFinding's own automatic capture (Slice 4) already produced for
+// it — the fixture Slice 2/3 tests build on. No separate manual
+// CaptureKnowledgeCandidate call is needed since Slice 4 wired that in.
 func captureKnowledgeItem(t *testing.T, app *Application, ctx context.Context, producerPrincipalID uuid.UUID, claim string) knowledgedomain.KnowledgeItem {
 	t.Helper()
-	findingID := publishFindingWithClaim(t, app, ctx, producerPrincipalID, claim)
-	res := app.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
-		RequestID: uuid.New(), PrincipalID: producerPrincipalID,
-		SourceType: knowledgedomain.SourceResearchFinding, SourceID: findingID,
-	})
-	if res.Outcome != Accepted || res.ResourceID == nil {
-		t.Fatalf("CaptureKnowledgeCandidate outcome = %s (reasons: %v)", res.Outcome, res.Reasons)
-	}
-	item, err := app.GetKnowledgeItem(ctx, *res.ResourceID)
+	_, knowledgeItemID := publishFindingWithClaim(t, app, ctx, producerPrincipalID, claim)
+	item, err := app.GetKnowledgeItem(ctx, knowledgeItemID)
 	if err != nil {
 		t.Fatalf("GetKnowledgeItem: %v", err)
 	}
@@ -382,7 +359,7 @@ func TestIntegration_Knowledge_RequestApproval_StaleVersionRejected(t *testing.T
 		ProducedByPrincipalID: producerID,
 		ProducedByMethod:      knowledgedomain.MethodSourceVerbatim,
 		Status:                knowledgedomain.StatusDraft,
-		CreatedAt:              time.Now().UTC(),
+		CreatedAt:             time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("seed newer version: %v", err)
 	}
@@ -443,7 +420,7 @@ func TestIntegration_Knowledge_QueryDefaultReturnsOnlyApproved_LatestApprovedVer
 		ProducedByPrincipalID: producerID,
 		ProducedByMethod:      knowledgedomain.MethodSourceVerbatim,
 		Status:                knowledgedomain.StatusDraft,
-		CreatedAt:              time.Now().UTC(),
+		CreatedAt:             time.Now().UTC(),
 	}); err != nil {
 		t.Fatalf("seed newer draft version: %v", err)
 	}

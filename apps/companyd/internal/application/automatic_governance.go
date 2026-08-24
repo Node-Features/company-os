@@ -44,11 +44,11 @@ func (a *Application) evaluateAutomaticGovernance(ctx context.Context, requestID
 	}
 
 	switch decision.Outcome {
-	case policy.DecisionDeny:
+	case policy.DecisionDenied:
 		return decision, Result{Outcome: Denied, Reasons: []string{command.ReasonGovernanceDenied}}, false
 	case policy.DecisionRequireApproval:
 		return decision, Result{Outcome: Unavailable, Reasons: []string{"approval_required_not_supported_for_this_action"}}, false
-	default:
+	default: // AUTOMATIC or HUMAN_ONLY
 		return decision, Result{}, true
 	}
 }

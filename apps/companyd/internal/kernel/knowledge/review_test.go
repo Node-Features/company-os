@@ -72,8 +72,8 @@ func TestValidateApprovalRequest_HappyPath_StableDigest(t *testing.T) {
 	if proposal == nil {
 		t.Fatalf("proposal = nil, reasons = %v, want a proposal", reasons)
 	}
-	if proposal.Action != "knowledge.approve" {
-		t.Fatalf("Action = %q, want knowledge.approve", proposal.Action)
+	if proposal.Action != "knowledge.review.request" {
+		t.Fatalf("Action = %q, want knowledge.review.request", proposal.Action)
 	}
 	if proposal.ResourceType != "KnowledgeItem" || proposal.ResourceID != cmd.KnowledgeItemID.String() {
 		t.Fatalf("ResourceType/ResourceID = %s/%s, want KnowledgeItem/%s", proposal.ResourceType, proposal.ResourceID, cmd.KnowledgeItemID)

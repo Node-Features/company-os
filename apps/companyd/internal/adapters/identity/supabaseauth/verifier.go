@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
-	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 )
 

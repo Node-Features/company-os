@@ -35,7 +35,7 @@ func (o Outcome) RejectsResult() bool {
 // Result is the reported outcome of one ExecutionIntent's execution
 // attempt. See docs/domain/result.md.
 type Result struct {
-	ResultID            uuid.UUID
+	ResultID             uuid.UUID
 	OrganizationID       uuid.UUID
 	ResultType           string
 	WorkflowID           uuid.UUID

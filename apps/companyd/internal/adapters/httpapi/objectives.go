@@ -21,8 +21,9 @@ var validSourceTypes = map[string]objdomain.SourceType{
 // ProposeObjectiveHandler handles POST /v1/objectives/propose.
 func ProposeObjectiveHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		principalID, ok := requirePrincipal(w, r)
+		p, ok := PrincipalFromContext(r.Context())
 		if !ok {
+			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		var body struct {
@@ -47,12 +48,13 @@ func ProposeObjectiveHandler(app *application.Application) http.HandlerFunc {
 		}
 		requestID := uuid.New()
 		res := app.ProposeObjective(r.Context(), application.ProposeObjectiveRequest{
-			RequestID:   requestID,
-			PrincipalID: principalID,
-			SourceType:  sourceType,
-			SourceID:    sourceID,
-			Title:       body.Title,
-			Intent:      body.Intent,
+			RequestID:     requestID,
+			PrincipalID:   p.PrincipalID,
+			PrincipalKind: p.Kind,
+			SourceType:    sourceType,
+			SourceID:      sourceID,
+			Title:         body.Title,
+			Intent:        body.Intent,
 		})
 		writeDepartmentResult(w, requestID, res)
 	}

@@ -28,10 +28,10 @@ type Authenticator interface {
 // verifier can actually distinguish; the full ~15-category list needs
 // session/revocation infrastructure this slice doesn't build.
 var (
-	ErrMalformedToken    = errors.New("ports: malformed authentication token")
-	ErrInvalidSignature  = errors.New("ports: invalid token signature")
-	ErrExpiredToken      = errors.New("ports: expired token")
-	ErrWrongIssuer       = errors.New("ports: untrusted token issuer")
-	ErrWrongAudience     = errors.New("ports: wrong token audience")
+	ErrMalformedToken      = errors.New("ports: malformed authentication token")
+	ErrInvalidSignature    = errors.New("ports: invalid token signature")
+	ErrExpiredToken        = errors.New("ports: expired token")
+	ErrWrongIssuer         = errors.New("ports: untrusted token issuer")
+	ErrWrongAudience       = errors.New("ports: wrong token audience")
 	ErrVerifierUnavailable = errors.New("ports: authenticator verifier unavailable")
 )

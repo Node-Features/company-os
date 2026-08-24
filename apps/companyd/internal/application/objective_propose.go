@@ -76,20 +76,21 @@ func (a *Application) ProposeObjective(ctx context.Context, req ProposeObjective
 	}
 
 	cmd := command.ObjectiveProposalCommandEnvelope{
-		SchemaVersion:         1,
-		CommandID:             uuid.New(),
-		RequestID:             req.RequestID,
-		IdempotencyKey:        req.RequestID.String(),
-		CommandType:           command.ProposeObjective,
-		OrganizationID:        orgID,
-		ObjectiveID:           uuid.New(),
-		SourceType:            req.SourceType,
-		SourceID:              req.SourceID,
-		Title:                 req.Title,
-		Intent:                req.Intent,
-		RequestingPrincipalID: req.PrincipalID,
-		DeclaredTime:          time.Now().UTC(),
-		CorrelationID:         req.RequestID,
+		SchemaVersion:           1,
+		CommandID:               uuid.New(),
+		RequestID:               req.RequestID,
+		IdempotencyKey:          req.RequestID.String(),
+		CommandType:             command.ProposeObjective,
+		OrganizationID:          orgID,
+		ObjectiveID:             uuid.New(),
+		SourceType:              req.SourceType,
+		SourceID:                req.SourceID,
+		Title:                   req.Title,
+		Intent:                  req.Intent,
+		RequestingPrincipalID:   req.PrincipalID,
+		RequestingPrincipalKind: req.PrincipalKind,
+		DeclaredTime:            time.Now().UTC(),
+		CorrelationID:           req.RequestID,
 	}
 
 	proposal, reasons := kernelobj.ValidateProposal(cmd, alreadyProposed)

@@ -1,0 +1,21 @@
+-- performance_profiles was created (20260823013950_monitoring_evaluation.sql)
+-- with subject_id alone as PRIMARY KEY. UpsertPerformanceProfile's
+-- ON CONFLICT (subject_id) therefore treats the subject as globally unique
+-- across every organization: a second organization's evaluation for the
+-- same subject silently updates the first organization's row in place
+-- (organization_id is not in the UPDATE SET list, so it's left as whichever
+-- organization inserted first), while GetPerformanceProfile correctly
+-- filters by (organization_id, subject_id) — so a query for the second
+-- organization's own profile finds nothing. This never surfaced before
+-- because every caller in this codebase has so far shared the one fixture
+-- OrganizationID; it was demonstrated for real by giving
+-- internal/application's real-database tests isolated per-test
+-- organizations (a 2026-08-24 test-determinism fix) and observing
+-- GetPerformanceProfile return ports.ErrNotFound for a row that had, in
+-- fact, just been written — by a different organization's concurrent test.
+--
+-- Fix: the subject is only unique per organization, so the primary key
+-- must be (organization_id, subject_id), matching every other per-org
+-- table's scoping convention in this schema.
+ALTER TABLE performance_profiles DROP CONSTRAINT IF EXISTS performance_profiles_pkey;
+ALTER TABLE performance_profiles ADD PRIMARY KEY (organization_id, subject_id);

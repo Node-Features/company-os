@@ -98,7 +98,7 @@ func (r *MonitoringEvaluationRepository) UpsertPerformanceProfile(ctx context.Co
 	_, err := r.p.pool.Exec(ctx, `
 		INSERT INTO performance_profiles (subject_id, organization_id, latest_evaluation_id, outcome, success_rate, updated_at)
 		VALUES ($1,$2,$3,$4,$5,$6)
-		ON CONFLICT (subject_id) DO UPDATE SET
+		ON CONFLICT (organization_id, subject_id) DO UPDATE SET
 			latest_evaluation_id = EXCLUDED.latest_evaluation_id,
 			outcome = EXCLUDED.outcome,
 			success_rate = EXCLUDED.success_rate,

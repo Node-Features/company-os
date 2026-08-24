@@ -9,6 +9,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/approval"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
 	knowledgedomain "github.com/Node-Features/company-os/apps/companyd/internal/domain/knowledge"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/governance"
 	kernelknowledge "github.com/Node-Features/company-os/apps/companyd/internal/kernel/knowledge"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
@@ -22,6 +23,7 @@ import (
 type RequestKnowledgeApprovalRequest struct {
 	RequestID       uuid.UUID
 	PrincipalID     uuid.UUID
+	PrincipalKind   principal.Kind
 	KnowledgeItemID uuid.UUID
 	Version         int
 	ContentDigest   string
@@ -47,18 +49,19 @@ func (a *Application) RequestKnowledgeApproval(ctx context.Context, req RequestK
 	}
 
 	cmd := command.KnowledgeApprovalCommandEnvelope{
-		SchemaVersion:         1,
-		CommandID:             uuid.New(),
-		RequestID:             req.RequestID,
-		IdempotencyKey:        req.RequestID.String(),
-		CommandType:           command.ApproveKnowledgeItem,
-		OrganizationID:        orgID,
-		KnowledgeItemID:       req.KnowledgeItemID,
-		Version:               req.Version,
-		ContentDigest:         req.ContentDigest,
-		RequestingPrincipalID: req.PrincipalID,
-		DeclaredTime:          time.Now().UTC(),
-		CorrelationID:         req.RequestID,
+		SchemaVersion:           1,
+		CommandID:               uuid.New(),
+		RequestID:               req.RequestID,
+		IdempotencyKey:          req.RequestID.String(),
+		CommandType:             command.ApproveKnowledgeItem,
+		OrganizationID:          orgID,
+		KnowledgeItemID:         req.KnowledgeItemID,
+		Version:                 req.Version,
+		ContentDigest:           req.ContentDigest,
+		RequestingPrincipalID:   req.PrincipalID,
+		RequestingPrincipalKind: req.PrincipalKind,
+		DeclaredTime:            time.Now().UTC(),
+		CorrelationID:           req.RequestID,
 	}
 
 	proposal, reasons := kernelknowledge.ValidateApprovalRequest(found, item.Status, item.Version, item.ContentDigest, req.Version, req.ContentDigest, cmd)

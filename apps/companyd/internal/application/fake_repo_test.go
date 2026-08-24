@@ -3,17 +3,42 @@ package application
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/approval"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/execution"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/result"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
 )
+
+// rendezvous blocks each of n Arrive callers until all n have arrived, then
+// releases all of them simultaneously — a one-shot barrier. Used to force a
+// specific goroutine interleaving deterministically in a concurrency test,
+// rather than relying on real Go-scheduler timing (which only makes a race
+// window *likely* to be hit, not certain — see loadGate's use in
+// pipeline_test.go for why that distinction matters here).
+type rendezvous struct {
+	n       int32
+	arrived int32
+	release chan struct{}
+}
+
+func newRendezvous(n int) *rendezvous {
+	return &rendezvous{n: int32(n), release: make(chan struct{})}
+}
+
+func (r *rendezvous) Arrive() {
+	if atomic.AddInt32(&r.arrived, 1) >= r.n {
+		close(r.release)
+	}
+	<-r.release
+}
 
 // fakeRepo is an in-memory ports.AuthoritativeStateRepository. Sanctioned
 // under docs/testing/strategy.md for pipeline_test.go's concurrency- and
@@ -26,6 +51,12 @@ type fakeRepo struct {
 	idempotency         map[string]string
 	results             map[uuid.UUID]*result.Result
 	governanceDecisions map[string]bool // keyed by governanceDecisionKey(orgID, action, resourceType, resourceID)
+
+	// loadGate, when non-nil, synchronizes concurrent LoadWorkflow callers
+	// via rendezvous — see pipeline_test.go's use of it. nil (the default
+	// for every test but the one that sets it) makes LoadWorkflow behave
+	// exactly as before.
+	loadGate *rendezvous
 }
 
 func newFakeRepo() *fakeRepo {
@@ -45,12 +76,28 @@ func key(org, id uuid.UUID) string { return org.String() + ":" + id.String() }
 
 func (f *fakeRepo) LoadWorkflow(_ context.Context, orgID, workflowID uuid.UUID) (*workflow.Workflow, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	w, ok := f.workflows[key(orgID, workflowID)]
+	var cp workflow.Workflow
+	if ok {
+		cp = *w
+	}
+	f.mu.Unlock()
 	if !ok {
 		return nil, ports.ErrNotFound
 	}
-	cp := *w
+	// loadGate.Arrive() (if armed) blocks here, AFTER the locked read but
+	// BEFORE returning to the caller — so a racing caller cannot proceed to
+	// CommitTransition until every gated LoadWorkflow call has completed its
+	// own read. Arriving before the lock (an earlier version of this code)
+	// only synchronized *starting* the load, not the load itself: goroutine
+	// A could still lock, read, unlock, and race all the way through
+	// Kernel-validate/Governance/CommitTransition before goroutine B ever
+	// got scheduled to acquire the lock for its own read — reproduced via
+	// debug tracing during development of this fix. Blocking the return
+	// instead closes that gap for real.
+	if f.loadGate != nil {
+		f.loadGate.Arrive()
+	}
 	return &cp, nil
 }
 
@@ -134,6 +181,9 @@ func (f *fakeExec) RecordTerminal(context.Context, uuid.UUID, int64, execution.A
 	return nil
 }
 func (f *fakeExec) ScheduleRetry(context.Context, uuid.UUID, uuid.UUID, time.Time) error { return nil }
+func (f *fakeExec) ReclaimExpiredLeases(context.Context, uuid.UUID, int) ([]execution.ClaimedExecution, error) {
+	return nil, nil
+}
 func (f *fakeExec) SaveResult(_ context.Context, r *result.Result) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -167,6 +217,6 @@ func (fakePending) CreatePendingApproval(context.Context, *command.PendingComman
 	return nil
 }
 
-func (fakePending) ResolveApproval(context.Context, uuid.UUID, uuid.UUID, bool, *string) (*command.PendingCommand, *approval.Approval, error) {
+func (fakePending) ResolveApproval(context.Context, uuid.UUID, principal.Principal, bool, *string) (*command.PendingCommand, *approval.Approval, error) {
 	return nil, nil, ports.ErrConflict
 }

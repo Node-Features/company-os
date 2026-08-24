@@ -16,15 +16,22 @@ import (
 
 // ResolveApproval is the human-decision use case for a PENDING Approval
 // (docs/domain/approval.md's lifecycle step 3). The deciding Principal is
-// always fixtures.Registry.ApproverPrincipal() (Kind HUMAN) — never
+// always fixtures.Registry.ApproverPrincipal() (Kind HUMAN) today — never
 // client-asserted, same as every other Principal reference this slice.
+//
 // docs/domain/approval.md's "only a human, not the requester, may approve"
-// invariant holds by construction rather than a runtime check: the
-// deciding Principal is always the Approver fixture and the requesting
-// Principal on every CancelWorkflowRequest is always the (distinct)
-// Trigger fixture, so they can never collide given how those two request
-// types are wired this slice — there is no client input path that could
-// make them the same Principal.
+// invariant is now a real runtime check
+// (docs/adr/ADR-0010-authority-model-formalization.md), not merely true by
+// construction: a.Pending.ResolveApproval verifies decidingPrincipal.Kind
+// == HUMAN and decidingPrincipal.PrincipalID != the Approval's
+// RequestingPrincipalID unconditionally, for every CommandType, inside the
+// same transaction as the status write (ports.ErrNonHumanDecider /
+// ErrSelfApproval). This holds trivially today (the fixture pairing
+// already made both facts true by construction, same as before), but is
+// no longer *only* true by construction — once
+// docs/audit/gap-approval-principal-attribution.md wires a real resolved
+// Principal in as decidingPrincipal, this check is what actually protects
+// the invariant, not luck of which fixtures happened to be wired where.
 //
 // On reject, the PendingCommand is closed (by the repository, in the same
 // transaction as the Approval status write) and nothing else happens. On
@@ -33,11 +40,17 @@ import (
 // and resumption as sequential steps of one resolution, not two separate
 // client-triggered actions.
 func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRequest) Result {
-	pc, appr, err := a.Pending.ResolveApproval(ctx, req.ApprovalID, a.Fixtures.ApproverPrincipal().PrincipalID, req.Approve, req.Reason)
-	if errors.Is(err, ports.ErrConflict) {
+	pc, appr, err := a.Pending.ResolveApproval(ctx, req.ApprovalID, a.Fixtures.ApproverPrincipal(), req.Approve, req.Reason)
+	switch {
+	case errors.Is(err, ports.ErrConflict):
 		return Result{Outcome: Conflict, Reasons: []string{command.ReasonApprovalAlreadyResolved}}
-	}
-	if err != nil {
+	case errors.Is(err, ports.ErrApprovalExpired):
+		return Result{Outcome: Rejected, Reasons: []string{"approval_expired"}}
+	case errors.Is(err, ports.ErrSelfApproval):
+		return Result{Outcome: Denied, Reasons: []string{"self_approval_prohibited"}}
+	case errors.Is(err, ports.ErrNonHumanDecider):
+		return Result{Outcome: Denied, Reasons: []string{command.ReasonApproverNotAuthorized}}
+	case err != nil:
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 

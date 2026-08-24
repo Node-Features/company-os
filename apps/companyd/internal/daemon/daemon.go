@@ -26,7 +26,13 @@ func (d *Daemon) Start(ctx context.Context) error {
 
 // Shutdown waits, bounded by ctx, for in-flight execute() calls to drain
 // (docs/architecture/daemon.md#lifecycle: "stop accepting work, drain
-// bounded in-flight operations ... before closing dependencies").
+// bounded in-flight operations ... before closing dependencies"). If ctx
+// expires first, it calls Runtime.StopWork so anything still in flight past
+// the deadline at least observes cancellation going forward — it cannot be
+// force-killed, only asked to stop, so this narrows the abandonment window
+// (bounded by ctx's own deadline) rather than eliminating it; the lease on
+// whatever it was doing will still expire normally and ReclaimExpiredLeases
+// recovers it on a later Sweep the same as any other lost worker.
 func (d *Daemon) Shutdown(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
@@ -37,6 +43,7 @@ func (d *Daemon) Shutdown(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
+		d.rt.StopWork()
 		return ctx.Err()
 	}
 }

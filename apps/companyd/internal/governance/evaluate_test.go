@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/policy"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +24,7 @@ func TestEvaluate_AllowsWorkflowActions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if decision.Outcome != policy.DecisionAllow {
+			if decision.Outcome != policy.DecisionAutomatic {
 				t.Errorf("outcome = %s, want ALLOW", decision.Outcome)
 			}
 		})
@@ -35,7 +36,7 @@ func TestEvaluate_AllowsCapabilityDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Errorf("outcome = %s, want ALLOW", decision.Outcome)
 	}
 }
@@ -45,7 +46,7 @@ func TestEvaluate_DefaultDenyForUnknownAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Errorf("outcome = %s, want DENY (default-deny)", decision.Outcome)
 	}
 }
@@ -57,7 +58,7 @@ func TestEvaluate_DenyWithoutEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Errorf("outcome = %s, want DENY (missing evidence)", decision.Outcome)
 	}
 }
@@ -77,7 +78,7 @@ func TestEvaluate_DeniesResourceOwnerMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Fatalf("outcome = %s, want DENY (requester does not own the resource)", decision.Outcome)
 	}
 }
@@ -94,7 +95,7 @@ func TestEvaluate_AllowsResourceOwnerMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Fatalf("outcome = %s, want ALLOW (requester owns the resource)", decision.Outcome)
 	}
 }
@@ -136,7 +137,7 @@ func TestEvaluate_MatchingApprovalEvidence_UnlocksAllow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Fatalf("outcome = %s, want ALLOW (matching approval evidence)", decision.Outcome)
 	}
 }
@@ -175,6 +176,69 @@ func TestEvaluate_AdditionalAutonomyRequirement_NeverWeakens(t *testing.T) {
 	}
 	if decision.Outcome != policy.DecisionRequireApproval {
 		t.Fatalf("outcome = %s, want REQUIRE_APPROVAL (a weaker additional requirement must not relax the Rule's own)", decision.Outcome)
+	}
+}
+
+// TestEvaluate_HumanOnly_HumanRequesterAllowed proves HUMAN_ONLY autonomy
+// is real, not dead code (docs/adr/ADR-0010-authority-model-formalization.md
+// — the prior three-value Decision model made this branch unconditionally
+// DENY regardless of requester, since Request carried no principal-kind
+// signal at all). No policy rule sets AutonomyHumanOnly yet, so this uses
+// AdditionalAutonomyRequirement to synthesize it, same technique
+// TestEvaluate_AdditionalAutonomyRequirement_EscalatesToApprovalRequired
+// already uses for APPROVAL_REQUIRED.
+func TestEvaluate_HumanOnly_HumanRequesterAllowed(t *testing.T) {
+	req := baseRequest("workflow.cancel") // Rule alone: AUTOMATIC
+	lvl := policy.AutonomyHumanOnly
+	req.AdditionalAutonomyRequirement = &lvl
+	req.RequestingPrincipalKind = principal.KindHuman
+
+	decision, err := Evaluate(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision.Outcome != policy.DecisionHumanOnly {
+		t.Fatalf("outcome = %s, want HUMAN_ONLY (eligible human requester)", decision.Outcome)
+	}
+	if decision.AutonomyLevel != policy.AutonomyHumanOnly {
+		t.Fatalf("autonomy level = %s, want HUMAN_ONLY", decision.AutonomyLevel)
+	}
+}
+
+// TestEvaluate_HumanOnly_NonHumanRequesterDenied is governance.md step 6's
+// other half: "an agent or service request is DENY."
+func TestEvaluate_HumanOnly_NonHumanRequesterDenied(t *testing.T) {
+	req := baseRequest("workflow.cancel")
+	lvl := policy.AutonomyHumanOnly
+	req.AdditionalAutonomyRequirement = &lvl
+	req.RequestingPrincipalKind = principal.KindService
+
+	decision, err := Evaluate(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision.Outcome != policy.DecisionDenied {
+		t.Fatalf("outcome = %s, want DENIED (service requester under human_only)", decision.Outcome)
+	}
+}
+
+// TestEvaluate_HumanOnly_UnsetKindDenied proves a zero-value
+// RequestingPrincipalKind fails closed rather than being silently treated
+// as human — the same "a missing input never implies eligibility"
+// discipline every other check in Evaluate already follows (evidence,
+// resource ownership, exclusion).
+func TestEvaluate_HumanOnly_UnsetKindDenied(t *testing.T) {
+	req := baseRequest("workflow.cancel")
+	lvl := policy.AutonomyHumanOnly
+	req.AdditionalAutonomyRequirement = &lvl
+	// req.RequestingPrincipalKind left at its zero value deliberately.
+
+	decision, err := Evaluate(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision.Outcome != policy.DecisionDenied {
+		t.Fatalf("outcome = %s, want DENIED (unset requester kind must fail closed)", decision.Outcome)
 	}
 }
 

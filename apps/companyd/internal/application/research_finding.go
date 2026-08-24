@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/departments/research"
+	knowledgedomain "github.com/Node-Features/company-os/apps/companyd/internal/domain/knowledge"
 	researchdomain "github.com/Node-Features/company-os/apps/companyd/internal/domain/research"
 	"github.com/Node-Features/company-os/apps/companyd/internal/ports"
 	"github.com/google/uuid"
@@ -65,5 +66,24 @@ func (a *Application) PublishFinding(ctx context.Context, req PublishFindingRequ
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
-	return Result{Outcome: Accepted, ResourceID: &findingID}
+	// ROADMAP.md Phase 5 Slice 4: a published Finding automatically
+	// proposes a KnowledgeItem candidate — end-to-end wiring from Research
+	// output to Knowledge's ingestion path (Phase 5 Slice 1). This is a
+	// derived side effect, never authoritative for the Finding itself: if
+	// capture doesn't succeed, PublishFinding still reports Accepted (the
+	// Finding is already real, committed domain data), just with a note in
+	// Reasons rather than a silently swallowed failure.
+	result := Result{Outcome: Accepted, ResourceID: &findingID}
+	capture := a.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
+		RequestID:   uuid.New(),
+		PrincipalID: req.PrincipalID,
+		SourceType:  knowledgedomain.SourceResearchFinding,
+		SourceID:    findingID,
+	})
+	if capture.Outcome == Accepted && capture.ResourceID != nil {
+		result.KnowledgeItemID = capture.ResourceID
+	} else {
+		result.Reasons = append(result.Reasons, "knowledge_capture_not_captured:"+string(capture.Outcome))
+	}
+	return result
 }

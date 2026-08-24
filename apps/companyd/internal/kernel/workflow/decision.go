@@ -216,7 +216,7 @@ func FinalizeCancel(cmd command.WorkflowCommandEnvelope, proposal command.Govern
 }
 
 func verifyAllow(proposal command.GovernedCommandProposal, decision policy.GovernanceDecision) []string {
-	if decision.Outcome != policy.DecisionAllow {
+	if !decision.Outcome.Allows() {
 		return []string{command.ReasonGovernanceDenied}
 	}
 	if decision.ProposalDigest != proposal.ProposalDigest {

@@ -164,10 +164,10 @@ func main() {
 			wakeup := make(chan uuid.UUID, 16)
 			realtimePublisher := supabase.NewRealtimePublisher(pool)
 			app := &application.Application{
-				Repo:     supabase.NewWorkflowRepository(pool),
-				Pending:  supabase.NewPendingCommandRepository(pool),
-				Exec:     supabase.NewExecutionRepository(pool),
-				Fixtures: reg,
+				Repo:                 supabase.NewWorkflowRepository(pool),
+				Pending:              supabase.NewPendingCommandRepository(pool),
+				Exec:                 supabase.NewExecutionRepository(pool),
+				Fixtures:             reg,
 				Notify:               wakeup,
 				Research:             supabase.NewResearchRepository(pool),
 				MonitoringEvaluation: supabase.NewMonitoringEvaluationRepository(pool),
@@ -178,15 +178,16 @@ func main() {
 			// Boot stage 7: Runtime construction — the "runtime subsystems"
 			// stage (dispatch loop, leases, retries).
 			rt := &runtime.Runtime{
-				Exec:          supabase.NewExecutionRepository(pool),
-				App:           app,
-				Provider:      provider,
-				ProviderName:  provider.String(),
-				Fixtures:      reg,
-				PollInterval:  5 * time.Second,
-				LeaseDuration: 60 * time.Second,
-				Wakeup:        wakeup,
-				Notifier:      realtimePublisher,
+				Exec:                  supabase.NewExecutionRepository(pool),
+				App:                   app,
+				Provider:              provider,
+				ProviderName:          provider.String(),
+				Fixtures:              reg,
+				PollInterval:          5 * time.Second,
+				LeaseDuration:         60 * time.Second,
+				Wakeup:                wakeup,
+				Notifier:              realtimePublisher,
+				MaxConcurrentDispatch: 10,
 			}
 			// Boot stage 8: Daemon construction and start — supervises
 			// Runtime's dispatch loop (daemon.md's process-lifecycle

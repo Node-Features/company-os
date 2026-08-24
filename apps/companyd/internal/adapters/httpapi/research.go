@@ -16,15 +16,19 @@ import (
 // (ROADMAP.md Phase 4 Slice 2) endpoint, mirroring workflowCommandResponse's
 // role for Workflow endpoints.
 type departmentCommandResponse struct {
-	Outcome    string   `json:"outcome"`
-	ResourceID string   `json:"resourceId,omitempty"`
+	Outcome    string `json:"outcome"`
+	ResourceID string `json:"resourceId,omitempty"`
 	// ApprovalID is set only when Outcome is APPROVAL_REQUIRED — first
 	// exercised by ROADMAP.md Phase 4 Slice 4's ProposeObjective, whose
 	// policy always requires human approval; every prior department
 	// endpoint is AUTOMATIC-only and never sets it.
-	ApprovalID string   `json:"approvalId,omitempty"`
-	RequestID  string   `json:"requestId"`
-	Reasons    []string `json:"reasons,omitempty"`
+	ApprovalID string `json:"approvalId,omitempty"`
+	// KnowledgeItemID is set only by PublishFinding, when its automatic
+	// Finding -> KnowledgeItem capture succeeds (ROADMAP.md Phase 5
+	// Slice 4) — every other department endpoint never sets it.
+	KnowledgeItemID string   `json:"knowledgeItemId,omitempty"`
+	RequestID       string   `json:"requestId"`
+	Reasons         []string `json:"reasons,omitempty"`
 }
 
 func writeDepartmentResult(w http.ResponseWriter, requestID uuid.UUID, res application.Result) {
@@ -38,6 +42,9 @@ func writeDepartmentResult(w http.ResponseWriter, requestID uuid.UUID, res appli
 	}
 	if res.ApprovalID != nil {
 		resp.ApprovalID = res.ApprovalID.String()
+	}
+	if res.KnowledgeItemID != nil {
+		resp.KnowledgeItemID = res.KnowledgeItemID.String()
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCodeFor(res.Outcome))

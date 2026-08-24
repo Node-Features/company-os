@@ -114,7 +114,7 @@ func (a *Application) AuthorizeDispatch(ctx context.Context, intent workflow.Exe
 			ResourceID:     intent.IntentID.String(),
 			ProposalDigest: proposalDigest,
 			PolicyVersion:  governance.PolicyVersion,
-			Outcome:        policy.DecisionDeny,
+			Outcome:        policy.DecisionDenied,
 		}
 		reason := "stale intent version"
 		decision.Reason = &reason
@@ -129,11 +129,11 @@ func (a *Application) AuthorizeDispatch(ctx context.Context, intent workflow.Exe
 		OrganizationID:       intent.OrganizationID,
 		PrincipalID:          reg.TriggerPrincipal().PrincipalID,
 		EvidencePresent:      true,
-		Action:                fixtures.GovernanceActionDispatch,
-		ResourceType:          "ExecutionIntent",
-		ResourceID:            intent.IntentID.String(),
-		ProposalDigest:        proposalDigest,
-		TrustedContextDigest:  trustedContextDigest,
+		Action:               fixtures.GovernanceActionDispatch,
+		ResourceType:         "ExecutionIntent",
+		ResourceID:           intent.IntentID.String(),
+		ProposalDigest:       proposalDigest,
+		TrustedContextDigest: trustedContextDigest,
 	})
 	if err != nil {
 		return decision, err

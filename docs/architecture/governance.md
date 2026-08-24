@@ -12,7 +12,7 @@ Governance owns:
 - resolving applicable policy and delegated authority at explicit versions;
 - default-deny policy evaluation and restrictive policy composition;
 - assigning the effective autonomy level;
-- returning exactly `ALLOW`, `DENY`, or `REQUIRE_APPROVAL`;
+- returning exactly `AUTOMATIC`, `HUMAN_ONLY`, `REQUIRE_APPROVAL`, or `DENIED` (`docs/architecture/authority-model.md`'s decision model; renamed 2026-08-24 from the prior three-value `ALLOW`/`DENY`/`REQUIRE_APPROVAL` vocabulary by `ADR-0010-authority-model-formalization.md` — historical decision records keep their original spelling, only new decisions use this vocabulary);
 - determining approval requirements and verifying Approval evidence against the canonical Approval contract;
 - producing attributable authorization decisions and approval requirements for Application-coordinated persistence;
 - re-evaluating governed actions immediately before dispatch.
@@ -36,18 +36,18 @@ Every governance request contains:
 | Policies | Validated, applicable policy set at recorded versions |
 | Approval evidence | Optional resolved approval bound to this exact request |
 
-Absent or unverifiable required input produces `DENY`. Provider names and tool strings may be context or adapter data, but cannot replace stable Action and Resource identities.
+Absent or unverifiable required input produces `DENIED`. Provider names and tool strings may be context or adapter data, but cannot replace stable Action and Resource identities.
 
 ## Decision pipeline
 
-1. Validate Identity-issued authentication evidence and resolve the exact active Principal and organization-binding versions; invalid, stale, revoked, ambiguous, or insufficient evidence is `DENY`.
-2. Validate Action, Resource, trusted Context/attestations, entity data, policy syntax/schema, and organization scope; uncertainty is `DENY`.
-3. Confirm the Principal has active Authority covering the request; missing, expired, revoked, or exceeded authority is `DENY`.
+1. Validate Identity-issued authentication evidence and resolve the exact active Principal and organization-binding versions; invalid, stale, revoked, ambiguous, or insufficient evidence is `DENIED`.
+2. Validate Action, Resource, trusted Context/attestations, entity data, policy syntax/schema, and organization scope; uncertainty is `DENIED`.
+3. Confirm the Principal has active Authority covering the request; missing, expired, revoked, or exceeded authority is `DENIED`.
 4. Evaluate applicable authorization policies using default deny: at least one permit must match and no forbid may match. Evaluation errors fail closed.
 5. Compose applicable autonomy requirements using the most restrictive result: `human_only` > `approval_required` > `automatic`.
-6. If effective autonomy is `human_only`, an agent or service request is `DENY`; an eligible human principal continues.
+6. If effective autonomy is `human_only`, an agent or service request is `DENIED`; an eligible human principal continues and receives `HUMAN_ONLY`, not `AUTOMATIC` — a distinct outcome so the audit trail always shows exactly why this specific request proceeded (`docs/architecture/authority-model.md`).
 7. If effective autonomy is `approval_required`, return `REQUIRE_APPROVAL` unless valid unconsumed approval evidence exactly matches the request.
-8. Re-evaluate policy, authority, context, and approval at dispatch time. Only then return `ALLOW`.
+8. Re-evaluate policy, authority, context, and approval at dispatch time. Only then return `AUTOMATIC` (or `HUMAN_ONLY`, per step 6).
 
 `REQUIRE_APPROVAL` means the request is otherwise eligible but lacks valid approval evidence. It is not a weak allow and must never be sent to an executor.
 
@@ -65,17 +65,21 @@ Absent or unverifiable required input produces `DENY`. Provider names and tool s
 
 The canonical [Approval domain contract](../domain/approval.md) owns Approval meaning, fields, lifecycle, and invariants. Governance evaluates whether that exact evidence satisfies current policy and Authority; it does not create, transition, consume, or persist Approval records directly.
 
-At execution, Governance verifies that the approval is approved, unexpired, unrevoked, unconsumed when single-use, issued by an authorized human, and still matches the request. Policy and authority are then evaluated again. Approving a request does not execute it; the Application layer records the new `ALLOW` decision for the exact intent before Runtime executes separately.
+At execution, Governance verifies that the approval is approved, unexpired, unrevoked, unconsumed when single-use, issued by an authorized human, and still matches the request. Policy and authority are then evaluated again. Approving a request does not execute it; the Application layer records the new `AUTOMATIC` decision for the exact intent before Runtime executes separately.
+
+"Issued by an authorized human" is enforced structurally, unconditionally, for every `CommandType` — not merely true by the accident of which fixtures happen to be wired where — by `ResolveApproval`'s self-approval and human-decider checks (`docs/architecture/authority-model.md#approval-domain-structural-invariants`).
 
 The Application layer constructs and submits the Governance request and persists the decision reference with the resulting state or intent. It cannot modify the request after evaluation, reinterpret the outcome, or make an authorization decision. Immediately before a governed external effect, Runtime requests dispatch authorization through an Application use case so Governance evaluates current evidence for the exact persisted intent.
 
 ## Knowledge approval boundary
 
-Knowledge approval is a governed `knowledge.approve` Action on a Resource containing the exact organization, knowledge scope, KnowledgeItem identity/version, and content/source digest. While deterministic automatic approval is disabled, applicable policy classifies this Action as `human_only` and Governance returns `DENY` for agent, service, or provider Principals.
+Knowledge review has two distinct steps, sharing a name until `ADR-0010-authority-model-formalization.md` (2026-08-24) separated them — that ADR is the authoritative record of this section's history; what follows describes the resolved, current shape only.
 
-For a human reviewer, Governance verifies current `AuthenticatedPrincipalEvidence`; active reviewer Authority for the knowledge class and scope; authorship and separation-of-duties constraints; required expertise or role evidence; item status and immutable digest; source/evidence requirements; organization boundary; policy versions; and any additional Approval evidence. Only `ALLOW` may support the separate Kernel transition to `APPROVED`.
+**Requesting** review is the governed `knowledge.review.request` Action (renamed from `knowledge.approve`) on a Resource containing the exact organization, knowledge scope, KnowledgeItem identity/version, and content/source digest. Any Principal may request review — this Action is `approval_required`, not `human_only`: while deterministic automatic *approval* is disabled (below), asking that a candidate be reviewed is not itself approving it.
 
-`REQUIRE_APPROVAL` means the review action needs further human authorization and leaves the KnowledgeItem unapproved. `DENY`, stale evidence, item mutation, changed sources, or changed reviewer/Authority/policy context requires a new evaluation. The Governance decision contains reviewer, authentication-evidence, Authority, policy, determining-rule, item-digest, outcome, reason, and time references for Application-coordinated persistence.
+**Deciding** — the actual approve/reject act — is where `human_only` applies, and it is enforced generically by the Approval domain (`docs/architecture/authority-model.md#approval-domain-structural-invariants`) rather than by this Action's policy classification: the deciding Principal's `Kind` must be human, and it must not be the same Principal that requested the review, checked unconditionally for every `CommandType`'s decide act, not Knowledge's alone. Governance also verifies, at decide time: current `AuthenticatedPrincipalEvidence`; active reviewer Authority for the knowledge class and scope; authorship and separation-of-duties constraints (`ExcludedPrincipalID` — the content *producer*, a check distinct from and additional to the general requester/decider check above, since the producer may differ from whoever happened to call the request endpoint); required expertise or role evidence; item status and immutable digest; source/evidence requirements; organization boundary; policy versions; and any additional Approval evidence. Only `AUTOMATIC` (the outcome of a successfully resumed, approval-cleared decision — see `docs/architecture/authority-model.md`'s decision model) may support the separate Kernel transition to `APPROVED`.
+
+`REQUIRE_APPROVAL` means the review action needs further human authorization and leaves the KnowledgeItem unapproved. `DENIED`, stale evidence, item mutation, changed sources, or changed reviewer/Authority/policy context requires a new evaluation. The Governance decision contains reviewer, authentication-evidence, Authority, policy, determining-rule, item-digest, outcome, reason, and time references for Application-coordinated persistence.
 
 Deterministic automatic knowledge approval remains prohibited until a dedicated ADR is accepted and applicable policy is activated. The ADR must narrowly identify eligible knowledge classes and establish reproducibility, source eligibility, validation, failure, accountability, rollback, and audit requirements. A general `automatic` autonomy level, model confidence, test result, deterministic derivation, or provider assertion is insufficient.
 
@@ -88,9 +92,9 @@ Sensitive arguments are represented by canonical digests plus governed reference
 ## Invariants
 
 - Agents may request actions; Governance determines whether they may execute.
-- No governed action reaches an executor without a current persisted `ALLOW` decision.
-- `REQUIRE_APPROVAL` and `DENY` never authorize execution.
-- No matching permit, any matching forbid, or any evaluation uncertainty results in `DENY`.
+- No governed action reaches an executor without a current persisted `AUTOMATIC` or `HUMAN_ONLY` decision.
+- `REQUIRE_APPROVAL` and `DENIED` never authorize execution.
+- No matching permit, any matching forbid, or any evaluation uncertainty results in `DENIED`.
 - Approval is explicit human evidence, never inferred from silence, prior conversation, or repeated requests.
 - The requester cannot approve its own action unless a future policy explicitly permits a human acting in both roles; agents can never self-approve.
 - Approval is bound to immutable request content and cannot be reused after material changes.
@@ -134,9 +138,11 @@ CompanyOS should borrow the typed request tuple, explicit entities and hierarchi
 - [Top-level architecture](../../ARCHITECTURE.md)
 - [System context](system-context.md)
 - [Identity](identity.md)
+- [Authority model](authority-model.md) — the formalized `Principal + Organization + Department + Role + Capability + Action + Resource + Scope + Autonomy Class + Constraints + Evidence` tuple, the LEGALITY/AUTHORITY/APPROVAL layer split, and the evaluator pipeline this document's Decision pipeline section maps onto
 - [Principal domain](../domain/principal.md)
 - [Policy domain](../domain/policy.md)
 - [Approval domain](../domain/approval.md)
 - [Command domain](../domain/command.md)
 - [Agent domain](../domain/agent.md)
+- [ADR-0008](../adr/ADR-0008-authority-capability-model.md), [ADR-0010](../adr/ADR-0010-authority-model-formalization.md)
 - Future security contract

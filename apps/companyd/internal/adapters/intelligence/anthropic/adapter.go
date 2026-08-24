@@ -67,8 +67,8 @@ type classifiedError struct {
 	retryable bool
 }
 
-func (c *classifiedError) Error() string  { return c.err.Error() }
-func (c *classifiedError) Unwrap() error  { return c.err }
+func (c *classifiedError) Error() string   { return c.err.Error() }
+func (c *classifiedError) Unwrap() error   { return c.err }
 func (c *classifiedError) Retryable() bool { return c.retryable }
 
 // classify maps Anthropic SDK errors to retryable (timeout/rate_limit/

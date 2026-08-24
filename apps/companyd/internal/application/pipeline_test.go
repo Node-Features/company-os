@@ -33,12 +33,38 @@ func newTestApp() (*Application, chan uuid.UUID) {
 
 func TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict(t *testing.T) {
 	app, _ := newTestApp()
+	repo := app.Repo.(*fakeRepo)
 
 	created := app.CreateWorkflow(context.Background(), CreateWorkflowRequest{RequestID: uuid.New(), IdempotencyKey: uuid.New().String()})
 	if created.Outcome != Accepted {
 		t.Fatalf("setup: create outcome = %s", created.Outcome)
 	}
 	workflowID := uuid.MustParse(created.Workflow.WorkflowID)
+
+	// StartWorkflow's pipeline is Load -> Kernel-validate -> Governance ->
+	// CommitTransition, with no atomicity between Load and Commit (that gap
+	// is exactly what CommitTransition's own compare-and-swap exists to
+	// police). Two concurrent callers racing for the same ExpectedVersion
+	// can interleave two different, individually-correct ways:
+	//
+	//  1. Both Load before either Commits: both reach CommitTransition with
+	//     ExpectedVersion == the version they both saw; the CAS lets exactly
+	//     one through and the other gets ports.ErrConflict -> Outcome=Conflict.
+	//  2. One caller's entire Load-Validate-Commit completes before the
+	//     other even calls Load: the second caller's Load observes the
+	//     already-bumped version, so Kernel-level staleness validation
+	//     (ValidateStartProposal) rejects it *before* CommitTransition is
+	//     ever reached -> Outcome=Rejected, reasons
+	//     [ILLEGAL_STATE VERSION_MISMATCH], not Conflict.
+	//
+	// Both are correct optimistic-concurrency outcomes — no state is ever
+	// corrupted or double-committed in either case — but they're different
+	// Outcome values, and which one happens depends on real goroutine
+	// scheduling. Left to the scheduler, that made this assertion flaky
+	// (measured ~10% of runs failing under `go test -count=500`). The gate
+	// below forces every run into interleaving 1, which is what this test
+	// specifically names and exercises: the storage layer's conflict path.
+	repo.loadGate = newRendezvous(2)
 
 	var wg sync.WaitGroup
 	results := make([]Result, 2)
@@ -98,4 +124,3 @@ func TestStartWorkflow_NotifiesOnlyAfterCommit(t *testing.T) {
 		t.Fatal("expected a notify after StartWorkflow committed its ExecutionIntent")
 	}
 }
-

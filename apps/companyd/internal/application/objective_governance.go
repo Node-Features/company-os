@@ -27,23 +27,24 @@ import (
 // outcome.
 func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, cmd command.ObjectiveProposalCommandEnvelope, proposal command.GovernedCommandProposal, approvalEvidence *governance.ApprovalEvidence) (policy.GovernanceDecision, Result, bool) {
 	decision, err := governance.Evaluate(ctx, governance.Request{
-		RequestID:            cmd.RequestID,
-		CorrelationID:        cmd.CorrelationID,
-		OrganizationID:       cmd.OrganizationID,
-		PrincipalID:          cmd.RequestingPrincipalID,
-		EvidencePresent:      true,
-		Action:               proposal.Action,
-		ResourceType:         proposal.ResourceType,
-		ResourceID:           proposal.ResourceID,
-		ProposalDigest:       proposal.ProposalDigest,
-		TrustedContextDigest: proposal.TrustedContextDigest,
-		ApprovalEvidence:     approvalEvidence,
+		RequestID:               cmd.RequestID,
+		CorrelationID:           cmd.CorrelationID,
+		OrganizationID:          cmd.OrganizationID,
+		PrincipalID:             cmd.RequestingPrincipalID,
+		EvidencePresent:         true,
+		RequestingPrincipalKind: cmd.RequestingPrincipalKind,
+		Action:                  proposal.Action,
+		ResourceType:            proposal.ResourceType,
+		ResourceID:              proposal.ResourceID,
+		ProposalDigest:          proposal.ProposalDigest,
+		TrustedContextDigest:    proposal.TrustedContextDigest,
+		ApprovalEvidence:        approvalEvidence,
 	})
 	if err != nil {
 		return decision, Result{Outcome: Unavailable, Reasons: []string{err.Error()}}, false
 	}
 
-	// Persisted for every outcome, not only DENY — same reasoning
+	// Persisted for every outcome, not only DENIED — same reasoning
 	// evaluateGovernance's identical call documents: execution_intents and
 	// pending_commands both reference governance_decisions by ID.
 	if err := a.Repo.SaveGovernanceDecision(ctx, decision.DecisionID, decision.OrganizationID, decision.RequestID, decision.CorrelationID, decision.PrincipalID,
@@ -53,7 +54,7 @@ func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, c
 	}
 
 	switch decision.Outcome {
-	case policy.DecisionDeny:
+	case policy.DecisionDenied:
 		return decision, Result{Outcome: Denied, Reasons: []string{command.ReasonGovernanceDenied}}, false
 
 	case policy.DecisionRequireApproval:
@@ -65,6 +66,8 @@ func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, c
 		if err != nil {
 			return decision, Result{Outcome: Unavailable, Reasons: []string{err.Error()}}, false
 		}
+		now := time.Now().UTC()
+		expiresAt := now.Add(approvalTTL)
 		pc := &command.PendingCommand{
 			PendingCommandID:     uuid.New(),
 			OrganizationID:       cmd.OrganizationID,
@@ -76,7 +79,8 @@ func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, c
 			RequestID:            cmd.RequestID,
 			IdempotencyKey:       cmd.IdempotencyKey,
 			CorrelationID:        cmd.CorrelationID,
-			CreatedAt:            time.Now().UTC(),
+			CreatedAt:            now,
+			ExpiresAt:            &expiresAt,
 		}
 		appr := &approval.Approval{
 			ApprovalID:            uuid.New(),
@@ -88,7 +92,7 @@ func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, c
 			ResourceID:            proposal.ResourceID,
 			ProposalDigest:        proposal.ProposalDigest,
 			Status:                approval.StatusPending,
-			CreatedAt:             time.Now().UTC(),
+			CreatedAt:             now,
 		}
 		pc.ApprovalID = &appr.ApprovalID
 		if err := a.Pending.CreatePendingApproval(ctx, pc, decision.DecisionID, appr); err != nil {
@@ -96,7 +100,7 @@ func (a *Application) evaluateObjectiveProposalGovernance(ctx context.Context, c
 		}
 		return decision, Result{Outcome: ApprovalRequired, ApprovalID: &appr.ApprovalID}, false
 
-	default: // ALLOW
+	default: // AUTOMATIC or HUMAN_ONLY
 		return decision, Result{}, true
 	}
 }

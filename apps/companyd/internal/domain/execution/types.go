@@ -57,24 +57,24 @@ func (s AttemptStatus) IsTerminal() bool {
 // plan decision #9).
 type ExecutionAttempt struct {
 	AttemptID           uuid.UUID
-	OrganizationID       uuid.UUID
-	IntentID             uuid.UUID
-	WorkflowID           uuid.UUID
-	WorkflowVersion      int64
-	LogicalOperationID   string
-	AttemptNumber        int
-	CapabilityRequestID  uuid.UUID
-	Status               AttemptStatus
-	LeaseOwner           *string
-	LeaseFencingToken    *int64
-	LeaseExpiresAt       *time.Time
-	ProviderRunID        *string
-	Checkpoint           map[string]any
-	CreatedAt            time.Time
-	LastHeartbeatAt      *time.Time
-	NextAttemptDueAt     *time.Time
-	TerminalAt           *time.Time
-	ResultID             *uuid.UUID
+	OrganizationID      uuid.UUID
+	IntentID            uuid.UUID
+	WorkflowID          uuid.UUID
+	WorkflowVersion     int64
+	LogicalOperationID  string
+	AttemptNumber       int
+	CapabilityRequestID uuid.UUID
+	Status              AttemptStatus
+	LeaseOwner          *string
+	LeaseFencingToken   *int64
+	LeaseExpiresAt      *time.Time
+	ProviderRunID       *string
+	Checkpoint          map[string]any
+	CreatedAt           time.Time
+	LastHeartbeatAt     *time.Time
+	NextAttemptDueAt    *time.Time
+	TerminalAt          *time.Time
+	ResultID            *uuid.UUID
 }
 
 // ClaimedExecution pairs a newly claimed ExecutionAttempt with the

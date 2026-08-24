@@ -12,6 +12,7 @@ import (
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/command"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/event"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/execution"
+	"github.com/Node-Features/company-os/apps/companyd/internal/domain/principal"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/result"
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/workflow"
 	"github.com/google/uuid"
@@ -25,6 +26,32 @@ var ErrNotFound = errors.New("ports: not found")
 // ErrConflict is returned when a compare-and-write's expected version (or,
 // for CreateWorkflow, expected absence) does not match current state.
 var ErrConflict = errors.New("ports: version conflict")
+
+// ErrSelfApproval, ErrNonHumanDecider, and ErrApprovalExpired are returned
+// by PendingCommandRepository.ResolveApproval — structural Approval-domain
+// invariants (docs/domain/approval.md, docs/adr/ADR-0010-authority-model-formalization.md)
+// enforced unconditionally, for every CommandType, not opt-in per feature.
+// Distinct from ErrConflict (which means "this Approval was already
+// resolved, or never existed") so callers and audiences can tell these
+// apart: an attempt that trips one of these three leaves the Approval
+// exactly as it was (still PENDING, still resolvable by a legitimate
+// decider later) rather than being silently folded into a generic
+// conflict.
+var (
+	// ErrSelfApproval means the deciding principal is the same principal
+	// who requested the review/approval — docs/domain/approval.md: "the
+	// requester cannot approve its own request... agent self-approval is
+	// always prohibited."
+	ErrSelfApproval = errors.New("ports: requesting principal cannot approve its own request")
+	// ErrNonHumanDecider means the deciding principal's Kind is not HUMAN —
+	// governance.md: "agents, services, providers, and models cannot serve
+	// as the reviewer."
+	ErrNonHumanDecider = errors.New("ports: approval must be decided by a human principal")
+	// ErrApprovalExpired means the linked PendingCommand's ExpiresAt has
+	// passed — the Approval is transitioned to EXPIRED as part of
+	// returning this error, not left PENDING forever.
+	ErrApprovalExpired = errors.New("ports: approval has expired")
+)
 
 // ResultDecision tells CommitTransition to mark a Result's accepted/decided_at
 // columns within the same transaction as the Workflow state write, so a
@@ -118,6 +145,25 @@ type ExecutionRepository interface {
 	// each time."
 	ScheduleRetry(ctx context.Context, orgID, intentID uuid.UUID, dueAt time.Time) error
 
+	// ReclaimExpiredLeases atomically finds up to limit attempts whose lease
+	// has expired while still CLAIMED/DISPATCHED/WAITING (a worker that
+	// crashed, was killed, or otherwise never reported a terminal status),
+	// transitions each to LEASE_EXPIRED, and — critically — issues each a
+	// fresh lease_fencing_token in the same update. The token bump is what
+	// makes reclaim safe under invariant 8 (concurrent workers must not
+	// both successfully claim the same exclusive execution) even though the
+	// original worker is never forcibly stopped: if it eventually does call
+	// RecordDispatched/RecordTerminal using its old token, that call's
+	// WHERE ... AND lease_fencing_token=$old will no longer match this row,
+	// so it fails cleanly (ErrConflict) instead of silently overwriting
+	// whatever superseded it. FOR UPDATE SKIP LOCKED (same pattern as
+	// ClaimDueIntents) makes concurrent reclaimers safe against each other.
+	// Returns each reclaimed attempt paired with its ExecutionIntent (the
+	// same shape ClaimDueIntents returns), since the caller (Runtime) needs
+	// both to decide retry-vs-exhausted and, if exhausted, to build a
+	// Result.
+	ReclaimExpiredLeases(ctx context.Context, orgID uuid.UUID, limit int) ([]execution.ClaimedExecution, error)
+
 	SaveResult(ctx context.Context, r *result.Result) error
 	GetResult(ctx context.Context, orgID, resultID uuid.UUID) (*result.Result, error)
 
@@ -141,9 +187,24 @@ type PendingCommandRepository interface {
 	// PENDING -> REJECTED — and returns the updated Approval plus its
 	// associated PendingCommand so the caller can proceed (resume on
 	// approve, nothing further on reject — the PendingCommand is already
-	// closed in the same transaction). The WHERE status='PENDING' guard is
-	// the concurrency control: a second call against an already-decided
-	// Approval affects zero rows and returns ErrConflict, preventing
-	// double-resolution/double-resumption without a separate lock.
-	ResolveApproval(ctx context.Context, approvalID, decidedByPrincipalID uuid.UUID, approve bool, reason *string) (*command.PendingCommand, *approval.Approval, error)
+	// closed in the same transaction). The row is locked with SELECT ...
+	// FOR UPDATE before any decision is made, so the checks below and the
+	// eventual write are atomic within one transaction — no separate lock
+	// needed, and no TOCTOU window between checking and writing:
+	//
+	//   - not found, or not currently PENDING -> ErrConflict (a second call
+	//     against an already-decided Approval affects zero rows; this is
+	//     the sole double-resolution/double-resumption guard).
+	//   - the linked PendingCommand.ExpiresAt has passed -> both rows
+	//     transition to EXPIRED, ErrApprovalExpired.
+	//   - decidingPrincipal.PrincipalID equals the Approval's
+	//     RequestingPrincipalID -> ErrSelfApproval, no state change (the
+	//     Approval stays PENDING, resolvable by a different decider later).
+	//   - decidingPrincipal.Kind is not principal.KindHuman ->
+	//     ErrNonHumanDecider, no state change.
+	//
+	// decidingPrincipal replaces a bare PrincipalID so this method has
+	// access to Kind without a second lookup — the caller already has the
+	// full Principal value (today always fixtures.Registry.ApproverPrincipal()).
+	ResolveApproval(ctx context.Context, approvalID uuid.UUID, decidingPrincipal principal.Principal, approve bool, reason *string) (*command.PendingCommand, *approval.Approval, error)
 }

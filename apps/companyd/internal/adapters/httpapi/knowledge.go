@@ -60,8 +60,9 @@ func CaptureKnowledgeCandidateHandler(app *application.Application) http.Handler
 // already generic by CommandType.
 func RequestKnowledgeApprovalHandler(app *application.Application) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		principalID, ok := requirePrincipal(w, r)
+		p, ok := PrincipalFromContext(r.Context())
 		if !ok {
+			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		itemID, err := uuid.Parse(r.PathValue("knowledgeItemId"))
@@ -80,7 +81,8 @@ func RequestKnowledgeApprovalHandler(app *application.Application) http.HandlerF
 		requestID := uuid.New()
 		res := app.RequestKnowledgeApproval(r.Context(), application.RequestKnowledgeApprovalRequest{
 			RequestID:       requestID,
-			PrincipalID:     principalID,
+			PrincipalID:     p.PrincipalID,
+			PrincipalKind:   p.Kind,
 			KnowledgeItemID: itemID,
 			Version:         body.Version,
 			ContentDigest:   body.ContentDigest,

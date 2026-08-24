@@ -23,7 +23,7 @@ func TestAuthorize_AllowedAction_Succeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Fatalf("outcome = %s, want ALLOW", decision.Outcome)
 	}
 }
@@ -36,7 +36,7 @@ func TestAuthorize_DeniedAction_Fails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Fatalf("outcome = %s, want DENY (wrong role for this action)", decision.Outcome)
 	}
 }
@@ -53,7 +53,7 @@ func TestAuthorize_UnknownSubject_FailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Fatalf("outcome = %s, want DENY (unknown role fails closed)", decision.Outcome)
 	}
 }
@@ -83,7 +83,7 @@ func TestAuthorize_FinanceAgent_ReadFinancialData_Succeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Fatalf("outcome = %s, want ALLOW", decision.Outcome)
 	}
 }
@@ -93,7 +93,7 @@ func TestAuthorize_ResearchAgent_SendCustomerMessage_Denied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Fatalf("outcome = %s, want DENY (no rule grants this to research_agent)", decision.Outcome)
 	}
 }

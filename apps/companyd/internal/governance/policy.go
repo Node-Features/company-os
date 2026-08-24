@@ -81,14 +81,24 @@ var firstSlicePolicies = []policy.Rule{
 	// slice) needs human review.
 	{RuleID: "knowledge-item-capture", Effect: policy.EffectPermit, Action: "knowledge.item.capture", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 5 Slice 2's knowledge.approve governed action.
+	// ROADMAP.md Phase 5 Slice 2's knowledge-review-request governed
+	// action — requesting that a KnowledgeItem candidate be reviewed.
+	// Renamed 2026-08-24 from "knowledge.approve"
+	// (docs/adr/ADR-0010-authority-model-formalization.md): the *request*
+	// (any principal may ask for review) and the *decide* act (only a
+	// human may actually approve/reject) are structurally different
+	// operations that were sharing one confusingly-named action. This rule
+	// governs only the request; the decide act is protected by
+	// ResolveApproval's unconditional human-decider check
+	// (internal/adapters/persistence/supabase/pending_repo.go), which
+	// applies to every CommandType, not a per-action policy rule.
 	// Unconditional AutonomyApprovalRequired, same shape as
 	// "objective-propose" above — but unlike Objective's "no numeric field
 	// to condition on" reasoning, this one is a permanent architectural
 	// prohibition: docs/architecture/knowledge.md is explicit that
 	// deterministic automatic approval is disabled until a dedicated ADR is
 	// accepted, not merely a judgment call this slice made.
-	{RuleID: "knowledge-approve", Effect: policy.EffectPermit, Action: "knowledge.approve", Autonomy: policy.AutonomyApprovalRequired},
+	{RuleID: "knowledge-review-request", Effect: policy.EffectPermit, Action: "knowledge.review.request", Autonomy: policy.AutonomyApprovalRequired},
 
 	{RuleID: "research-agent-read-market-data", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.read_market_data", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-agent-create-report", Effect: policy.EffectPermit, Role: "research_agent", Action: "research.create_report", Autonomy: policy.AutonomyAutomatic},

@@ -14,10 +14,10 @@ import (
 // research-loop.md's scope boundary).
 
 type SubmitSignalRequest struct {
-	RequestID      uuid.UUID
-	PrincipalID    uuid.UUID
-	SourceType     string
-	Description    string
+	RequestID   uuid.UUID
+	PrincipalID uuid.UUID
+	SourceType  string
+	Description string
 }
 
 type OpenResearchQuestionRequest struct {

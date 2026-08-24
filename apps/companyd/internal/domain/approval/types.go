@@ -22,17 +22,17 @@ const (
 )
 
 type Approval struct {
-	ApprovalID           uuid.UUID
-	OrganizationID       uuid.UUID
-	PendingCommandID     uuid.UUID
+	ApprovalID            uuid.UUID
+	OrganizationID        uuid.UUID
+	PendingCommandID      uuid.UUID
 	RequestingPrincipalID uuid.UUID
-	Action               string
-	ResourceType         string
-	ResourceID           string
-	ProposalDigest       string
-	Status               Status
-	DecidedByPrincipalID *uuid.UUID
-	DecidedAt            *time.Time
-	Reason               *string
-	CreatedAt            time.Time
+	Action                string
+	ResourceType          string
+	ResourceID            string
+	ProposalDigest        string
+	Status                Status
+	DecidedByPrincipalID  *uuid.UUID
+	DecidedAt             *time.Time
+	Reason                *string
+	CreatedAt             time.Time
 }

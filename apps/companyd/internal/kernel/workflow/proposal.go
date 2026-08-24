@@ -9,18 +9,18 @@ import (
 
 func newProposal(cmd command.WorkflowCommandEnvelope, resourceID string, args map[string]any) *command.GovernedCommandProposal {
 	p := &command.GovernedCommandProposal{
-		ProposalID:            cmd.CommandID, // 1:1 with the command this slice; no re-proposal path yet
-		SchemaVersion:         1,
-		CommandID:             cmd.CommandID,
-		Action:                command.ActionFor[cmd.CommandType],
-		ResourceType:          "Workflow",
-		ResourceID:            resourceID,
-		OrganizationID:        cmd.OrganizationID,
-		ExpectedVersion:       cmd.ExpectedVersion,
-		Arguments:             args,
-		TrustedContextDigest:  canonicalDigest(map[string]any{"org": cmd.OrganizationID, "principal": cmd.RequestingPrincipalID, "time": cmd.DeclaredTime}),
-		EffectClassification:  "governed-state-change",
-		ExpiresAt:             cmd.DeclaredTime.Add(commandTTL),
+		ProposalID:           cmd.CommandID, // 1:1 with the command this slice; no re-proposal path yet
+		SchemaVersion:        1,
+		CommandID:            cmd.CommandID,
+		Action:               command.ActionFor[cmd.CommandType],
+		ResourceType:         "Workflow",
+		ResourceID:           resourceID,
+		OrganizationID:       cmd.OrganizationID,
+		ExpectedVersion:      cmd.ExpectedVersion,
+		Arguments:            args,
+		TrustedContextDigest: canonicalDigest(map[string]any{"org": cmd.OrganizationID, "principal": cmd.RequestingPrincipalID, "time": cmd.DeclaredTime}),
+		EffectClassification: "governed-state-change",
+		ExpiresAt:            cmd.DeclaredTime.Add(commandTTL),
 	}
 	p.CommandDigest = canonicalDigest(cmd)
 	p.ProposalDigest = canonicalDigest(struct {

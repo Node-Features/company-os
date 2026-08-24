@@ -16,7 +16,7 @@ import (
 func testReg() fixtures.Registry { return fixtures.NewRegistry() }
 
 func allowDecision(digest string) policy.GovernanceDecision {
-	return policy.GovernanceDecision{DecisionID: uuid.New(), Outcome: policy.DecisionAllow, ProposalDigest: digest}
+	return policy.GovernanceDecision{DecisionID: uuid.New(), Outcome: policy.DecisionAutomatic, ProposalDigest: digest}
 }
 
 func TestValidateCreateProposal_Legal(t *testing.T) {

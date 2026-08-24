@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/domain/execution"
@@ -44,9 +45,9 @@ func (r *ExecutionRepository) ClaimDueIntents(ctx context.Context, orgID uuid.UU
 	}
 
 	type claim struct {
-		intent       workflow.ExecutionIntent
-		constraints  []byte
-		inputs       []byte
+		intent      workflow.ExecutionIntent
+		constraints []byte
+		inputs      []byte
 	}
 	var claims []claim
 	for rows.Next() {
@@ -130,7 +131,18 @@ func (r *ExecutionRepository) RecordDispatched(ctx context.Context, attemptID uu
 		return err
 	}
 	if tag.RowsAffected() != 1 {
-		return errors.New("execution_repo: lease lost, attempt not dispatched")
+		// The fencing token no longer matches this row — either a
+		// concurrent writer already moved it (shouldn't happen; only one
+		// worker is ever handed this token), or ReclaimExpiredLeases
+		// already reclaimed this attempt (lease expired, token bumped) and
+		// this caller is the original, since-superseded worker calling in
+		// late. Either way this must fail closed, not silently succeed or
+		// silently no-op, so the caller (Runtime) aborts rather than
+		// proceeding as if it still held the lease. ports.ErrConflict
+		// matches every other compare-and-swap loss in this codebase
+		// (CommitTransition, ResolveApproval, KnowledgeRepository.
+		// TransitionStatus) rather than an ad hoc error type.
+		return fmt.Errorf("execution_repo: lease lost, attempt not dispatched: %w", ports.ErrConflict)
 	}
 	return nil
 }
@@ -143,7 +155,12 @@ func (r *ExecutionRepository) RecordTerminal(ctx context.Context, attemptID uuid
 		return err
 	}
 	if tag.RowsAffected() != 1 {
-		return errors.New("execution_repo: lease lost, attempt not recorded")
+		// Same reasoning as RecordDispatched above — most commonly this is
+		// the original worker's terminal report arriving after
+		// ReclaimExpiredLeases already reclaimed (and thus fenced out) this
+		// attempt. Must fail closed: the caller must not treat this as "my
+		// result is now durable" when it isn't.
+		return fmt.Errorf("execution_repo: lease lost, attempt not recorded: %w", ports.ErrConflict)
 	}
 	return nil
 }
@@ -151,6 +168,109 @@ func (r *ExecutionRepository) RecordTerminal(ctx context.Context, attemptID uuid
 func (r *ExecutionRepository) ScheduleRetry(ctx context.Context, orgID, intentID uuid.UUID, dueAt time.Time) error {
 	_, err := r.p.pool.Exec(ctx, `UPDATE execution_intents SET status='PENDING', due_at=$1 WHERE organization_id=$2 AND intent_id=$3`, dueAt, orgID, intentID)
 	return err
+}
+
+// ReclaimExpiredLeases implements ports.ExecutionRepository.ReclaimExpiredLeases
+// — see that doc comment for the fencing-token safety argument. The WHERE
+// clause's status set (CLAIMED, DISPATCHED, WAITING) matches exactly the
+// three FROM-states execution.AttemptStatus.CanTransitionTo's table
+// legalizes a transition to LEASE_EXPIRED from; reclaim never touches a row
+// already in a genuinely terminal status (SUCCEEDED, FAILED_TERMINAL,
+// CANCELLED, or already LEASE_EXPIRED), so a real completion that lands
+// concurrently with a reclaim sweep simply excludes that row from this
+// query (its status no longer matches) rather than racing destructively.
+func (r *ExecutionRepository) ReclaimExpiredLeases(ctx context.Context, orgID uuid.UUID, limit int) ([]execution.ClaimedExecution, error) {
+	tx, err := r.p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
+		WITH expired AS (
+			SELECT attempt_id FROM execution_attempts
+			WHERE organization_id = $1 AND status IN ('CLAIMED', 'DISPATCHED', 'WAITING') AND lease_expires_at < now()
+			ORDER BY lease_expires_at LIMIT $2 FOR UPDATE SKIP LOCKED
+		)
+		UPDATE execution_attempts SET status = 'LEASE_EXPIRED', terminal_at = now(),
+		       lease_fencing_token = nextval('lease_fencing_seq')
+		WHERE attempt_id IN (SELECT attempt_id FROM expired)
+		RETURNING attempt_id, organization_id, intent_id, workflow_id, workflow_version, logical_operation_id,
+		          attempt_number, capability_request_id, lease_owner, provider_run_id, created_at, last_heartbeat_at`,
+		orgID, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	var attempts []execution.ExecutionAttempt
+	intentIDs := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var a execution.ExecutionAttempt
+		if err := rows.Scan(&a.AttemptID, &a.OrganizationID, &a.IntentID, &a.WorkflowID, &a.WorkflowVersion,
+			&a.LogicalOperationID, &a.AttemptNumber, &a.CapabilityRequestID, &a.LeaseOwner, &a.ProviderRunID,
+			&a.CreatedAt, &a.LastHeartbeatAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		a.Status = execution.StatusLeaseExpired
+		attempts = append(attempts, a)
+		intentIDs[a.IntentID] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(attempts) == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	ids := make([]string, 0, len(intentIDs))
+	for id := range intentIDs {
+		ids = append(ids, id.String())
+	}
+	intentRows, err := tx.Query(ctx, `
+		SELECT intent_id, workflow_id, workflow_version, capability_definition_id, capability_definition_version,
+		       governance_decision_id, idempotency_key, constraints, due_at, inputs
+		FROM execution_intents WHERE intent_id = ANY($1::uuid[])`, ids)
+	if err != nil {
+		return nil, err
+	}
+	intentsByID := map[uuid.UUID]workflow.ExecutionIntent{}
+	for intentRows.Next() {
+		var intent workflow.ExecutionIntent
+		var constraints, inputs []byte
+		if err := intentRows.Scan(&intent.IntentID, &intent.WorkflowID, &intent.WorkflowVersion,
+			&intent.CapabilityDefinitionID, &intent.CapabilityDefinitionVersion, &intent.GovernanceDecisionID,
+			&intent.IdempotencyKey, &constraints, &intent.DueAt, &inputs); err != nil {
+			intentRows.Close()
+			return nil, err
+		}
+		intent.OrganizationID = orgID
+		if len(constraints) > 0 {
+			_ = json.Unmarshal(constraints, &intent.Constraints)
+		}
+		if len(inputs) > 0 {
+			_ = json.Unmarshal(inputs, &intent.Inputs)
+		}
+		intentsByID[intent.IntentID] = intent
+	}
+	intentRows.Close()
+	if err := intentRows.Err(); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	out := make([]execution.ClaimedExecution, 0, len(attempts))
+	for _, a := range attempts {
+		out = append(out, execution.ClaimedExecution{Attempt: a, Intent: intentsByID[a.IntentID]})
+	}
+	return out, nil
 }
 
 func (r *ExecutionRepository) SaveResult(ctx context.Context, res *result.Result) error {

@@ -22,14 +22,14 @@ func newReviewProposal(cmd command.KnowledgeApprovalCommandEnvelope) *command.Go
 		ProposalID:           cmd.CommandID,
 		SchemaVersion:        1,
 		CommandID:            cmd.CommandID,
-		Action:                command.ActionFor[cmd.CommandType],
-		ResourceType:          "KnowledgeItem",
-		ResourceID:            cmd.KnowledgeItemID.String(),
-		OrganizationID:        cmd.OrganizationID,
-		Arguments:             args,
-		TrustedContextDigest:  proposalDigest(map[string]any{"org": cmd.OrganizationID, "principal": cmd.RequestingPrincipalID, "time": cmd.DeclaredTime}),
-		EffectClassification:  "governed-state-change",
-		ExpiresAt:             cmd.DeclaredTime.Add(reviewTTL),
+		Action:               command.ActionFor[cmd.CommandType],
+		ResourceType:         "KnowledgeItem",
+		ResourceID:           cmd.KnowledgeItemID.String(),
+		OrganizationID:       cmd.OrganizationID,
+		Arguments:            args,
+		TrustedContextDigest: proposalDigest(map[string]any{"org": cmd.OrganizationID, "principal": cmd.RequestingPrincipalID, "time": cmd.DeclaredTime}),
+		EffectClassification: "governed-state-change",
+		ExpiresAt:            cmd.DeclaredTime.Add(reviewTTL),
 	}
 	p.CommandDigest = proposalDigest(cmd)
 	p.ProposalDigest = proposalDigest(struct {

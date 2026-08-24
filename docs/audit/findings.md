@@ -1,0 +1,130 @@
+# Architecture Reality Findings (2026-08-24)
+
+Status: APPROVED (2026-08-24)
+
+Full evidence base for every doc in [`audit/`](README.md). Gap docs cite this file by section instead of repeating it — read this once.
+
+## Scope
+
+Intended chain: Company → Mission → Governance → Objectives → Departments → Workflows → Agents/Teams → Capabilities → Results → Evaluation, executed as Goal → Command → Governance → Domain transition → Durable event → Execution intent → Lease → Execution attempt → Checkpoint → Result → Evidence → Evaluation. Core invariant under test: external execution must never become authoritative organizational state without validation and commitment through domain operations.
+
+## 1. Subsystem reality
+
+### 1.0 Architecture-center component check
+
+Each named link in the Company → Mission → Governance → Objectives → Departments → Workflows → Agents/Teams → Capabilities → Results → Evaluation chain, checked individually against code (not inferred from the subsystem table below):
+
+| Component | Code reality |
+|---|---|
+| Company | No literal `Company` type exists. `domain/organization.Organization` ([types.go](../../apps/companyd/internal/domain/organization/types.go)) is the real top-level tenant aggregate — what [`organization.md`](../domain/organization.md) and ADR-0004's single-organization decision actually govern. Treated as the ground truth for "Company" throughout this audit. |
+| Mission | **Zero footprint anywhere** — no domain type, no stub package, no `docs/domain/mission.md`, no mention in `ROADMAP.md`. The only architecture-center component with no representation at all, docs included. |
+| Governance | Real, implemented — §1 row below. |
+| Objectives | Real, implemented — §1 row below. |
+| Departments | Real for Research/M&E/Finance (3 of an eventual larger set); `domain/department` is an empty stub — §1 row below. |
+| Workflows | Real, the most mature subsystem — §1 row below. |
+| Agents/Teams | **No governed implementation.** [`domain/agent.md`](../domain/agent.md) (APPROVED) defines `AgentDefinition`/`AgentPrincipal`/an Authority binding — none have a Go type; no `internal/domain/agent` package exists (ADR-0007 flags this gap explicitly). A separate `internal/agent` package does exist ([runtime.go](../../apps/companyd/internal/agent/runtime.go)) but is explicitly self-disclaimed in its own doc comment as "not the governed Agent... deliberately not wired to Governance/Capability/Authority" — a generic supervised-goroutine primitive (`Runtime.Register`/`Start`/`Wait`, best-effort in-memory status via `internal/concurrency.Bus`) with one trivial example (`examples.EchoAgent`), confirmed unreferenced by `apps/companyd/cmd` — not part of any live path. No `Team` concept anywhere in code or docs. |
+| Capabilities | Real (`domain/capability`), one fixture `CapabilityDefinition` (bounded text generation). |
+| Results | Real, implemented — §1 Runtime/Daemon row. |
+| Evaluation | `domain/evaluation` is an empty stub; the real equivalent is department-scoped (`domain/monitoringevaluation.Evaluation`) — §1 row below. |
+
+### 1.1 Subsystem-by-subsystem reality
+
+| Subsystem | Architecture says | Code reality |
+|---|---|---|
+| Kernel (workflow/objective/knowledge) | Pure legality functions, caller resolves facts | Holds, no exceptions found. Workflow is two-phase (`ValidateProposal`→`Finalize`, [decision.go](../../apps/companyd/internal/kernel/workflow/decision.go)); Objective/Knowledge are single-phase. `Finalize*` trusts a digest match rather than re-checking `current.State`/`Version` itself — the re-check is implicit via digest composition, not an explicit second gate. |
+| Domain aggregates | Company/Objective/Department/Workflow/Agent/Capability/Result/Evaluation as real types | `workflow`, `objective`, `command`, `policy`, `approval`, `result`, `principal`, `organization`, `execution`, `capability`, `knowledge`, plus department-scoped `research`/`monitoringevaluation`/`finance` are real. **`artifact`, `department`, `evaluation`, `evidence`, `metric`, `resource`, `workspace` are empty `doc.go` stubs — zero type declarations.** Equivalent functionality lives instead in department-local duplicates (`domain/monitoringevaluation.Metric/Evaluation`, `domain/finance.CostConstraint`, `domain/execution.ExecutionAttempt` folding in Lease/Checkpoint per its own comment, [types.go:53-57](../../apps/companyd/internal/domain/execution/types.go)). |
+| Governance | Default-deny, policy-driven ALLOW/DENY/REQUIRE_APPROVAL, autonomy composition | Real, correctly ordered: evidence check → resource-owner check → excluded-principal check → rule match (default-deny) → autonomy composition → outcome dispatch ([evaluate.go:113-185](../../apps/companyd/internal/governance/evaluate.go)). Policy table is a hardcoded Go literal ([policy.go:27-99](../../apps/companyd/internal/governance/policy.go)) — no runtime policy admin; every rule change is a redeploy. `AutonomyHumanOnly` is dead: no rule sets it, and it is an unconditional DENY if reached (no Principal-Kind verification mechanism exists). |
+| Identity/Authorization | Governance evaluated against the real, authenticated caller | JWT verification (`ES256` pinned, JWKS cached) and Principal resolution (race-safe upsert) are real. **Workflow commands and every Approval decision evaluate governance against a fixed fixture Principal, not the authenticated caller** — zero exceptions found in `workflow_start.go`, `workflow_cancel.go`, `approval_resolve.go`. Research/M&E/Finance/Objective/Knowledge use the real resolved Principal (`PrincipalFromContext`). |
+| Persistence | Atomic commit, durable events, compare-and-swap concurrency | Governed-action flows (`CommitTransition`, `TransitionStatus`, `CreateObjective`) atomically close PendingCommand+Approval+domain-row+outbox-event in one transaction. Research/M&E/Finance writes are single-statement with **no outbox events at all** — the "Durable event" execution-model step does not apply to those departments. |
+| Execution intents / Leases | Lease → Execution attempt → Checkpoint, with reclaim on lease expiry | **No reclaim mechanism exists.** Schema anticipates it (`lease_expires_at`, indexed); domain defines `StatusLeaseExpired` and a legal-transition table (`execution.AttemptStatus.CanTransitionTo`, [types.go:38-46](../../apps/companyd/internal/domain/execution/types.go)) — this function is **never called anywhere**, and no sweep re-selects `CLAIMED`/`DISPATCHED` rows. See [`gap-execution-lease-reclaim.md`](gap-execution-lease-reclaim.md). |
+| Runtime/Daemon | Bounded, supervised dispatch; external execution never becomes authoritative without a governed commit | Core invariant **holds**: raw provider output is saved as an evidentiary `Result` row, then only becomes Workflow state via `Application.SubmitResult` → Kernel `FinalizeAccept`/`FinalizeReject` → `CommitTransition` ([runtime.go:143-233](../../apps/companyd/internal/runtime/runtime.go), [result_submit.go](../../apps/companyd/internal/application/result_submit.go)). No direct provider→state path exists. Dispatch itself is unbounded (no worker pool/semaphore, no goroutine panic recovery) and shutdown reuses the already-cancelled root `ctx` for in-flight work rather than draining — routine deploys, not only crashes, can orphan intents. |
+| Departments (Research/M&E/Finance) | Adaptive feedback loops, pluggable | Three real vertical slices, consistent package pattern (`internal/domain/<dept>`, `internal/departments/<dept>`, `internal/ports.<Dept>Repository`, `internal/application/<dept>_*.go`), `AUTOMATIC`-only governance, no idempotency guard by design, no cross-department transaction (accepted, single-process topology). |
+| Knowledge | Immutable versioning, governed human-only approval | Solid. ~~`knowledge.approve`'s autonomy classification contradicts `governance.md`~~ **RESOLVED 2026-08-24** — see [`docs/adr/ADR-0010-authority-model-formalization.md`](../adr/ADR-0010-authority-model-formalization.md) and [`fixed-authority-model-formalization.md`](fixed-authority-model-formalization.md). |
+| HTTP/Frontend | Governed, per-principal API surface | 23 routes, uniformly wrapped `RequireHumanAuth`→`ResolvePrincipal`; only `GET /health` is open. Organization scoping exists only because one hardcoded org ([firstslice.go:29](../../apps/companyd/internal/fixtures/firstslice.go)) is the sole tenant — no enforcement code would catch cross-org access if a second org existed. |
+| CI | Validates the above | **CI never sets `DATABASE_URL`/`SUPABASE_URL`.** Every `requireRealApp`-gated integration test — the majority of correctness coverage for governance, concurrency, transactions, idempotency — is skipped in CI, run only manually. See [`gap-ci-integration-coverage.md`](gap-ci-integration-coverage.md). |
+| Security docs | threat-model / agent-authority / tool-security / workspace-isolation | `agent-authority.md`'s default-deny posture is implemented via Governance. **`tool-security.md` and `workspace-isolation.md` are 100% aspirational — zero code** (no `Agent` execution path, no workspace/container package exists). `APPROVED` here means the design is settled, not that a control is enforced. |
+| Redis | Disposable cache per ADR-0009 | Zero lines of code anywhere (`grep -rn redis -i` over `apps/companyd`: no matches outside `go.sum`). Plan-only. |
+
+## 2. Critical invariants
+
+**Holds, verified in code:**
+1. External provider output never becomes authoritative Workflow state without `ValidateResultProposal` → governance → `FinalizeAccept/Reject` → `CommitTransition`.
+2. No governed state mutation happens before `governance.Evaluate` runs and its decision is persisted — confirmed across all four governance-evaluation call sites (Workflow, department-automatic, Objective proposal, Knowledge approval); the historical "ALLOW not persisted" bug is fixed everywhere.
+3. Optimistic-concurrency compare-and-swap is DB-enforced for Workflow/Approval/Knowledge (`WHERE version = $expected`, zero-rows → `ports.ErrConflict`).
+4. Double-resolution of a human Approval decision is impossible (CAS on `approvals.status='PENDING'`).
+5. Principal upsert on first sign-in is race-safe (`ON CONFLICT` + unique constraint on `(external_issuer, external_subject)`).
+
+**Does not hold, or only asserted in docs:**
+1. ~~Lease-based reclaim of abandoned execution work~~ **FIXED 2026-08-24** — architecturally named as a first-class step, previously zero enforcing code. See [`fixed-execution-lifecycle-hardening.md`](fixed-execution-lifecycle-hardening.md); [`gap-execution-lease-reclaim.md`](gap-execution-lease-reclaim.md) for the original finding.
+2. Per-principal authorization for Workflow commands and Approval decisions. [`gap-approval-principal-attribution.md`](gap-approval-principal-attribution.md).
+3. ~~`AutonomyHumanOnly` as a distinguishable autonomy tier — currently indistinguishable from any other DENY.~~ **FIXED 2026-08-24** — `HUMAN_ONLY` is now a real, reachable `policy.Decision` value, distinguishable from `DENIED`; see [`docs/adr/ADR-0010-authority-model-formalization.md`](../adr/ADR-0010-authority-model-formalization.md).
+4. ~~Execution-attempt state-machine legality (`CanTransitionTo`) — defined, never invoked.~~ **FIXED 2026-08-24** — now enforced (as a hand-matched SQL WHERE clause, not a literal Go call — see [`fixed-execution-lifecycle-hardening.md`](fixed-execution-lifecycle-hardening.md) for why a literal call isn't possible while keeping the check-and-transition atomic).
+5. Atomicity of "Governance decided REQUIRE_APPROVAL" → "Approval is durably actionable" — three separate transactions with real crash windows between them. [`gap-approval-flow-durability.md`](gap-approval-flow-durability.md).
+
+**Related, not fully closed:** the lease-reclaim fix above narrows but does not eliminate every abandonment window — a crash between `RecordTerminal` succeeding and `Application.SubmitResult` completing (a handful of function calls) still leaves a Result that nothing automatically resubmits. See [`fixed-execution-lifecycle-hardening.md`](fixed-execution-lifecycle-hardening.md)'s "Residual gap" section.
+
+## 3. Failure-mode matrix
+
+| # | Scenario | Component | Current behavior | Consequence | Severity | Tracked in |
+|---|---|---|---|---|---|---|
+| 1 | Crash/redeploy after `ClaimDueIntents` commits, before `RecordTerminal` | Runtime dispatch | Intent stuck `status='CLAIMED'` forever; nothing re-selects it | Workflow silently stalls at `READY` indefinitely | P0 | [gap-execution-lease-reclaim.md](gap-execution-lease-reclaim.md) |
+| 2 | SIGTERM during a routine deploy while dispatches are in flight | `main.go` shutdown | Same (already-`Done()`) root `ctx` reused for in-flight DB/provider calls | Same orphaning as #1, on every deploy | P0 | [gap-execution-lease-reclaim.md](gap-execution-lease-reclaim.md) |
+| 3 | Crash between `SaveGovernanceDecision` and `CreatePendingApproval` | Governance/Approval | Orphaned `GovernanceDecision` row, no reachable Approval; retry produces a fresh, correct flow | Harmless clutter, silent | P2 | [backlog-p2-p4.md](backlog-p2-p4.md) |
+| 4 | Crash between `CreatePendingApproval` commit and idempotency-store write | Governance/Approval | Retry uses a fresh digest → a second, duplicate PendingCommand/Approval for one logical request | Approver sees two entries for one request | P1 | [gap-approval-flow-durability.md](gap-approval-flow-durability.md) |
+| 5 | `a.Repo.IdempotencyStore` write fails after a successful commit (Workflow use cases) | Application idempotency | Error swallowed (`_ = a.Repo.IdempotencyStore(...)`, [application.go:64](../../apps/companyd/internal/application/application.go)) | Later retry doesn't find the replay guard, re-executes the command | P1 | [gap-approval-flow-durability.md](gap-approval-flow-durability.md) |
+| 6 | Concurrent capture of the same Knowledge source | Knowledge persistence | No unique constraint on `(organization_id, source_type, source_id)` in `knowledge_items` | Two concurrent DRAFT versions for one source | P1 | [gap-knowledge-source-uniqueness.md](gap-knowledge-source-uniqueness.md) |
+| 7 | `RunEvaluation`'s second write (`UpsertPerformanceProfile`) fails after the first succeeds | M&E application | Non-transactional, no compensating action | Evaluation recorded, PerformanceProfile stale | P2 | [backlog-p2-p4.md](backlog-p2-p4.md) |
+| 8 | Panic inside a dispatch goroutine | Runtime | No `recover()` anywhere in runtime/daemon/main | Entire daemon crashes, taking down every in-flight intent | P1 | [gap-runtime-resilience.md](gap-runtime-resilience.md) |
+| 9 | Slow-provider window with many due intents | Runtime | 5s poll, batch 10, no concurrency cap, overlapping sweeps possible | Unbounded concurrent provider calls | P1 | [gap-runtime-resilience.md](gap-runtime-resilience.md) |
+| 10 | Daemon restart while a provider is in cooldown | Provider fallback | Cooldown state is in-memory only | Restart forgets an outaged provider | P3 | [backlog-p2-p4.md](backlog-p2-p4.md) |
+| 11 | `ScheduleRetry` called against an intent not in the expected prior status | Execution persistence | No status guard on the UPDATE | Theoretical double-schedule race; no known trigger today | P2 | [backlog-p2-p4.md](backlog-p2-p4.md) |
+| 12 | A second Organization is created before real org-scoping exists | Multi-tenancy | Every use case scopes to a hardcoded org constant; no enforcement code | Immediate cross-tenant leak the moment org #2 exists | P2 (P0 if triggered) | [backlog-p2-p4.md](backlog-p2-p4.md) |
+
+## 4. Severity legend
+
+P0 = threatens correctness/data integrity/security · P1 = threatens runtime reliability · P2 = architectural weakness · P3 = maintainability/documentation · P4 = optional improvement.
+
+## 5. Authoritative vs. disposable state
+
+**Authoritative** (loss or corruption is a real incident): `organizations`, `principals`, `principal_organization_bindings`, `workflows`, `objectives`, `knowledge_items`, `governance_decisions`, `pending_commands`, `approvals`, `execution_intents`, `execution_attempts`, `results`, `signals`/`research_questions`/`evidence`/`findings`/`recommendations`, `metrics`/`evaluations`/`performance_profiles`, `budgets`/`cost_constraints`/`resource_usage`/`resource_evaluations`, `idempotency_keys` (durable, Postgres-backed — load-bearing for replay safety despite conceptually being a record of past decisions rather than business fact).
+
+**Disposable** (may be lost, rebuilt, or reset without corrupting organizational truth — matching [`persistence.md`](../architecture/persistence.md)'s own invariant, "Conversation, cache, search index, vector index, provider state, checkpoint, and message history are never authoritative business state"): `event_outbox` (transient relay, sweeper-consumed, at-least-once — §1), provider-cooldown state (in-memory, `fallback.Adapter`), Redis (planned, never authoritative per ADR-0009, currently non-existent), `internal/concurrency.Bus` events and `internal/agent.Runtime`'s `StatusEvent`s (explicitly documented as best-effort — "a subscriber that isn't listening simply never sees it").
+
+**Named but not yet real**: `execution_attempts.Checkpoint` is modeled as part of the authoritative execution-mechanics record per [`domain/execution.md`](../domain/execution.md), but per the Execution intents/Leases row above, nothing currently reads or acts on it to resume abandoned work — authoritative in schema only until [`gap-execution-lease-reclaim.md`](gap-execution-lease-reclaim.md) closes that gap.
+
+## 6. Known flaky tests
+
+**Update (2026-08-24): the first two rows below are FIXED — see [`fixed-test-suite-nondeterminism.md`](fixed-test-suite-nondeterminism.md) for full root-cause evidence and verification.** Left in place, corrected, rather than deleted, so the original (initially wrong) understanding stays visible next to what was actually true.
+
+| Test | File | Symptom | Root cause (as currently understood) |
+|---|---|---|---|
+| ~~`TestStartWorkflow_ConcurrentSameVersion_OneAcceptedOneConflict`~~ **FIXED** | [pipeline_test.go](../../apps/companyd/internal/application/pipeline_test.go) | Was: passed 5/5 in isolation, failed once under full-suite `go test ./...` with `REJECTED`/`ILLEGAL_STATE`/`VERSION_MISMATCH` reasons (per `current-state.md`, 2026-08-22) | This audit's original text called it "not reproduced" — wrong. A follow-up investigation reproduced it at 51/500 (10.2%) and confirmed the real mechanism: a genuine Load/Commit race in `workflow_start.go` with two legitimately different loser outcomes depending on scheduling, not a bug in `fakeRepo`. Fixed with a real synchronization barrier; 0/3000 since. |
+| ~~`TestIntegration_CreateStartReject_FullPipelineToFailed`~~ **FIXED (same root cause class)** | [integration_test.go](../../apps/companyd/internal/application/integration_test.go) | Was: failed consistently against the real database with "claimed 0 intents after polling, want exactly 1" (per `current-state.md`, 2026-08-22) | Confirmed as an instance of the shared-fixture-organization-ID class of bug: `internal/application`'s tests all shared `fixtures.OrganizationID` against `ClaimDueIntents`' organization-wide claim, exactly like the class `internal/adapters/persistence/supabase` had already fixed for itself. Reproducing it directly hit a different specific test (`TestIntegration_ProposeObjective_RejectLeavesNoObjective`) under deliberate concurrent invocation — same mechanism, and fixing it also unmasked a real, previously-latent production bug in `performance_profiles`' primary key (§5's "named but not yet real" note doesn't cover this — see the fix doc). |
+| Multiple `TestIntegration_*` tests, various | `internal/application/*_integration_test.go` | Recurring `wsarecv`/connection-timeout failures on isolated runs, always passing on immediate re-run (documented at least 6 separate times across Phase 4/5 sessions in `current-state.md`) | Still consistent with transient network blips against the pooled real Postgres connection — not reproduced as a repeatable failure across ~15 real-database runs during the 2026-08-24 investigation either. Relevant to [`gap-ci-integration-coverage.md`](gap-ci-integration-coverage.md): once this suite runs in CI, expect and tolerate occasional real-network flakiness here rather than treating every red run as a regression. |
+
+No test in the current suite carries a skip/retry annotation or a `// flaky` comment — this table is reconstructed from `current-state.md`'s own session notes, cross-checked against the actual test files; no in-repo flaky-test registry exists.
+
+## 7. Orchestration-framework assessment (LangGraph or equivalent)
+
+Checked explicitly, per this audit's brief, for any concrete responsibility the existing architecture cannot reasonably handle. Finding: **none**. `internal/runtime` + `internal/daemon` already own what an orchestration framework would otherwise be reached for — durable step sequencing (`execution_intents`), retry/backoff (`capability.RetryPolicy`, real and enforced, §1), provider fallback (`internal/adapters/intelligence/fallback`), and commit-gated state transitions (Kernel + Governance + `CommitTransition`). Every gap this audit found — no lease reclaim, no shutdown drain, no panic recovery, no concurrency bound — is missing plumbing *within* that existing model, not a missing capability only a framework like LangGraph supplies; each is scoped as a `gap-*.md` doc against the current Go-native Runtime. No code, doc, ADR, or `ROADMAP.md` entry in this repository references LangGraph or any other orchestration framework as a candidate. **This audit does not recommend introducing one.**
+
+## 8. Recommended implementation order
+
+Not a commitment to build all of this — the sequence this audit would recommend if and when a remediation slice is scoped:
+
+1. [`gap-execution-lease-reclaim.md`](gap-execution-lease-reclaim.md) (P0) — the one gap that silently corrupts organizational state today, on every deploy; nothing else should land in Runtime/daemon ahead of it.
+2. [`gap-approval-principal-attribution.md`](gap-approval-principal-attribution.md) (P1) — before any multi-operator UI (`ROADMAP.md` Phase 10's approval inbox) ships, since that work would otherwise expose this gap directly.
+3. [`gap-approval-flow-durability.md`](gap-approval-flow-durability.md) (P1) — tighten the REQUIRE_APPROVAL transaction boundary alongside the idempotency-store error swallow.
+4. [`gap-runtime-resilience.md`](gap-runtime-resilience.md) (P1) — panic recovery and bounded dispatch concurrency; natural to bundle with item 1 since both touch `runtime.go`'s dispatch loop.
+5. [`gap-ci-integration-coverage.md`](gap-ci-integration-coverage.md) (P1) — ideally in parallel with 1-4, not strictly after: every fix above ships without automated regression protection until this lands.
+6. [`gap-knowledge-source-uniqueness.md`](gap-knowledge-source-uniqueness.md) (P1) — small, isolated, no dependency on the others; can be picked up any time.
+7. [`backlog-p2-p4.md`](backlog-p2-p4.md)'s governance-autonomy-drift row — a decision, not a build; unblocks generalizing separation-of-duties cleanly.
+8. Remaining `backlog-p2-p4.md` rows as ordinary backlog, no urgency-driven sequencing required.
+
+## Dependencies
+
+- [`architecture/kernel.md`](../architecture/kernel.md), [`architecture/governance.md`](../architecture/governance.md), [`architecture/runtime.md`](../architecture/runtime.md), [`architecture/persistence.md`](../architecture/persistence.md), [`architecture/events.md`](../architecture/events.md), [`architecture/identity.md`](../architecture/identity.md)
+- [`domain/execution.md`](../domain/execution.md), [`domain/approval.md`](../domain/approval.md), [`domain/knowledge.md`](../domain/knowledge.md), [`domain/agent.md`](../domain/agent.md), [`domain/organization.md`](../domain/organization.md)
+- [`testing/strategy.md`](../testing/strategy.md)
+- [`adr/ADR-0007-concurrency-model.md`](../adr/ADR-0007-concurrency-model.md) (Status: PROPOSED — names the `internal/agent`/`internal/domain/agent` gap independently)
+- [`ROADMAP.md`](../../ROADMAP.md)

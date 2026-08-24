@@ -18,9 +18,9 @@ Knowledge architecture consumes the canonical [Knowledge](../domain/knowledge.md
 2. Preserve source identity and content integrity; classify access, retention, and tenant scope.
 3. Normalize into a new immutable `KnowledgeItem` version without overwriting its sources.
 4. Detect potential duplicates and contradictions as review signals, not automatic merges.
-5. Freeze the candidate version and submit `knowledge.review` or `knowledge.approve` through an Application use case with current authenticated reviewer evidence.
+5. Freeze the candidate version and submit `knowledge.review.request` (renamed from `knowledge.approve` 2026-08-24, `docs/adr/ADR-0010-authority-model-formalization.md` — requesting review and deciding it are distinct operations, see the Approval boundary section below) through an Application use case, then decide it with current authenticated reviewer evidence via the separate decide action.
 6. Governance verifies the human reviewer's Authority, policy, organization and knowledge scope, separation-of-duties requirements, and exact item-version/content digest.
-7. Only a current Governance `ALLOW` for `knowledge.approve` permits the Kernel transition to `APPROVED`; Application coordinates atomic persistence of the KnowledgeReview, Governance-decision reference, and item transition.
+7. Only a current Governance `AUTOMATIC` decision on the decide act permits the Kernel transition to `APPROVED`; Application coordinates atomic persistence of the KnowledgeReview, Governance-decision reference, and item transition.
 8. Publish to approved retrieval projections only after that commit.
 9. Re-evaluate affected knowledge when sources expire, are retracted, or are superseded.
 
@@ -28,9 +28,9 @@ Models may extract, summarize, relate, or propose knowledge. Agents, services, p
 
 ## Approval boundary
 
-Knowledge approval is the governed Action `knowledge.approve` against a Resource identifying one organization, knowledge scope, KnowledgeItem ID, immutable version, and content/source digest. The requesting reviewer must be an authenticated active `HumanPrincipal` with current Authority for that knowledge class and scope. Policy may require independence from authorship, multiple reviewers, specialist credentials, or additional Approval evidence.
+Requesting Knowledge review is the governed Action `knowledge.review.request` against a Resource identifying one organization, knowledge scope, KnowledgeItem ID, immutable version, and content/source digest — any Principal may request review, not only a human (`docs/architecture/authority-model.md`: requesting review is `approval_required`, not `human_only`; only the deciding act is human-restricted). The deciding reviewer must be an authenticated active `HumanPrincipal` with current Authority for that knowledge class and scope, enforced structurally by the Approval domain's unconditional self-approval and human-decider checks — not by this Action's own policy classification. Policy may require independence from authorship, multiple reviewers, specialist credentials, or additional Approval evidence.
 
-Governance `DENY` leaves the candidate unchanged or permits a separate rejected-review transition according to the review request. `REQUIRE_APPROVAL` pauses the approval action; it does not approve the KnowledgeItem. A stale item version, changed content or sources, expired reviewer evidence, changed Authority/policy, or mismatched organization requires a new Governance evaluation.
+A `DENIED` decide-time decision leaves the candidate unchanged or permits a separate rejected-review transition according to the review request. `REQUIRE_APPROVAL` pauses the approval action; it does not approve the KnowledgeItem. A stale item version, changed content or sources, expired reviewer evidence, changed Authority/policy, or mismatched organization requires a new Governance evaluation.
 
 The Application layer coordinates Governance, Kernel legality, and atomic persistence. Knowledge storage, review UI, events, indexes, agents, and departments cannot set `APPROVED` directly. Approval of one version does not approve earlier, later, derived, translated, summarized, or conflicting versions.
 

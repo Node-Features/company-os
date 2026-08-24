@@ -13,5 +13,6 @@ This directory indexes CompanyOS documentation without duplicating its canonical
 | [Security](security/README.md) | Detailed security requirements | APPROVED | Read for authority, tools, isolation, or threat analysis. |
 | [Testing](testing/README.md) | Testing and failure-validation strategy | APPROVED | Read when designing validation or implementation tests. |
 | [Features](features/README.md) | Significant feature documentation | NOT YET SPECIFIED | Read when planning or delivering a significant feature. |
+| [Audit](audit/README.md) | Architecture-reality findings and remediation gap docs | APPROVED | Read when scoping a P0/P1 remediation slice, or investigating a known implementation gap. |
 
 Note (2026-08-21): the References row links `reference-implementations/README.md`, which conflicts with the separate, more current-looking `references/README.md` (see `.companyos/agent-memory/current-state.md#open-questions`) — left unresolved pending a decision on which directory is canonical.

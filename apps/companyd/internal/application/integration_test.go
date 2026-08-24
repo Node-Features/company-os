@@ -21,6 +21,20 @@ import (
 // DATABASE_URL is set — the fake_repo_test.go fakes prove pipeline
 // sequencing in isolation; this proves the same Application code actually
 // works wired to the real schema supabase/migrations/ applies.
+//
+// Fixtures use a fresh organization ID per call (fixtures.
+// NewRegistryWithOrganization), not the shared fixtures.OrganizationID
+// constant — ClaimDueIntents claims due ExecutionIntents organization-wide,
+// so two Applications sharing one org (whether from two tests in this
+// package, two packages, or two overlapping `go test` invocations against
+// this project's persistent dev database) can each claim intents the other
+// created, breaking any test that polls for "claimed exactly 1 intent".
+// Reproduced directly: running this package's suite concurrently with
+// itself against the shared constant reliably produced exactly that failure
+// ("claimed 2 intents after polling, want exactly 1"). A fresh org per test
+// makes that structurally impossible rather than merely unlikely — matching
+// the isolation internal/adapters/persistence/supabase's own tests already
+// use (see its testOrgID doc comment) for the same reason.
 func requireRealApp(t *testing.T) *Application {
 	t.Helper()
 	_ = godotenv.Load("../../.env")
@@ -35,10 +49,10 @@ func requireRealApp(t *testing.T) *Application {
 	t.Cleanup(pool.Close)
 
 	return &Application{
-		Repo:     supabase.NewWorkflowRepository(pool),
-		Pending:  supabase.NewPendingCommandRepository(pool),
-		Exec:     supabase.NewExecutionRepository(pool),
-		Fixtures: fixtures.NewRegistry(),
+		Repo:                 supabase.NewWorkflowRepository(pool),
+		Pending:              supabase.NewPendingCommandRepository(pool),
+		Exec:                 supabase.NewExecutionRepository(pool),
+		Fixtures:             fixtures.NewRegistryWithOrganization(uuid.New()),
 		Notify:               make(chan uuid.UUID, 4),
 		Research:             supabase.NewResearchRepository(pool),
 		MonitoringEvaluation: supabase.NewMonitoringEvaluationRepository(pool),
@@ -78,7 +92,7 @@ func submitFakeResultWithProvider(t *testing.T, app *Application, outcome result
 	var claims []execution.ClaimedExecution
 	var err error
 	for attempt := 0; attempt < 30; attempt++ {
-		claims, err = app.Exec.ClaimDueIntents(ctx, fixtures.OrganizationID, 10, time.Minute, "integration-test-worker")
+		claims, err = app.Exec.ClaimDueIntents(ctx, app.Fixtures.Organization().OrganizationID, 10, time.Minute, "integration-test-worker")
 		if err != nil {
 			t.Fatalf("ClaimDueIntents: %v", err)
 		}
@@ -308,7 +322,7 @@ func TestIntegration_CancelWorkflow_ReadyToCancelled_ClosesOutstandingIntent(t *
 	// The outstanding ExecutionIntent START_WORKFLOW produced must now be
 	// durably closed — Runtime's claim query (status = 'PENDING') must
 	// never pick it up, per docs/domain/execution.md's invariants.
-	claims, err := app.Exec.ClaimDueIntents(ctx, fixtures.OrganizationID, 10, time.Minute, "integration-test-worker")
+	claims, err := app.Exec.ClaimDueIntents(ctx, app.Fixtures.Organization().OrganizationID, 10, time.Minute, "integration-test-worker")
 	if err != nil {
 		t.Fatalf("ClaimDueIntents: %v", err)
 	}
@@ -371,16 +385,16 @@ func TestIntegration_CancelWorkflow_NonInitiatorDenied(t *testing.T) {
 	w := &workflow.Workflow{
 		OrganizationID:        reg.Organization().OrganizationID,
 		WorkflowID:            uuid.New(),
-		Version:                1,
-		DefinitionID:           reg.WorkflowDefinition().DefinitionID,
-		DefinitionVersion:      reg.WorkflowDefinition().Version,
-		ObjectiveID:            reg.Objective().ObjectiveID,
-		State:                  workflow.StatePlanned,
-		InitiatingPrincipalID:  uuid.New(), // deliberately not the fixture trigger Principal
-		CorrelationID:          uuid.New(),
-		Inputs:                 map[string]any{"prompt": "owned by someone else"},
-		CreatedAt:              time.Now().UTC(),
-		UpdatedAt:              time.Now().UTC(),
+		Version:               1,
+		DefinitionID:          reg.WorkflowDefinition().DefinitionID,
+		DefinitionVersion:     reg.WorkflowDefinition().Version,
+		ObjectiveID:           reg.Objective().ObjectiveID,
+		State:                 workflow.StatePlanned,
+		InitiatingPrincipalID: uuid.New(), // deliberately not the fixture trigger Principal
+		CorrelationID:         uuid.New(),
+		Inputs:                map[string]any{"prompt": "owned by someone else"},
+		CreatedAt:             time.Now().UTC(),
+		UpdatedAt:             time.Now().UTC(),
 	}
 	if err := app.Repo.CreateWorkflow(ctx, w, nil, uuid.New()); err != nil {
 		t.Fatalf("seed CreateWorkflow: %v", err)
@@ -434,7 +448,7 @@ func startedReadyWorkflow(t *testing.T, app *Application) (workflowID uuid.UUID,
 		t.Fatalf("setup StartWorkflow outcome = %s (reasons: %v)", started.Outcome, started.Reasons)
 	}
 	t.Cleanup(func() {
-		_, _ = app.Exec.ClaimDueIntents(context.Background(), fixtures.OrganizationID, 10, time.Minute, "integration-test-cleanup")
+		_, _ = app.Exec.ClaimDueIntents(context.Background(), app.Fixtures.Organization().OrganizationID, 10, time.Minute, "integration-test-cleanup")
 	})
 	return workflowID, started.Workflow.Version
 }
@@ -634,7 +648,7 @@ func TestIntegration_AuthorizeDispatch_StaleWorkflowVersionDenied(t *testing.T) 
 	// through the DB.
 	staleIntent := workflow.ExecutionIntent{
 		IntentID:        uuid.New(),
-		OrganizationID:  fixtures.OrganizationID,
+		OrganizationID:  app.Fixtures.Organization().OrganizationID,
 		WorkflowID:      workflowID,
 		WorkflowVersion: version - 1,
 	}
@@ -643,7 +657,7 @@ func TestIntegration_AuthorizeDispatch_StaleWorkflowVersionDenied(t *testing.T) 
 	if err != nil {
 		t.Fatalf("AuthorizeDispatch: %v", err)
 	}
-	if decision.Outcome != policy.DecisionDeny {
+	if decision.Outcome != policy.DecisionDenied {
 		t.Fatalf("AuthorizeDispatch on a stale intent version outcome = %s, want DENY", decision.Outcome)
 	}
 	if decision.Reason == nil || *decision.Reason != "stale intent version" {
@@ -663,7 +677,7 @@ func TestIntegration_AuthorizeDispatch_CurrentVersionAllowed(t *testing.T) {
 
 	var claim *execution.ClaimedExecution
 	for attempt := 0; attempt < 30; attempt++ {
-		claims, err := app.Exec.ClaimDueIntents(ctx, fixtures.OrganizationID, 10, time.Minute, "integration-test-worker")
+		claims, err := app.Exec.ClaimDueIntents(ctx, app.Fixtures.Organization().OrganizationID, 10, time.Minute, "integration-test-worker")
 		if err != nil {
 			t.Fatalf("ClaimDueIntents: %v", err)
 		}
@@ -686,7 +700,7 @@ func TestIntegration_AuthorizeDispatch_CurrentVersionAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthorizeDispatch: %v", err)
 	}
-	if decision.Outcome != policy.DecisionAllow {
+	if decision.Outcome != policy.DecisionAutomatic {
 		t.Fatalf("AuthorizeDispatch on a current-version intent outcome = %s (reason: %v), want ALLOW", decision.Outcome, decision.Reason)
 	}
 }

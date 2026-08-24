@@ -25,18 +25,19 @@ import (
 // via governance.Request.ExcludedPrincipalID, not a Kernel legality check.
 func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, cmd command.KnowledgeApprovalCommandEnvelope, proposal command.GovernedCommandProposal, excludedPrincipalID uuid.UUID, approvalEvidence *governance.ApprovalEvidence) (policy.GovernanceDecision, Result, bool) {
 	decision, err := governance.Evaluate(ctx, governance.Request{
-		RequestID:            cmd.RequestID,
-		CorrelationID:        cmd.CorrelationID,
-		OrganizationID:       cmd.OrganizationID,
-		PrincipalID:          cmd.RequestingPrincipalID,
-		EvidencePresent:      true,
-		Action:               proposal.Action,
-		ResourceType:         proposal.ResourceType,
-		ResourceID:           proposal.ResourceID,
-		ProposalDigest:       proposal.ProposalDigest,
-		TrustedContextDigest: proposal.TrustedContextDigest,
-		ExcludedPrincipalID:  &excludedPrincipalID,
-		ApprovalEvidence:     approvalEvidence,
+		RequestID:               cmd.RequestID,
+		CorrelationID:           cmd.CorrelationID,
+		OrganizationID:          cmd.OrganizationID,
+		PrincipalID:             cmd.RequestingPrincipalID,
+		EvidencePresent:         true,
+		RequestingPrincipalKind: cmd.RequestingPrincipalKind,
+		Action:                  proposal.Action,
+		ResourceType:            proposal.ResourceType,
+		ResourceID:              proposal.ResourceID,
+		ProposalDigest:          proposal.ProposalDigest,
+		TrustedContextDigest:    proposal.TrustedContextDigest,
+		ExcludedPrincipalID:     &excludedPrincipalID,
+		ApprovalEvidence:        approvalEvidence,
 	})
 	if err != nil {
 		return decision, Result{Outcome: Unavailable, Reasons: []string{err.Error()}}, false
@@ -49,7 +50,7 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 	}
 
 	switch decision.Outcome {
-	case policy.DecisionDeny:
+	case policy.DecisionDenied:
 		return decision, Result{Outcome: Denied, Reasons: []string{command.ReasonGovernanceDenied}}, false
 
 	case policy.DecisionRequireApproval:
@@ -57,6 +58,8 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 		if err != nil {
 			return decision, Result{Outcome: Unavailable, Reasons: []string{err.Error()}}, false
 		}
+		now := time.Now().UTC()
+		expiresAt := now.Add(approvalTTL)
 		pc := &command.PendingCommand{
 			PendingCommandID:     uuid.New(),
 			OrganizationID:       cmd.OrganizationID,
@@ -68,7 +71,8 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 			RequestID:            cmd.RequestID,
 			IdempotencyKey:       cmd.IdempotencyKey,
 			CorrelationID:        cmd.CorrelationID,
-			CreatedAt:            time.Now().UTC(),
+			CreatedAt:            now,
+			ExpiresAt:            &expiresAt,
 		}
 		appr := &approval.Approval{
 			ApprovalID:            uuid.New(),
@@ -80,7 +84,7 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 			ResourceID:            proposal.ResourceID,
 			ProposalDigest:        proposal.ProposalDigest,
 			Status:                approval.StatusPending,
-			CreatedAt:             time.Now().UTC(),
+			CreatedAt:             now,
 		}
 		pc.ApprovalID = &appr.ApprovalID
 		if err := a.Pending.CreatePendingApproval(ctx, pc, decision.DecisionID, appr); err != nil {
@@ -88,7 +92,7 @@ func (a *Application) evaluateKnowledgeApprovalGovernance(ctx context.Context, c
 		}
 		return decision, Result{Outcome: ApprovalRequired, ApprovalID: &appr.ApprovalID}, false
 
-	default: // ALLOW
+	default: // AUTOMATIC or HUMAN_ONLY
 		return decision, Result{}, true
 	}
 }

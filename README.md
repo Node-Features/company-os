@@ -480,7 +480,7 @@ This keeps both humans and coding agents from loading unnecessary context.
 
 ## Roadmap
 
-CompanyOS has an approved architecture and a working first vertical slice — `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT/REJECT/CANCEL_WORKFLOW_RESULT` runs end to end against the real database and a real provider call, with live push updates over Supabase Realtime. The security and testing foundations (threat model, agent authority, tool security, workspace isolation, testing strategy, contract tests, failure injection) are also written and approved. Work is moving into governed execution, the adaptive-organization departments, and production readiness.
+CompanyOS has an approved architecture and a working first vertical slice — `CREATE_WORKFLOW → START_WORKFLOW → Runtime dispatch → ACCEPT/REJECT/CANCEL_WORKFLOW_RESULT` runs end to end against the real database and a real provider call, with live push updates over Supabase Realtime. The security and testing foundations, governed execution (Governance `DENY`/`REQUIRE_APPROVAL`, real Human authentication via Supabase Auth, real Organization/Principal persistence), the adaptive-organization departments (Research, Monitoring & Evaluation, Finance, and the Objective-proposal gate that connects their outputs back into governed action), and organizational knowledge (capturing, human-reviewed approval, and retrieval of durable claims derived from those departments' outputs) are all complete. Work is moving into engineering workspaces, the remaining departments, CI/CD growth, and production readiness.
 
 ### Phase 0 — Foundation
 
@@ -533,6 +533,8 @@ Execution / Wait
 Resume
 ```
 
+Phase 2 is complete — every governed Action passes through this pipeline for real, with a persisted `GovernanceDecision` for every outcome, real Human authentication, and real Organization/Principal persistence.
+
 ### Phase 3 — Adaptive organization
 
 ```text
@@ -547,7 +549,9 @@ Finance
 Research
 ```
 
-`ROADMAP.md` now tracks this in more granular phases (security/testing foundations, governed execution, adaptive organization, knowledge, engineering workspaces, remaining departments, CI/CD, and production deployment) than the three shown here — its Phase 2 (security/testing foundations, complete) and Phase 3 (governed execution) map to this section's "Phase 2" above; its Phase 4 (adaptive organization) maps to this section's "Phase 3." See the full **[ROADMAP.md](ROADMAP.md)** for the authoritative numbering.
+Phase 3 is complete — Research, Monitoring & Evaluation, and Finance all feed a governed Objective-proposal gate closing this loop. Organizational knowledge (`ROADMAP.md` Phase 5) is also complete: capturing, human-reviewing, and retrieving durable claims derived from these departments' outputs, not shown as its own diagram here.
+
+`ROADMAP.md` now tracks this in more granular phases (security/testing foundations, governed execution, adaptive organization, knowledge, engineering workspaces, remaining departments, CI/CD, and production deployment) than the three shown here — its Phase 2 (security/testing foundations, complete) and Phase 3 (governed execution, complete) map to this section's "Phase 2" above; its Phase 4 (adaptive organization, complete) and Phase 5 (organizational knowledge, complete) map to this section's "Phase 3." See the full **[ROADMAP.md](ROADMAP.md)** for the authoritative numbering.
 
 ---
 

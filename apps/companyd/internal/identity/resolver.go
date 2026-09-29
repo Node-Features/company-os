@@ -9,8 +9,7 @@ import (
 )
 
 // Resolver owns durable Principal resolution (docs/architecture/identity.md)
-// against the one real Organization (ROADMAP.md Phase 3 Slice 6 — a
-// single-organization deployment).
+// against the one real Organization — a single-organization deployment.
 type Resolver struct {
 	Principals     ports.PrincipalRepository
 	OrganizationID uuid.UUID
@@ -22,8 +21,7 @@ func NewResolver(principals ports.PrincipalRepository, organizationID uuid.UUID)
 
 // ResolveHuman resolves verified Human authentication evidence to a durable
 // Principal, creating it (and its PrincipalOrganizationBinding) on first
-// sign-in. Not consumed by Application this slice — see ROADMAP.md Phase 3
-// Slice 6's scope note.
+// sign-in. Not consumed by Application this slice.
 func (res *Resolver) ResolveHuman(ctx context.Context, evidence principal.AuthenticatedEvidence) (principal.Principal, error) {
 	return res.Principals.FindOrCreateHumanBinding(ctx, res.OrganizationID, evidence)
 }

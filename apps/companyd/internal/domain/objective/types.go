@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Status is the Objective lifecycle status. This slice (ROADMAP.md Phase 4
-// Slice 4, the creation gate) only ever writes StatusProposed — the
+// Status is the Objective lifecycle status. This slice (the creation gate)
+// only ever writes StatusProposed — the
 // APPROVED/ACTIVE/BLOCKED/COMPLETED/CANCELLED/SUPERSEDED transitions
 // docs/domain/objective.md's full lifecycle describes are future work, not
 // built here.

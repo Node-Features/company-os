@@ -42,9 +42,8 @@ type Evidence struct {
 // AuthenticatedEvidence is the normalized result of successfully verifying
 // external authentication evidence for a HumanPrincipal — this slice's
 // first real implementation of docs/architecture/identity.md's
-// AuthenticatedPrincipalEvidence (ROADMAP.md Phase 3 Slice 3), for the
-// Human flow only (Agent/Service/Provider flows are deferred, per the
-// roadmap's own scope note).
+// AuthenticatedPrincipalEvidence, for the Human flow only (Agent/Service/
+// Provider flows are deferred).
 //
 // Deliberately narrower than identity.md's full envelope: everything
 // below is a real, cryptographically verified field. Out of scope this
@@ -54,9 +53,8 @@ type Evidence struct {
 // nonce/replay-protection (no session/nonce infra yet); and durable
 // PrincipalID/PrincipalOrganizationBinding (no persisted Principal or
 // binding store exists at all — docs/domain/principal.md's
-// PrincipalOrganizationBinding has no table yet; ROADMAP.md Phase 3 Slice
-// 6 is the dedicated later slice for real Organization/Principal
-// persistence). This type's job ends at producing trustworthy, normalized
+// PrincipalOrganizationBinding has no table yet). This type's job ends at
+// producing trustworthy, normalized
 // claims — resolving Subject to a durable Principal is whichever later
 // slice has somewhere real to resolve it to.
 type AuthenticatedEvidence struct {

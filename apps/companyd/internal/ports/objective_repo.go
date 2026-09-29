@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ObjectiveRepository persists proposed Objectives (ROADMAP.md Phase 4
-// Slice 4). No compare-and-swap/version machinery — an Objective proposal
+// ObjectiveRepository persists proposed Objectives. No compare-and-swap/
+// version machinery — an Objective proposal
 // creates a brand new row, never transitions an existing one, so this
 // slice's flow is linear, the same reasoning ports.ResearchRepository's
 // doc comment gives.

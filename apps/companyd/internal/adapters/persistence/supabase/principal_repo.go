@@ -7,14 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// PrincipalRepository implements ports.PrincipalRepository.
 type PrincipalRepository struct{ p *Pool }
 
 func NewPrincipalRepository(p *Pool) *PrincipalRepository { return &PrincipalRepository{p: p} }
 
 // FindOrCreateHumanBinding resolves evidence's (Issuer, Subject) to a
-// durable HumanPrincipal bound to organizationID (ROADMAP.md Phase 3 Slice
-// 6's onboarding flow). The upsert's ON CONFLICT ... DO UPDATE SET
+// durable HumanPrincipal bound to organizationID. The upsert's
+// ON CONFLICT ... DO UPDATE SET
 // display_name = principals.display_name is a deliberate no-op — it exists
 // only so RETURNING fires and hands back the existing row on a replay,
 // without touching a display name the Principal might have acquired since

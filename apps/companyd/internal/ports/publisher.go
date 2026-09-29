@@ -15,8 +15,7 @@ import (
 // (the write side, already real), but no code anywhere reads that table,
 // calls Publish, or ever sets published_at — there is no stub, no-op or
 // otherwise, only an unread table today. internal/adapters/notify/realtime
-// is the intended home for a real implementation, deferred to ROADMAP.md
-// Phase 1 Slice 8.
+// is the intended home for a real implementation.
 //
 // This is not the "EventBus" that was asked for: docs/architecture/events.md
 // and docs/references/feature-provenance.md's JARVIS row both explicitly

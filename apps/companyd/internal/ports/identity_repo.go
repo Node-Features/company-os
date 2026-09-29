@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// OrganizationRepository reads the one real, persisted Organization
-// (ROADMAP.md Phase 3 Slice 6). GetOrganization returns ErrNotFound if no
+// OrganizationRepository reads the one real, persisted Organization.
+// GetOrganization returns ErrNotFound if no
 // row exists — companyd fails closed rather than silently falling back to
 // a hardcoded value.
 type OrganizationRepository interface {

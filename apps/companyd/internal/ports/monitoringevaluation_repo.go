@@ -7,8 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// MonitoringEvaluationRepository persists M&E's core contracts
-// (ROADMAP.md Phase 4 Slice 2).
+// MonitoringEvaluationRepository persists M&E's core contracts.
 type MonitoringEvaluationRepository interface {
 	RecordMetric(ctx context.Context, m *monitoringevaluation.Metric) error
 	GetMetricsByIDs(ctx context.Context, organizationID uuid.UUID, metricIDs []uuid.UUID) ([]monitoringevaluation.Metric, error)

@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ObjectiveRepository implements ports.ObjectiveRepository.
 type ObjectiveRepository struct{ p *Pool }
 
 func NewObjectiveRepository(p *Pool) *ObjectiveRepository {

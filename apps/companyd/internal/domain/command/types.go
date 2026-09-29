@@ -20,13 +20,12 @@ const (
 	AcceptWorkflowResult CommandType = "ACCEPT_WORKFLOW_RESULT"
 	RejectWorkflowResult CommandType = "REJECT_WORKFLOW_RESULT"
 	CancelWorkflow       CommandType = "CANCEL_WORKFLOW"
-	// ProposeObjective is ROADMAP.md Phase 4 Slice 4's Objective-creation
-	// gate command — not a Workflow command at all, but shares
-	// CommandType/PendingCommand/Approval since those are already generic.
+	// ProposeObjective is the Objective-creation gate command — not a
+	// Workflow command at all, but shares CommandType/PendingCommand/Approval
+	// since those are already generic.
 	ProposeObjective CommandType = "PROPOSE_OBJECTIVE"
-	// ApproveKnowledgeItem is ROADMAP.md Phase 5 Slice 2's knowledge.approve
-	// governed action — same reuse of CommandType/PendingCommand/Approval
-	// as ProposeObjective.
+	// ApproveKnowledgeItem is the knowledge.approve governed action — same
+	// reuse of CommandType/PendingCommand/Approval as ProposeObjective.
 	ApproveKnowledgeItem CommandType = "APPROVE_KNOWLEDGE_ITEM"
 )
 
@@ -75,8 +74,8 @@ type WorkflowCommandEnvelope struct {
 }
 
 // ObjectiveProposalCommandEnvelope is the transport-independent request to
-// propose an Objective (ROADMAP.md Phase 4 Slice 4) — deliberately not a
-// WorkflowCommandEnvelope: it has no WorkflowID/DefinitionID/version to
+// propose an Objective — deliberately not a WorkflowCommandEnvelope: it has
+// no WorkflowID/DefinitionID/version to
 // compare-and-write against, since an Objective proposal creates a brand
 // new, unversioned record rather than transitioning an existing one.
 type ObjectiveProposalCommandEnvelope struct {
@@ -106,8 +105,8 @@ type ObjectiveProposalCommandEnvelope struct {
 }
 
 // KnowledgeApprovalCommandEnvelope is the transport-independent request to
-// approve a KnowledgeItem candidate (ROADMAP.md Phase 5 Slice 2) —
-// deliberately not a WorkflowCommandEnvelope or ObjectiveProposalCommandEnvelope:
+// approve a KnowledgeItem candidate — deliberately not a
+// WorkflowCommandEnvelope or ObjectiveProposalCommandEnvelope:
 // it transitions an existing, already-versioned row rather than creating a
 // new one or a new version.
 type KnowledgeApprovalCommandEnvelope struct {

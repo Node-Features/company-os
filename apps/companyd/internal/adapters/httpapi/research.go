@@ -13,19 +13,19 @@ import (
 
 // departmentCommandResponse is the shared response shape for every
 // state-changing Research (docs/workflows/research-loop.md) and M&E
-// (ROADMAP.md Phase 4 Slice 2) endpoint, mirroring workflowCommandResponse's
-// role for Workflow endpoints.
+// endpoint, mirroring workflowCommandResponse's role for Workflow
+// endpoints.
 type departmentCommandResponse struct {
 	Outcome    string `json:"outcome"`
 	ResourceID string `json:"resourceId,omitempty"`
 	// ApprovalID is set only when Outcome is APPROVAL_REQUIRED — first
-	// exercised by ROADMAP.md Phase 4 Slice 4's ProposeObjective, whose
-	// policy always requires human approval; every prior department
-	// endpoint is AUTOMATIC-only and never sets it.
+	// exercised by ProposeObjective, whose policy always requires human
+	// approval; every prior department endpoint is AUTOMATIC-only and
+	// never sets it.
 	ApprovalID string `json:"approvalId,omitempty"`
 	// KnowledgeItemID is set only by PublishFinding, when its automatic
-	// Finding -> KnowledgeItem capture succeeds (ROADMAP.md Phase 5
-	// Slice 4) — every other department endpoint never sets it.
+	// Finding -> KnowledgeItem capture succeeds — every other department
+	// endpoint never sets it.
 	KnowledgeItemID string   `json:"knowledgeItemId,omitempty"`
 	RequestID       string   `json:"requestId"`
 	Reasons         []string `json:"reasons,omitempty"`

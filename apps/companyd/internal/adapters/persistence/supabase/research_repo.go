@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ResearchRepository implements ports.ResearchRepository.
 // See docs/workflows/research-loop.md.
 type ResearchRepository struct{ p *Pool }
 

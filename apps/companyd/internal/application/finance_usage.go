@@ -28,9 +28,9 @@ func outputInt(output map[string]any, key string) (int, bool) {
 	}
 }
 
-// RecordResourceUsage is the RECORD_RESOURCE_USAGE use case (ROADMAP.md
-// Phase 4 Slice 3): given a real completed Result, looks up the seeded
-// PriceProfile for its provider, reads its token usage, computes cost, and
+// RecordResourceUsage is the RECORD_RESOURCE_USAGE use case: given a real
+// completed Result, looks up the seeded PriceProfile for its provider,
+// reads its token usage, computes cost, and
 // persists a ResourceUsage record. Fails closed — an unknown provider or
 // missing token usage is Rejected, never priced at zero (finance.md:
 // "missing, stale, incompatible, or unverifiable pricing never defaults to

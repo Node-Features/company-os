@@ -28,7 +28,7 @@ See [System Context](docs/architecture/system-context.md) for actors, terminolog
 - **Knowledge:** governed organizational knowledge handling and reuse; see [Knowledge](docs/architecture/knowledge.md).
 - **Persistence:** authoritative durable state behind CompanyOS-owned transactional contracts.
 
-These responsibilities require further specification in [detailed architecture documents](docs/architecture/README.md). No concrete database, workflow engine, agent framework, model provider, coding-agent provider, or workspace provider is selected by this draft.
+These responsibilities require further specification in [detailed architecture documents](docs/architecture/README.md). No concrete database, workflow engine, agent framework, model provider, coding-agent provider, or workspace provider is selected by this document.
 
 ## Boundary invariants
 

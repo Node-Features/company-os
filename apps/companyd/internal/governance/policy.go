@@ -14,8 +14,8 @@ const PolicyVersion = "first-slice-v1"
 //
 // The research_agent/finance_agent rules below are ADR-0008's illustrative
 // role-to-action mapping, not a canonical department authority model —
-// docs/security/agent-authority.md (ROADMAP.md Phase 2 Slice 2) is where
-// that gets decided for real. transfer_funds is deliberately
+// docs/security/agent-authority.md is where that gets decided for real.
+// transfer_funds is deliberately
 // AutonomyApprovalRequired, not simply absent: "requires additional
 // authority" maps precisely onto REQUIRE_APPROVAL (eligible, but needs
 // Approval evidence this slice's requests never carry), which is more
@@ -28,29 +28,27 @@ var firstSlicePolicies = []policy.Rule{
 	{RuleID: "workflow-actions", Effect: policy.EffectPermit, ActionPrefix: "workflow.", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "capability-dispatch", Effect: policy.EffectPermit, Action: "capability.intelligence.dispatch", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 4 Slice 1's five Research use cases
-	// (docs/workflows/research-loop.md). Exact-Action entries, not a shared
-	// "research." prefix, so they don't overlap the pre-existing
-	// role-scoped illustrative research_agent rules below. AUTOMATIC per
-	// research-loop.md's scope boundary — research.md's own open question
-	// on which classes need human review is deliberately left unresolved,
-	// not answered here.
+	// The five Research use cases (docs/workflows/research-loop.md).
+	// Exact-Action entries, not a shared "research." prefix, so they don't
+	// overlap the pre-existing role-scoped illustrative research_agent
+	// rules below. AUTOMATIC per research-loop.md's scope boundary —
+	// research.md's own open question on which classes need human review
+	// is deliberately left unresolved, not answered here.
 	{RuleID: "research-signal-submit", Effect: policy.EffectPermit, Action: "research.signal.submit", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-question-open", Effect: policy.EffectPermit, Action: "research.question.open", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-evidence-record", Effect: policy.EffectPermit, Action: "research.evidence.record", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-finding-publish", Effect: policy.EffectPermit, Action: "research.finding.publish", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "research-recommendation-issue", Effect: policy.EffectPermit, Action: "research.recommendation.issue", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 4 Slice 2's two M&E use cases
-	// (docs/departments/monitoring-evaluation.md). AUTOMATIC per the same
-	// reasoning as Research's rules above — monitoring-evaluation.md's own
-	// open question on which outcomes need human/dual evaluation is
-	// deliberately left unresolved.
+	// The two M&E use cases (docs/departments/monitoring-evaluation.md).
+	// AUTOMATIC per the same reasoning as Research's rules above —
+	// monitoring-evaluation.md's own open question on which outcomes need
+	// human/dual evaluation is deliberately left unresolved.
 	{RuleID: "me-metric-record", Effect: policy.EffectPermit, Action: "me.metric.record", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "me-evaluation-run", Effect: policy.EffectPermit, Action: "me.evaluation.run", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 4 Slice 3's four Finance use cases
-	// (docs/departments/finance.md). Exact-Action entries, distinct from
+	// The four Finance use cases (docs/departments/finance.md).
+	// Exact-Action entries, distinct from
 	// the pre-existing illustrative finance_agent role-scoped rules below
 	// (finance.read_financial_data/.create_payment_request/.transfer_funds)
 	// — no overlap since matching here is exact-Action, not prefix.
@@ -62,8 +60,8 @@ var firstSlicePolicies = []policy.Rule{
 	{RuleID: "finance-usage-record", Effect: policy.EffectPermit, Action: "finance.usage.record", Autonomy: policy.AutonomyAutomatic},
 	{RuleID: "finance-evaluation-run", Effect: policy.EffectPermit, Action: "finance.evaluation.run", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 4 Slice 4's Objective-creation gate
-	// (docs/architecture/departments.md). Unconditional
+	// The Objective-creation gate (docs/architecture/departments.md).
+	// Unconditional
 	// AutonomyApprovalRequired — no resource-instance condition, same
 	// shape as "finance-agent-transfer-funds" below ("requires additional
 	// authority" maps precisely onto REQUIRE_APPROVAL). There is no
@@ -74,20 +72,17 @@ var firstSlicePolicies = []policy.Rule{
 	// created, per departments.md's Objective creation gate.
 	{RuleID: "objective-propose", Effect: policy.EffectPermit, Action: "objective.propose", Autonomy: policy.AutonomyApprovalRequired},
 
-	// ROADMAP.md Phase 5 Slice 1's KnowledgeItem ingestion/versioning use
-	// case (docs/architecture/knowledge.md steps 1-4). AUTOMATIC: capturing
+	// The KnowledgeItem ingestion/versioning use case
+	// (docs/architecture/knowledge.md steps 1-4). AUTOMATIC: capturing
 	// a DRAFT candidate is not approving Knowledge — knowledge.md is
 	// explicit that only knowledge.review/knowledge.approve (a later
 	// slice) needs human review.
 	{RuleID: "knowledge-item-capture", Effect: policy.EffectPermit, Action: "knowledge.item.capture", Autonomy: policy.AutonomyAutomatic},
 
-	// ROADMAP.md Phase 5 Slice 2's knowledge-review-request governed
-	// action — requesting that a KnowledgeItem candidate be reviewed.
-	// Renamed 2026-08-24 from "knowledge.approve"
-	// (docs/adr/ADR-0010-authority-model-formalization.md): the *request*
-	// (any principal may ask for review) and the *decide* act (only a
-	// human may actually approve/reject) are structurally different
-	// operations that were sharing one confusingly-named action. This rule
+	// The knowledge-review-request governed action — requesting that a
+	// KnowledgeItem candidate be reviewed. The *request* (any principal may
+	// ask for review) and the *decide* act (only a human may actually
+	// approve/reject) are structurally different operations. This rule
 	// governs only the request; the decide act is protected by
 	// ResolveApproval's unconditional human-decider check
 	// (internal/adapters/persistence/supabase/pending_repo.go), which

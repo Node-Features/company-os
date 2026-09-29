@@ -14,7 +14,7 @@ import (
 // IssueRecommendation is the ISSUE_RECOMMENDATION use case
 // (docs/workflows/research-loop.md). The Recommendation this produces is a
 // terminal artifact this slice — turning it into an Objective proposal is
-// ROADMAP.md Phase 4 Slice 4's job, not this one's.
+// ProposeObjective's job, not this one's.
 func (a *Application) IssueRecommendation(ctx context.Context, req IssueRecommendationRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID
 

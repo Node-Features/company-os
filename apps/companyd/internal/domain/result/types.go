@@ -18,10 +18,8 @@ const (
 	OutcomeIndeterminate Outcome = "INDETERMINATE"
 )
 
-// AcceptsResult reports whether this outcome drives ACCEPT_WORKFLOW_RESULT.
 func (o Outcome) AcceptsResult() bool { return o == OutcomeSucceeded }
 
-// RejectsResult reports whether this outcome drives REJECT_WORKFLOW_RESULT.
 // PARTIAL is treated as FAILED in this slice per docs/domain/workflow.md.
 func (o Outcome) RejectsResult() bool {
 	switch o {

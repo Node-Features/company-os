@@ -8,9 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// CreateBudget is the CREATE_BUDGET use case (ROADMAP.md Phase 4 Slice 3):
-// establishes one Budget for the one capability subject scope, caller-
-// supplied LimitAmount in USD.
+// CreateBudget is the CREATE_BUDGET use case: establishes one Budget for
+// the one capability subject scope, caller-supplied LimitAmount in USD.
 func (a *Application) CreateBudget(ctx context.Context, req CreateBudgetRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID
 	subjectID := a.Fixtures.Capability().CapabilityDefinitionID

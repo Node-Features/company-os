@@ -178,8 +178,6 @@ func TestAcceptWorkflowResult_ReadyToCompleted(t *testing.T) {
 func TestRejectWorkflowResult_FailedTimedOutPartialAllRejectToFailed(t *testing.T) {
 	for _, outcome := range []result.Outcome{result.OutcomeFailed, result.OutcomeTimedOut, result.OutcomePartial} {
 		t.Run(string(outcome), func(t *testing.T) {
-			reg := testReg()
-			_ = reg
 			current := workflow.Workflow{OrganizationID: uuid.New(), WorkflowID: uuid.New(), Version: 2, State: workflow.StateReady}
 			expected := current.Version
 			res := result.Result{ResultID: uuid.New(), WorkflowID: current.WorkflowID, Outcome: outcome}

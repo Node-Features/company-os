@@ -146,8 +146,8 @@ func main() {
 	var d *daemon.Daemon
 	if pool != nil {
 		// Boot stage 4b: adapter construction — Identity. companyd never
-		// trusts a client-asserted Principal (ROADMAP.md Phase 3 Slice 4):
-		// every governed route below requires a verified Supabase JWT. Fails
+		// trusts a client-asserted Principal: every governed route below
+		// requires a verified Supabase JWT. Fails
 		// soft like the database connection above — without SUPABASE_URL,
 		// companyd logs it and leaves the governed routes unmounted rather
 		// than starting in a state that can't actually authenticate anyone.
@@ -164,7 +164,7 @@ func main() {
 		}
 
 		// Boot stage 4c: adapter construction — Identity, Principal
-		// resolution (ROADMAP.md Phase 3 Slice 6). Loads the real, persisted
+		// resolution. Loads the real, persisted
 		// Organization instead of internal/fixtures.NewRegistry's Go
 		// literal, failing loudly (not falling back to the literal) if the
 		// migration's seed row is missing — same fail-closed shape as the
@@ -269,7 +269,7 @@ func main() {
 				mux.HandleFunc("GET /v1/workflows/{workflowId}", withAuth(httpapi.GetWorkflowHandler(app)))
 				mux.HandleFunc("POST /v1/approvals/{approvalId}/decide", withAuth(httpapi.ResolveApprovalHandler(app)))
 
-				// ROADMAP.md Phase 4 Slice 1 — docs/workflows/research-loop.md.
+				// See docs/workflows/research-loop.md.
 				mux.HandleFunc("POST /v1/research/signals", withAuth(httpapi.SubmitSignalHandler(app)))
 				mux.HandleFunc("POST /v1/research/signals/{signalId}/questions", withAuth(httpapi.OpenResearchQuestionHandler(app)))
 				mux.HandleFunc("POST /v1/research/questions/{questionId}/evidence", withAuth(httpapi.RecordEvidenceHandler(app)))
@@ -277,12 +277,12 @@ func main() {
 				mux.HandleFunc("POST /v1/research/findings/{findingId}/recommendations", withAuth(httpapi.IssueRecommendationHandler(app)))
 				mux.HandleFunc("GET /v1/research/questions/{questionId}", withAuth(httpapi.GetResearchQuestionHandler(app)))
 
-				// ROADMAP.md Phase 4 Slice 2 — docs/departments/monitoring-evaluation.md.
+				// See docs/departments/monitoring-evaluation.md.
 				mux.HandleFunc("POST /v1/me/results/{resultId}/metrics", withAuth(httpapi.RecordMetricHandler(app)))
 				mux.HandleFunc("POST /v1/me/evaluations", withAuth(httpapi.RunEvaluationHandler(app)))
 				mux.HandleFunc("GET /v1/me/subjects/{subjectId}/performance-profile", withAuth(httpapi.GetPerformanceProfileHandler(app)))
 
-				// ROADMAP.md Phase 4 Slice 3 — docs/departments/finance.md.
+				// See docs/departments/finance.md.
 				mux.HandleFunc("POST /v1/finance/budgets", withAuth(httpapi.CreateBudgetHandler(app)))
 				mux.HandleFunc("POST /v1/finance/constraints", withAuth(httpapi.CreateCostConstraintHandler(app)))
 				mux.HandleFunc("POST /v1/finance/results/{resultId}/usage", withAuth(httpapi.RecordResourceUsageHandler(app)))
@@ -290,7 +290,7 @@ func main() {
 				mux.HandleFunc("GET /v1/finance/constraint-status", withAuth(httpapi.GetConstraintStatusHandler(app)))
 				mux.HandleFunc("GET /v1/finance/evaluations/{evaluationId}", withAuth(httpapi.GetResourceEvaluationHandler(app)))
 
-				// ROADMAP.md Phase 4 Slice 4 — docs/architecture/departments.md's
+				// docs/architecture/departments.md's
 				// Objective creation gate. Approval resolution reuses the
 				// existing POST /v1/approvals/{approvalId}/decide route
 				// above unchanged — ResolveApproval's resume dispatch is
@@ -298,7 +298,7 @@ func main() {
 				mux.HandleFunc("POST /v1/objectives/propose", withAuth(httpapi.ProposeObjectiveHandler(app)))
 				mux.HandleFunc("GET /v1/objectives/{objectiveId}", withAuth(httpapi.GetObjectiveHandler(app)))
 
-				// ROADMAP.md Phase 5 Slice 1 — docs/architecture/knowledge.md's
+				// docs/architecture/knowledge.md's
 				// ingestion/versioning flow.
 				mux.HandleFunc("POST /v1/knowledge/items/capture", withAuth(httpapi.CaptureKnowledgeCandidateHandler(app)))
 				mux.HandleFunc("POST /v1/knowledge/items/{knowledgeItemId}/request-approval", withAuth(httpapi.RequestKnowledgeApprovalHandler(app)))

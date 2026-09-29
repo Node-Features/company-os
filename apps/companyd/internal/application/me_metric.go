@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// RecordMetric is the RECORD_METRIC use case (ROADMAP.md Phase 4 Slice 2):
-// computes this slice's one MetricDefinition ("did the Result succeed?")
+// RecordMetric is the RECORD_METRIC use case: computes this slice's one
+// MetricDefinition ("did the Result succeed?")
 // from an existing result.Result and persists it.
 func (a *Application) RecordMetric(ctx context.Context, req RecordMetricRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID

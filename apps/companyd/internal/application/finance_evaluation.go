@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// RunResourceEvaluation is the RUN_RESOURCE_EVALUATION use case
-// (ROADMAP.md Phase 4 Slice 3): sums the subject's ResourceUsage into a
-// total cost and effective cost per successful result — failed/retried
+// RunResourceEvaluation is the RUN_RESOURCE_EVALUATION use case: sums the
+// subject's ResourceUsage into a total cost and effective cost per
+// successful result — failed/retried
 // attempts are included, per finance.md's "must not count only successful
 // calls" invariant — records budget variance if a Budget exists, and reads
 // M&E's PerformanceProfile (Phase 4 Slice 2) for the same subject as

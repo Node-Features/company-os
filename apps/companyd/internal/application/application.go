@@ -33,19 +33,18 @@ type Application struct {
 	Fixtures fixtures.Registry
 	Notify   chan<- uuid.UUID
 	// Research persists the Research department's core contracts
-	// (ROADMAP.md Phase 4 Slice 1, docs/workflows/research-loop.md).
+	// (docs/workflows/research-loop.md).
 	Research ports.ResearchRepository
-	// MonitoringEvaluation persists M&E's core contracts (ROADMAP.md Phase
-	// 4 Slice 2, docs/departments/monitoring-evaluation.md).
+	// MonitoringEvaluation persists M&E's core contracts
+	// (docs/departments/monitoring-evaluation.md).
 	MonitoringEvaluation ports.MonitoringEvaluationRepository
-	// Finance persists Finance's core contracts (ROADMAP.md Phase 4 Slice
-	// 3, docs/departments/finance.md).
+	// Finance persists Finance's core contracts (docs/departments/finance.md).
 	Finance ports.FinanceRepository
-	// Objective persists proposed Objectives (ROADMAP.md Phase 4 Slice 4,
-	// docs/architecture/departments.md's Objective creation gate).
+	// Objective persists proposed Objectives
+	// (docs/architecture/departments.md's Objective creation gate).
 	Objective ports.ObjectiveRepository
-	// Knowledge persists KnowledgeItem versions (ROADMAP.md Phase 5 Slice 1,
-	// docs/architecture/knowledge.md's ingestion/versioning flow).
+	// Knowledge persists KnowledgeItem versions
+	// (docs/architecture/knowledge.md's ingestion/versioning flow).
 	Knowledge ports.KnowledgeRepository
 	// Metrics is an optional operational-metrics sink
 	// (docs/architecture/observability.md). A nil Metrics is never an

@@ -12,8 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// PublishFinding is the PUBLISH_FINDING use case
-// (docs/workflows/research-loop.md).
 func (a *Application) PublishFinding(ctx context.Context, req PublishFindingRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID
 
@@ -66,13 +64,10 @@ func (a *Application) PublishFinding(ctx context.Context, req PublishFindingRequ
 		return Result{Outcome: Unavailable, Reasons: []string{err.Error()}}
 	}
 
-	// ROADMAP.md Phase 5 Slice 4: a published Finding automatically
-	// proposes a KnowledgeItem candidate — end-to-end wiring from Research
-	// output to Knowledge's ingestion path (Phase 5 Slice 1). This is a
-	// derived side effect, never authoritative for the Finding itself: if
-	// capture doesn't succeed, PublishFinding still reports Accepted (the
-	// Finding is already real, committed domain data), just with a note in
-	// Reasons rather than a silently swallowed failure.
+	// Capture is a derived side effect, never authoritative for the Finding
+	// itself: if capture doesn't succeed, PublishFinding still reports
+	// Accepted (the Finding is already real, committed domain data), just
+	// with a note in Reasons rather than a silently swallowed failure.
 	result := Result{Outcome: Accepted, ResourceID: &findingID}
 	capture := a.CaptureKnowledgeCandidate(ctx, CaptureKnowledgeCandidateRequest{
 		RequestID:   uuid.New(),

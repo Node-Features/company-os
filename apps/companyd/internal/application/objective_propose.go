@@ -48,8 +48,8 @@ func (a *Application) validateSourceExists(ctx context.Context, orgID uuid.UUID,
 	}
 }
 
-// ProposeObjective is the PROPOSE_OBJECTIVE use case (ROADMAP.md Phase 4
-// Slice 4, docs/architecture/departments.md's Objective creation gate): a
+// ProposeObjective is the PROPOSE_OBJECTIVE use case
+// (docs/architecture/departments.md's Objective creation gate): a
 // Finding, Recommendation, Evaluation, or ResourceEvaluation may propose an
 // Objective, never create one directly. governance/policy.go's
 // "objective-propose" rule is unconditional AutonomyApprovalRequired, so

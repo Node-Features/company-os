@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// RunEvaluation is the RUN_EVALUATION use case (ROADMAP.md Phase 4 Slice 2):
-// classifies a set of Metrics into PASS/FAIL/INCONCLUSIVE and upserts the
+// RunEvaluation is the RUN_EVALUATION use case: classifies a set of
+// Metrics into PASS/FAIL/INCONCLUSIVE and upserts the
 // subject's PerformanceProfile with the result.
 func (a *Application) RunEvaluation(ctx context.Context, req RunEvaluationRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID

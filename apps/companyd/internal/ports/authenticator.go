@@ -12,9 +12,9 @@ import (
 // Authenticator verifies external authentication evidence and normalizes
 // it into principal.AuthenticatedEvidence — one adapter per Principal
 // type/method (docs/architecture/identity.md). This slice defines only
-// the Human flow (ROADMAP.md Phase 3 Slice 3's scope note); Agent/
-// Service/Provider authenticators are future work, added as their own
-// methods here when they exist rather than a single overloaded one.
+// the Human flow; Agent/Service/Provider authenticators are future work,
+// added as their own methods here when they exist rather than a single
+// overloaded one.
 //
 // A non-nil error is always one of the sentinels below (or wraps one) —
 // never a partial/ambiguous AuthenticatedEvidence. identity.md:

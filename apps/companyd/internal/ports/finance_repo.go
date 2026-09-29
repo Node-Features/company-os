@@ -7,8 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// FinanceRepository persists Finance's core contracts (ROADMAP.md Phase 4
-// Slice 3).
+// FinanceRepository persists Finance's core contracts.
 type FinanceRepository interface {
 	CreateBudget(ctx context.Context, b *finance.Budget) error
 	GetBudgetBySubject(ctx context.Context, organizationID, subjectID uuid.UUID) (finance.Budget, error)

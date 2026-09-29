@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// evaluateKnowledgeApprovalGovernance is ROADMAP.md Phase 5 Slice 2's
-// governance helper — structurally a near-duplicate of
+// evaluateKnowledgeApprovalGovernance is a governance helper —
+// structurally a near-duplicate of
 // objective_governance.go's evaluateObjectiveProposalGovernance, typed on
 // KnowledgeApprovalCommandEnvelope instead of ObjectiveProposalCommandEnvelope.
 // Not a generalization of it: same reasoning objective_governance.go

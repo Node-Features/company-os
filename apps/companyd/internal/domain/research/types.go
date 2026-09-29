@@ -90,8 +90,7 @@ const (
 
 // Recommendation is a proposed course of action linked to a Finding. It is
 // neither authorization nor an Objective (research.md invariant) — turning
-// one into an Objective proposal is ROADMAP.md Phase 4 Slice 4's job, not
-// built here.
+// one into an Objective proposal is a different concern, not built here.
 type Recommendation struct {
 	RecommendationID uuid.UUID
 	OrganizationID   uuid.UUID

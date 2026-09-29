@@ -30,13 +30,12 @@ type Result struct {
 	// state alone).
 	ApprovalID *uuid.UUID
 	// ResourceID is the created/referenced resource's identity for
-	// non-Workflow use cases (ROADMAP.md Phase 4 Slice 1's Research
-	// use cases) — e.g. a new Signal/ResearchQuestion/Finding/
-	// Recommendation ID. Workflow use cases keep using Workflow instead.
+	// non-Workflow use cases (e.g. a new Signal/ResearchQuestion/Finding/
+	// Recommendation ID). Workflow use cases keep using Workflow instead.
 	ResourceID *uuid.UUID
 	// KnowledgeItemID is set only by PublishFinding, when its automatic
-	// Finding -> KnowledgeItem capture (ROADMAP.md Phase 5 Slice 4)
-	// succeeds — the ID of the freshly captured DRAFT candidate, so the
+	// Finding -> KnowledgeItem capture succeeds — the ID of the freshly
+	// captured DRAFT candidate, so the
 	// caller doesn't need a separate lookup. Nil if capture didn't produce
 	// one; that never changes PublishFinding's own Accepted outcome, since
 	// capture is a derived side effect of the Finding, not part of its own

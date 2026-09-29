@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// FinanceRepository implements ports.FinanceRepository.
 type FinanceRepository struct{ p *Pool }
 
 func NewFinanceRepository(p *Pool) *FinanceRepository {

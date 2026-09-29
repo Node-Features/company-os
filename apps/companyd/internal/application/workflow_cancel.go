@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// cancelAutonomyRequirement is ROADMAP.md Phase 3 Slice 2's concrete,
-// HTTP-reachable REQUIRE_APPROVAL trigger: cancelling a Workflow that's
+// cancelAutonomyRequirement is a concrete, HTTP-reachable
+// REQUIRE_APPROVAL trigger: cancelling a Workflow that's
 // already READY (dispatched, possibly mid-provider-call) needs a human's
 // sign-off; cancelling a PLANNED one (nothing dispatched yet) stays
 // automatic. Shared by the original request (CancelWorkflow) and the
@@ -38,9 +38,9 @@ func cancelAutonomyRequirement(state workflow.State) *policy.AutonomyLevel {
 // evaluateGovernance as the resource owner, so a non-initiator's request
 // is DENIED before FinalizeCancel ever runs, per governance.md's
 // invariant that no governed action reaches an executor without a
-// current persisted ALLOW decision (ROADMAP.md Phase 3 Slice 1).
+// current persisted ALLOW decision.
 // Cancelling a READY Workflow additionally requires human approval
-// (cancelAutonomyRequirement, ROADMAP.md Phase 3 Slice 2) — the caller
+// (cancelAutonomyRequirement) — the caller
 // gets ApprovalRequired with an ApprovalID to resolve via
 // Application.ResolveApproval rather than an immediate CANCELLED. See
 // docs/domain/workflow.md#first-slice-commands-and-legal-transitions.

@@ -2,8 +2,8 @@ package application
 
 import "github.com/google/uuid"
 
-// Finance ApplicationRequests (ROADMAP.md Phase 4 Slice 3). Like
-// Research's and M&E's requests, each carries an explicit PrincipalID —
+// Finance ApplicationRequests. Like Research's and M&E's requests,
+// each carries an explicit PrincipalID —
 // the real authenticated, resolved Principal the HTTP handler read from
 // context, not a fixtures.Registry stand-in.
 

@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// evaluateObjectiveProposalGovernance is ROADMAP.md Phase 4 Slice 4's
-// governance helper — structurally a near-duplicate of pipeline.go's
+// evaluateObjectiveProposalGovernance is a governance helper —
+// structurally a near-duplicate of pipeline.go's
 // evaluateGovernance, but typed on ObjectiveProposalCommandEnvelope
 // instead of WorkflowCommandEnvelope. Not a generalization of
 // evaluateGovernance: that function reads cmd.RequestID/OrganizationID/etc.

@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// KnowledgeRepository implements ports.KnowledgeRepository.
 type KnowledgeRepository struct{ p *Pool }
 
 func NewKnowledgeRepository(p *Pool) *KnowledgeRepository {

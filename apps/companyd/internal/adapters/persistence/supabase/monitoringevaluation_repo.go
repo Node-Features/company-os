@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// MonitoringEvaluationRepository implements ports.MonitoringEvaluationRepository.
 type MonitoringEvaluationRepository struct{ p *Pool }
 
 func NewMonitoringEvaluationRepository(p *Pool) *MonitoringEvaluationRepository {

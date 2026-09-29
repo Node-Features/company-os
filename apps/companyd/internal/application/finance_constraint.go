@@ -11,11 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// CreateCostConstraint is the CREATE_COST_CONSTRAINT use case (ROADMAP.md
-// Phase 4 Slice 3): looks up the subject's Budget and creates one ADVISORY
-// CostConstraint with MaxCost = Budget.LimitAmount. ADVISORY only, always —
-// hard enforcement would mean gating Runtime dispatch, out of scope this
-// slice.
+// CreateCostConstraint is the CREATE_COST_CONSTRAINT use case: looks up the
+// subject's Budget and creates one ADVISORY CostConstraint with MaxCost =
+// Budget.LimitAmount. ADVISORY only, always — hard enforcement would mean
+// gating Runtime dispatch, out of scope this slice.
 func (a *Application) CreateCostConstraint(ctx context.Context, req CreateCostConstraintRequest) Result {
 	orgID := a.Fixtures.Organization().OrganizationID
 	subjectID := a.Fixtures.Capability().CapabilityDefinitionID

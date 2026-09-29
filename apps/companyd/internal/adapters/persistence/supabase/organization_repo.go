@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// OrganizationRepository implements ports.OrganizationRepository.
 type OrganizationRepository struct{ p *Pool }
 
 func NewOrganizationRepository(p *Pool) *OrganizationRepository { return &OrganizationRepository{p: p} }

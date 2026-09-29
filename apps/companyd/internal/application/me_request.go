@@ -2,8 +2,8 @@ package application
 
 import "github.com/google/uuid"
 
-// M&E ApplicationRequests (ROADMAP.md Phase 4 Slice 2). Like Research's
-// requests, each carries an explicit PrincipalID — the real authenticated,
+// M&E ApplicationRequests. Like Research's requests, each carries an
+// explicit PrincipalID — the real authenticated,
 // resolved Principal the HTTP handler read from context, not a
 // fixtures.Registry stand-in.
 

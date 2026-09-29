@@ -16,8 +16,7 @@ type evidenceContextKey struct{}
 
 // EvidenceFromContext returns the AuthenticatedEvidence RequireHumanAuth
 // verified for this request, if any. Not consumed by Application this
-// slice (ROADMAP.md Phase 3 Slice 4's scope note) — available here for
-// logging/future slices.
+// slice — available here for logging/future slices.
 func EvidenceFromContext(ctx context.Context) (principal.AuthenticatedEvidence, bool) {
 	ev, ok := ctx.Value(evidenceContextKey{}).(principal.AuthenticatedEvidence)
 	return ev, ok
@@ -26,8 +25,8 @@ func EvidenceFromContext(ctx context.Context) (principal.AuthenticatedEvidence, 
 // RequireHumanAuth wraps next so it only runs once rawToken from the
 // request's "Authorization: Bearer <token>" header has been verified by
 // authn. Every governed HTTP route uses this — companyd never trusts a
-// client-asserted Principal (docs/architecture/identity.md,
-// ROADMAP.md Phase 3 Slice 4). Verified evidence is attached to the
+// client-asserted Principal (docs/architecture/identity.md).
+// Verified evidence is attached to the
 // request context for next via EvidenceFromContext; Application's choice
 // of acting Principal is unchanged this slice (still fixtures.Registry).
 func RequireHumanAuth(authn ports.Authenticator, next http.HandlerFunc) http.HandlerFunc {

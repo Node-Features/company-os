@@ -71,8 +71,8 @@ type Request struct {
 	// knowledge.md's knowledge.approve step 6: "require independence from
 	// authorship") as a real Governance-layer authorization check, not a
 	// Kernel legality one — same precedent as ResourceOwnerPrincipalID
-	// moving CancelWorkflow's ownership check out of Kernel (ROADMAP.md
-	// Phase 3 Slice 1). Nil means this action carries no exclusion.
+	// moving CancelWorkflow's ownership check out of Kernel. Nil means this
+	// action carries no exclusion.
 	ExcludedPrincipalID *uuid.UUID
 	// AdditionalAutonomyRequirement, when non-nil, is a resource-instance
 	// autonomy requirement the caller resolved from trusted Context (e.g.
@@ -132,7 +132,7 @@ func moreRestrictive(a, b policy.AutonomyLevel) policy.AutonomyLevel {
 //     concept) — what a Role may do is fully expressed by which Action
 //     rules match it.
 //   - Evaluate Authority: evidence presence stands in for steps 1-2 (real
-//     identity verification is ROADMAP.md Phase 3 Slice 3 work);
+//     identity verification is future work);
 //     ResourceOwnerPrincipalID/ExcludedPrincipalID implement step 3's
 //     per-resource Authority/Constraints check for actions that declare
 //     one; matchRule's default-deny match is step 4.

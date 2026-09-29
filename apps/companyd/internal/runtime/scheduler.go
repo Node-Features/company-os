@@ -12,8 +12,7 @@ import "context"
 // ExecutionIntent with a due_at time and Application persists it —
 // Scheduler only discovers and dispatches intents that are already due and
 // already durable. It has no Cancel method either: nothing in this
-// codebase can cancel a pending or in-flight ExecutionIntent yet
-// (ROADMAP.md Phase 1 Slice 6, CANCEL_WORKFLOW, is not implemented) —
+// codebase can cancel a pending or in-flight ExecutionIntent yet —
 // adding one here would document a capability that does not exist. "Status"
 // is likewise not a Scheduler-level query today; the closest existing thing
 // is ports.ExecutionRepository.GetLatestResult, queried directly.

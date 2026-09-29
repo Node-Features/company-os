@@ -1,6 +1,6 @@
-// Package objective is the Objective department's Kernel-equivalent
-// (ROADMAP.md Phase 4 Slice 4): pure state-legality functions only, no I/O
-// — the same role internal/kernel/workflow plays for Workflow. See
+// Package objective is the Objective department's Kernel-equivalent:
+// pure state-legality functions only, no I/O — the same role
+// internal/kernel/workflow plays for Workflow. See
 // docs/architecture/kernel.md: "Kernel owns legal transitions, not
 // authorization."
 package objective

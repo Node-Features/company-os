@@ -35,7 +35,6 @@ var legalTransitions = map[AttemptStatus][]AttemptStatus{
 	StatusWaiting: {StatusDispatched, StatusCancelled, StatusLeaseExpired},
 }
 
-// CanTransitionTo reports whether next is a legal transition from s.
 func (s AttemptStatus) CanTransitionTo(next AttemptStatus) bool {
 	for _, n := range legalTransitions[s] {
 		if n == next {
@@ -45,7 +44,6 @@ func (s AttemptStatus) CanTransitionTo(next AttemptStatus) bool {
 	return false
 }
 
-// IsTerminal reports whether no further transition is legal from s.
 func (s AttemptStatus) IsTerminal() bool {
 	return len(legalTransitions[s]) == 0
 }

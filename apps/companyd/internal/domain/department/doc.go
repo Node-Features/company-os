@@ -6,6 +6,5 @@
 // today is three independent, hand-duplicated package sets —
 // internal/domain/{research,monitoringevaluation,finance} plus
 // internal/departments/{research,monitoringevaluation,finance} — with no
-// shared registry or base type binding them together (ROADMAP.md Phase 11
-// Slice 0 is the first slice that would build one).
+// shared registry or base type binding them together.
 package department

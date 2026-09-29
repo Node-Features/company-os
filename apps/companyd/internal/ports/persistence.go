@@ -198,8 +198,7 @@ type ExecutionRepository interface {
 }
 
 // PendingCommandRepository persists a REQUIRE_APPROVAL command and its
-// Approval, and resolves a human decision against it (ROADMAP.md Phase 3
-// Slice 2).
+// Approval, and resolves a human decision against it.
 type PendingCommandRepository interface {
 	CreatePendingApproval(ctx context.Context, pc *command.PendingCommand, decisionID uuid.UUID, appr *approval.Approval) error
 

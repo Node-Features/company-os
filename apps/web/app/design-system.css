@@ -1,0 +1,210 @@
+/*
+ * Product UI design tokens, matching the project owner's approved mockup
+ * (docs/architecture/ui-ux.md's re-approved "Visual direction", the design
+ * canvas ported verbatim for tokens/animation/component look). Deliberately
+ * separate from globals.css, which still styles the Phase 1 Workflow
+ * console pieces reused inside this shell.
+ */
+
+:root {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.19 0 0);
+  --card-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.75 0.15 205);
+  --primary-foreground: oklch(0.12 0 0);
+  --primary-glow: oklch(0.75 0.15 205 / 0.45);
+  --magenta: oklch(0.7 0.19 340);
+  --magenta-glow: oklch(0.7 0.19 340 / 0.25);
+  --secondary: oklch(0.27 0 0);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.24 0 0);
+  --muted-foreground: oklch(0.66 0 0);
+  --accent: oklch(0.27 0 0);
+  --accent-foreground: oklch(0.97 0 0);
+  --destructive: oklch(0.65 0.2 25);
+  --success: oklch(0.7 0.16 145);
+  --warning: oklch(0.78 0.14 85);
+  --violet: oklch(0.72 0.17 300);
+  --border: oklch(1 0 0 / 10%);
+  --radius: 10px;
+}
+
+.ds-root {
+  font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ds-mono {
+  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+}
+
+button.ds-reset {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--primary-glow);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@keyframes growBar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes dsShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.rise {
+  animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card-hover {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 24px var(--primary-glow);
+  border-color: oklch(0.75 0.15 205 / 0.35);
+}
+
+.navbtn {
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.btn {
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.18s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.glow-num {
+  text-shadow: 0 0 18px var(--primary-glow);
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary), 0 0 2px var(--primary);
+  animation: pulseGlow 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.brand-glow {
+  text-shadow: 0 0 22px var(--primary-glow), 0 0 46px var(--magenta-glow);
+}
+
+.bar {
+  transform-origin: bottom;
+  animation: growBar 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.node {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.node:hover {
+  transform: translateY(-1px);
+}
+
+.subtab {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ds-skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--muted) 0%, oklch(0.28 0 0) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: dsShimmer 1.4s ease-in-out infinite;
+}
+
+.ds-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ds-error {
+  padding: 14px 16px;
+  border: 1px solid oklch(0.65 0.2 25 / 35%);
+  border-radius: var(--radius);
+  color: var(--destructive);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ds-disclosure-detail {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--muted);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--primary);
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .card-hover,
+  .btn,
+  .live-dot,
+  .bar,
+  .node,
+  .ds-skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Node-Features/company-os/apps/companyd/internal/application"
 	objdomain "github.com/Node-Features/company-os/apps/companyd/internal/domain/objective"
@@ -79,5 +81,55 @@ func GetObjectiveHandler(app *application.Application) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(obj)
+	}
+}
+
+// ListObjectivesHandler handles GET /v1/objectives. Query params: statuses
+// (comma-separated, e.g. "PROPOSED,RETIRED"; omitted means every status),
+// limit, offset (real page-based pagination). See application.ListObjectives's
+// doc comment: this can only ever return already-approved proposals (a
+// pending or rejected proposal has no Objective row) — a UI listing
+// "Decisions" still needs the Approvals list for pending/rejected ones.
+func ListObjectivesHandler(app *application.Application) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var statuses []objdomain.Status
+		if raw := r.URL.Query().Get("statuses"); raw != "" {
+			for _, s := range strings.Split(raw, ",") {
+				statuses = append(statuses, objdomain.Status(strings.TrimSpace(s)))
+			}
+		}
+		limit := 0
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid limit")
+				return
+			}
+			limit = n
+		}
+		offset := 0
+		if raw := r.URL.Query().Get("offset"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 0 {
+				writeError(w, http.StatusBadRequest, "invalid offset")
+				return
+			}
+			offset = n
+		}
+
+		objectives, err := app.ListObjectives(r.Context(), statuses, limit, offset)
+		if err != nil {
+			if errors.Is(err, application.ErrInvalidObjectiveStatus) {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		if objectives == nil {
+			objectives = []objdomain.Objective{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(objectives)
 	}
 }

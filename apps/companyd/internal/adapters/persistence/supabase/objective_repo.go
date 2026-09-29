@@ -69,6 +69,53 @@ func (r *ObjectiveRepository) GetObjectiveBySource(ctx context.Context, organiza
 		organizationID, sourceType, sourceID)
 }
 
+// ListObjectives — see ports.ObjectiveRepository.ListObjectives's doc
+// comment for why this can only ever return already-approved proposals. No
+// DISTINCT ON/versioning needed (unlike KnowledgeRepository.QueryItems) —
+// an Objective is one row, never re-versioned.
+func (r *ObjectiveRepository) ListObjectives(ctx context.Context, organizationID uuid.UUID, statuses []objective.Status, limit, offset int) ([]objective.Objective, error) {
+	statusStrings := make([]string, len(statuses))
+	for i, s := range statuses {
+		statusStrings[i] = string(s)
+	}
+
+	var rows pgx.Rows
+	var err error
+	if len(statusStrings) == 0 {
+		rows, err = r.p.pool.Query(ctx, `
+			SELECT objective_id, organization_id, title, intent, status, owner_principal_id,
+			       source_type, source_id, governance_decision_id, approval_id, created_at
+			FROM objectives WHERE organization_id=$1
+			ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+			organizationID, limit, offset)
+	} else {
+		rows, err = r.p.pool.Query(ctx, `
+			SELECT objective_id, organization_id, title, intent, status, owner_principal_id,
+			       source_type, source_id, governance_decision_id, approval_id, created_at
+			FROM objectives WHERE organization_id=$1 AND status = ANY($2::text[])
+			ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+			organizationID, statusStrings, limit, offset)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var objectives []objective.Objective
+	for rows.Next() {
+		var o objective.Objective
+		var status, sourceType string
+		if err := rows.Scan(&o.ObjectiveID, &o.OrganizationID, &o.Title, &o.Intent, &status, &o.OwnerPrincipalID,
+			&sourceType, &o.SourceID, &o.GovernanceDecisionID, &o.ApprovalID, &o.CreatedAt); err != nil {
+			return nil, err
+		}
+		o.Status = objective.Status(status)
+		o.SourceType = objective.SourceType(sourceType)
+		objectives = append(objectives, o)
+	}
+	return objectives, rows.Err()
+}
+
 func (r *ObjectiveRepository) get(ctx context.Context, query string, args ...any) (objective.Objective, error) {
 	var o objective.Objective
 	var status, sourceType string

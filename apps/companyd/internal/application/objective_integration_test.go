@@ -240,3 +240,97 @@ func TestIntegration_ProposeObjective_RecommendationSourceAndUnknownSourceReject
 		t.Fatalf("ProposeObjective with an unknown RecommendationID outcome = %s, want REJECTED", unknown.Outcome)
 	}
 }
+
+// approveObjective proposes-and-approves one Objective from a fresh
+// EVALUATION source and returns its ID — a shared helper for
+// TestIntegration_ListObjectives_* below, which only care about having a
+// real, approved Objective row to list, not about the proposal pipeline
+// itself (already covered above).
+func approveObjective(t *testing.T, app *Application, principalID uuid.UUID, title string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	sourceID := makeEvaluationSource(t, app, principalID)
+	propose := app.ProposeObjective(ctx, ProposeObjectiveRequest{
+		RequestID: uuid.New(), PrincipalID: principalID,
+		SourceType: objdomain.SourceEvaluation, SourceID: sourceID,
+		Title: title, Intent: "objective for ListObjectives test",
+	})
+	if propose.Outcome != ApprovalRequired || propose.ApprovalID == nil {
+		t.Fatalf("ProposeObjective outcome = %s (reasons: %v)", propose.Outcome, propose.Reasons)
+	}
+	resolve := app.ResolveApproval(ctx, ResolveApprovalRequest{ApprovalID: *propose.ApprovalID, Approve: true, DecidingPrincipal: app.Fixtures.ApproverPrincipal()})
+	if resolve.Outcome != Accepted || resolve.ResourceID == nil {
+		t.Fatalf("ResolveApproval(approve) outcome = %s (reasons: %v)", resolve.Outcome, resolve.Reasons)
+	}
+	return *resolve.ResourceID
+}
+
+// TestIntegration_ListObjectives_ReturnsCreatedObjectives proves the happy
+// path: every approved Objective in this test's (fresh, isolated) org comes
+// back from ListObjectives, most recently created first, and nothing from
+// another test's org leaks in — the same org-isolation convention every
+// other real-database Application test in this package relies on.
+func TestIntegration_ListObjectives_ReturnsCreatedObjectives(t *testing.T) {
+	app := requireRealApp(t)
+	principalID := uuid.New()
+
+	first := approveObjective(t, app, principalID, "First objective")
+	second := approveObjective(t, app, principalID, "Second objective")
+
+	got, err := app.ListObjectives(context.Background(), nil, 0, 0)
+	if err != nil {
+		t.Fatalf("ListObjectives: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("ListObjectives returned %d objectives, want 2", len(got))
+	}
+	if got[0].ObjectiveID != second || got[1].ObjectiveID != first {
+		t.Fatalf("ListObjectives order = [%s, %s], want most-recently-created first [%s, %s]", got[0].ObjectiveID, got[1].ObjectiveID, second, first)
+	}
+	for _, o := range got {
+		if o.Status != objdomain.StatusProposed {
+			t.Fatalf("Objective %s Status = %s, want PROPOSED (the only status CreateObjective ever writes)", o.ObjectiveID, o.Status)
+		}
+	}
+}
+
+// TestIntegration_ListObjectives_StatusFilterExcludesNonMatching proves the
+// statuses filter actually filters — every real Objective in this org is
+// PROPOSED (CreateObjective never writes APPROVED/RETIRED, per
+// ports.ObjectiveRepository.ListObjectives's doc comment), so filtering for
+// RETIRED must return none, and filtering for PROPOSED must return the one
+// created here.
+func TestIntegration_ListObjectives_StatusFilterExcludesNonMatching(t *testing.T) {
+	app := requireRealApp(t)
+	principalID := uuid.New()
+	_ = approveObjective(t, app, principalID, "Status-filter objective")
+
+	none, err := app.ListObjectives(context.Background(), []objdomain.Status{objdomain.StatusRetired}, 0, 0)
+	if err != nil {
+		t.Fatalf("ListObjectives(RETIRED): %v", err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("ListObjectives(RETIRED) returned %d objectives, want 0", len(none))
+	}
+
+	proposed, err := app.ListObjectives(context.Background(), []objdomain.Status{objdomain.StatusProposed}, 0, 0)
+	if err != nil {
+		t.Fatalf("ListObjectives(PROPOSED): %v", err)
+	}
+	if len(proposed) != 1 {
+		t.Fatalf("ListObjectives(PROPOSED) returned %d objectives, want 1", len(proposed))
+	}
+}
+
+// TestListObjectives_InvalidStatusRejected needs no real database — the
+// status-validation loop runs before ListObjectives ever touches
+// a.Fixtures or a.Objective, so a zero-value Application is sufficient,
+// same reasoning kernel-level validation tests use for not needing a real
+// app.
+func TestListObjectives_InvalidStatusRejected(t *testing.T) {
+	app := &Application{}
+	_, err := app.ListObjectives(context.Background(), []objdomain.Status{"NOT_A_REAL_STATUS"}, 0, 0)
+	if !errors.Is(err, ErrInvalidObjectiveStatus) {
+		t.Fatalf("ListObjectives with an invalid status: err = %v, want ErrInvalidObjectiveStatus", err)
+	}
+}

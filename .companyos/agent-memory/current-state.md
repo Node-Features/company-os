@@ -1,9 +1,29 @@
 # Current State
 
-- **Last updated:** 2026-08-25
+- **Last updated:** 2026-09-29
 - **Current phase:** Phase 1, Phase 2, and Phase 3 (governed execution, Slices 1-6) are all complete. Phase 4 (adaptive organization) is fully complete (Slices 0-4, all landed 2026-08-23). **Phase 5 (Organizational knowledge) is now fully complete (Slices 1-4, all landed 2026-08-23).**
 - **Architecture approver:** Project owner (`Node-Features`)
-- **Next task:** Phase 6 (Engineering: Workspaces + CodingAgentRuntime), Phase 7 (remaining departments), Phase 8 (CI/CD growth), and Phase 9 (production deployment) remain unstarted and available as alternatives — the project owner hasn't chosen one yet. **New 2026-08-23:** `ROADMAP.md` Phases 10 (Product UI surface), 11 (Agent workforce), and 12 (Performance/messaging infrastructure) were added and fully doc-gated: `docs/architecture/ui-ux.md`, `docs/adr/ADR-0009-caching-and-agent-messaging-infrastructure.md`, and `docs/domain/agent.md` (reopened for a display-avatar addition) are all now `APPROVED` — Phase 10 Slice 0, Phase 12 Slice 0 checked off. No implementation has started against any of Phases 10-12 yet; the doc-gate work is what happened, not the build-out. One unresolved item remains — see the `governance.md` `knowledge.approve` autonomy-classification finding below, still awaiting the project owner's decision.
+- **Next task:** Phase 6 (Engineering: Workspaces + CodingAgentRuntime), Phase 7 (remaining departments), Phase 8 (CI/CD growth), and Phase 9 (production deployment) remain unstarted and available as alternatives — the project owner hasn't chosen one yet. **New 2026-08-23:** `ROADMAP.md` Phases 10 (Product UI surface), 11 (Agent workforce), and 12 (Performance/messaging infrastructure) were added and fully doc-gated: `docs/architecture/ui-ux.md`, `docs/adr/ADR-0009-caching-and-agent-messaging-infrastructure.md`, and `docs/domain/agent.md` (reopened for a display-avatar addition) are all now `APPROVED` — Phase 10 Slice 0, Phase 12 Slice 0 checked off. **Update 2026-09-29:** `ui-ux.md` was reopened for a visual-direction/screen-inventory revision (see below), re-approved the same day, and Phase 10 Slice 1 UI (Approval inbox) has now landed — implementation against Phase 10 has started. One unresolved item remains — see the `governance.md` `knowledge.approve` autonomy-classification finding below, still awaiting the project owner's decision.
+
+Phase 10 — re-approval of `docs/architecture/ui-ux.md` (2026-09-29) and Slice 1 UI (Approval inbox). The doc had been reopened the same day after a design-mockup review replaced the cyberpunk direction with a clean, dark, `shadcn-ui`-token-based direction and substantially expanded the screen inventory (see the doc's own revision note and the new `docs/ux/` directory, still `DRAFT`/awaiting separate review — it elaborates `ui-ux.md`, doesn't gate independently). Re-approved this session at the project owner's explicit direction ("approve now, then start building"), unblocking `ROADMAP.md` Phase 10 Slice 0.
+
+**Later the same day (2026-09-29): `apps/web` was deleted entirely at the project owner's explicit request** ("delete all UI feature and code existing currently" → confirmed scope "all of apps/web's UI"), then **rebuilt from scratch** ported pixel-for-pixel from the project owner's own design canvas (a claude.ai Design-type artifact — an interactive mockup they'd reviewed/iterated on directly, the same one `ui-ux.md`'s revision note already referenced). Restored the pre-existing tracked scaffold (`package.json`, `tsconfig.json`, login flow, Supabase plumbing, `WorkflowTrigger`/`WorkflowExecutionTree`) via `git checkout HEAD -- apps/web` rather than rewriting it from memory, then layered the new design on top.
+
+Built: the full design-system foundation ported from the mockup's exact `oklch` tokens/animations (`app/design-system.css`, `lib/ui-styles.ts`), a real `AppShell` (async server component with live pending-Approval/Decision badge counts, the full 13-item grouped sidebar + topbar from the mockup), and one route per nav item. Given a real tension between "port the exact design" and `ui-ux.md` invariant 7 ("never mock/illustrative data in the shipped product") — the mockup's own numbers (Jordan Diaz, "5 active research," a workflow table, achievements) are illustrative and several of its screens have no backing list endpoint in companyd — the project owner chose **real data only, honest empty/soon states** over a full illustrative-data visual pass. Consequently: Overview, Approvals, Decisions (combines `GET /v1/objectives` + `GET /v1/approvals?status=PENDING,REJECTED` per the Decisions caveat), Budget (the one real organization-wide `ConstraintStatusView` — **not** the mockup's per-department table, since `GetConstraintStatus` takes no subject argument and no per-department endpoint exists), and Knowledge library are wired to real endpoints; Workflows keeps the real Phase 1 create/start/cancel/watch-one flow (no list-all-workflows endpoint exists for the mockup's table); Research, Monitoring & Evaluation, and the Insights graph honestly show "nothing to trace yet" (both need a specific question/subject id with no discovery endpoint); Departments, People, and Activity log honestly show "on the way" (no backing infrastructure at all yet); Settings is a grouped IA shell with every item marked `SOON`, per `ui-ux.md`'s own explicit allowance for that pattern.
+
+Recovered a real incident along the way: `apps/web/.env.local` (untracked, holding the Supabase anon key) was permanently destroyed by the earlier `rm -rf` and could not be recovered from git. `SUPABASE_URL` was recoverable from `apps/companyd/.env` (a different, server-only file), but the anon/publishable key had to come from the project owner directly — they initially pasted a `sb_publishable_...` key, then a legacy `anon` JWT for the same project (used instead, since the pinned `@supabase/ssr@^0.12.4` more reliably supports the classic format), then their `service_role` key, which was **declined and not written to `apps/web`** — a full-admin, RLS-bypassing secret has no place in an app whose env vars are all `NEXT_PUBLIC_*` (browser-exposed); it already lives correctly, server-only, in `apps/companyd/.env`.
+
+Verified: `go build ./...` (companyd, unaffected), `npm run build`/`npm run lint` clean in `apps/web` (22 routes compiled). Live: booted both servers with the real `.env.local` — `/login` renders `200` with real content (not the earlier Supabase-client crash from the missing env file), and all 13 real nav routes (`/`, `/approvals`, `/decisions`, `/budget`, `/knowledge`, `/workflows`, `/research`, `/me`, `/graph`, `/activity`, `/departments`, `/people`, `/settings`) correctly redirect an unauthenticated browser through to `/login`. Did not click through the authenticated flow itself — no test account exists in this environment, same limitation every prior UI session has recorded.
+
+Not in scope this pass, explicitly: Knowledge's `DRAFT`/review queue (library-browse only); Research/M&E/Insights-graph real data (blocked on missing list-by-org endpoints, not built here); Activity log/Departments/People (blocked on missing backend entirely); Settings forms (shell only, no persistence exists); Slice 8's Workflow-thread visual rework (left as Phase 1's original look, deliberately).
+
+Built the design-system foundation `docs/ux/ui-implementation-plan.md` calls for before any screen (`apps/web/app/design-system.css`: the approved `oklch` tokens, dark-only; `apps/web/components/ui/{Button,Card,StatusBadge,StatusDot,ProgressBar,PageHeader,StatCard,NavItem,PlainLanguageDisclosure}.tsx`), then Slice 1's real screen: `apps/web/app/approvals/page.tsx` + `ApprovalsList`/`ApprovalCard`, wired to the already-landed `GET /v1/approvals`/`POST /v1/approvals/{id}/decide` endpoints through a new `AppShell` sidebar (`components/AppShell.tsx`, `lib/companyd-client.ts`'s new `listApprovals`, a new `app/api/approvals/route.ts` proxy). `WorkflowTrigger.tsx`/`WorkflowExecutionTree.tsx` and `globals.css`'s cyberpunk classes are deliberately untouched — Slice 8's rework, not this one's; `app/page.tsx` only gained the new `AppShell`/`PageHeader` wrapper around the unchanged Workflow console.
+
+Key honesty call: the domain has no human-readable title for a Workflow/Objective/KnowledgeItem, so `lib/governance-copy.ts`'s plain-language Approval summaries name the *kind* of governed action truthfully (e.g. "Cancel a running workflow...") rather than fabricating a resource title the backend can't back — the specific resource id stays behind the `PlainLanguageDisclosure` technical-detail toggle. `Approval`'s TS type mirrors the real Go struct's field casing exactly (`ApprovalID`, `Action`, etc. — PascalCase, since `internal/domain/approval.Approval` has no `json` tags).
+
+Verified: `go build ./...` (companyd, unaffected by this slice but confirmed against its own uncommitted in-flight changes), `npm run build`/`npm run lint` clean in `apps/web` (one `react-hooks/set-state-in-effect` lint finding on the fetch-on-mount pattern, fixed with a targeted disable comment and a code comment explaining why it's a false positive for this case). Live: booted both `companyd` and `apps/web` locally — `GET /health` → `200`, unauthenticated `GET /v1/approvals` → `401`; `/` and `/approvals` both correctly redirect an unauthenticated browser to `/login` (the existing `proxy.ts` gate covers the new route with no changes needed). Did not click through the authenticated Approve/Decline flow itself — same limitation Phase 3 Slice 4 already recorded: this is a sign-in-only app with no self-serve signup, and no test account exists in this environment.
+
+Not in scope this slice, explicitly: Slices 2–8 (Knowledge library/review, Research/Decisions/M&E/Finance dashboards, Activity log, Objective authoring, Policy admin, provider registration, Workflow thread rework) and the `docs/ux/` directory's own separate review/approval, which remains open.
 
 Housekeeping note (2026-08-23, start of this session): Phase 3 (all 6 slices) and Phase 4 (all 5 slices) had been implemented in a prior session but left uncommitted in the working tree — ~110 modified/new files. Committed as a single commit (`faf2fd9`) before starting Phase 5, since the changes to shared files (`governance/policy.go`, `application/application.go`, `main.go`, etc.) were threaded through both phases incrementally and couldn't be cleanly split by hunk into separate phase commits.
 
@@ -300,3 +320,93 @@ Verified: `go build`/`go vet`/`gofmt` clean (one pre-existing violation in `fina
 **Not yet done, recommended next** (see the approved plan for the full backlog): `gap-approval-flow-durability.md`'s two remaining documented-and-deferred idempotency crash windows (combine `SaveGovernanceDecision`+`CreatePendingApproval` into one transaction; fix `AuthorizeDispatch`'s swallowed `SaveGovernanceDecision` errors); `gap-knowledge-source-uniqueness.md`; remaining `backlog-p2-p4.md` P2 items (`ScheduleRetry` status guard, `ErrConflict` consistency in `execution_repo.go`). None of A-Q's 17 acceptance-criteria areas beyond what's listed above were touched this session — most were already MET with existing evidence (see the plan's inspection table), not newly built.
 
 **Nothing committed to git yet** as of this entry — check `git status` before assuming any of this session's work is landed on a branch.
+
+## 2026-09-29 — Resumption session: hardening-milestone wrap-up + UI/UX design pass
+
+Resumed after a real-world pause (project owner working on an unrelated project). Repository
+forensics found `main` had moved past the above entries via three uncommitted-at-the-time audit
+commits (`bcaaa45`, `4143b53`, `4b6ea60`) plus an in-progress, uncommitted working tree continuing
+the hardening milestone's failure-injection matrix. Verified `go build`/`go vet`/all non-DB unit
+tests clean; the Supabase dev project was found paused (free-tier auto-pause) — project owner
+restored it. Real-database verification then hit transient pooler instability for a few retries
+right after the restore (connection-handshake stalls, not query hangs — confirmed via a one-off
+`pg_stat_activity`/`pg_locks` diagnostic showing no server-side blocking), which cleared on its
+own; `internal/daemon`'s new shutdown test and `internal/runtime`'s two new failure-matrix tests
+all passed once stable. Committed as two scoped commits: `fb6249b` (completes the runtime
+failure-injection matrix — DB-failure-during-commit and real-provider-timeout scenarios, plus a
+`Daemon.Shutdown` bounded-drain test, closing out `docs/testing/failure-injection.md`'s 9-scenario
+matrix) and `4d3a213` (mechanical cleanup — stale inline `ROADMAP.md Phase X Slice Y` citations
+removed from Go doc comments across ~50 files, `README.md`'s Roadmap section pointed at
+`ROADMAP.md` instead of duplicating it, `docs/reference-implementations/` deleted per an
+already-recorded open question). `internal/application`'s full real-database suite still needs a
+clean confirming run once the pooler is fully settled — not blocking, unrelated to what landed.
+
+**Separate, larger thread — Phase 10 UI/UX design work (mockup only, no `apps/web` code changed).**
+Project owner asked to start designing the real product UI. Built an interactive design-canvas
+mockup (Claude Artifact, private to the project owner — not part of this repository) through
+several rounds: an initial app-shell redesign of the existing Workflow console; a full pivot away
+from the cyberpunk direction after the project owner found it "not usable... should be a company
+management system" — restyled using tokens/patterns pulled from the project owner's separate
+`KNAUF` project (Inter, shadcn-ui-shaped dark tokens, restrained color); a large IA expansion
+(Research timeline, Decisions with full traceability, an Insights graph, Monitoring & Evaluation,
+Budget, Activity log, a grouped Settings shell) explicitly mapped onto real CompanyOS domain types
+rather than invented concepts (Discovery=`Finding`, Insight=`Recommendation`, Decision=`Objective`,
+Outcome=`Result`); a redesign of the Insights graph specifically from a horizontally-scrolling row
+of cards into a vertical causal chain with real ancestor/descendant trace highlighting, a detail
+panel, and type filter chips, after the project owner supplied a detailed critique.
+
+Followed through on the doc-gate discipline this repo has used for every prior UI decision:
+**reopened `docs/architecture/ui-ux.md` from `APPROVED` to `DRAFT`** (2026-09-29) and rewrote its
+"Visual direction" section and screen inventory to match what the project owner actually approved
+in the mockup, rather than leaving the canonical doc silently stale against a decision made in a
+side channel. Flagged one real, important gap surfaced while writing the doc update, not smoothed
+over: the Insights graph's chain only has genuine backing data through **Decision**
+(`Objective.SourceType`/`SourceID` really does link back to its Finding/Recommendation/Evaluation)
+— **Decision→Action→Outcome→Evaluation is not modeled anywhere in the domain today** (no field
+links an `Objective` to a `Workflow`, nor a `Result`/`Evaluation` back to the `Objective` it
+satisfies). New invariant 9 in `ui-ux.md` states screens must not imply a relationship the domain
+doesn't establish; a new `OPEN QUESTION` defers deciding how (or whether) to add those links to a
+separate design pass before Phase 10 Slice 3 renders the graph past Decision. Also updated
+`docs/architecture/README.md`'s index row and `ROADMAP.md` Phase 10's intro/Slice 0/Slice 3/Slice 4
+to match — Slice 0 is back to `[ ]` pending project-owner re-approval, same reopen-then-reapprove
+pattern `agent.md`'s avatar addition used earlier. No implementation started against Phase 10;
+this is doc-and-mockup work only, consistent with this repo's two-gate convention.
+
+**Follow-up, same day — two real backend slices landed** after the project owner picked between
+three options for closing the Decisions-list gap `docs/ux/ui-implementation-plan.md` flagged
+(build `GET /v1/objectives`; piggyback on the Approvals list; or descope to pending-only) and chose
+to build the real endpoint. `GET /v1/objectives` (list, filterable by status, newest-first) was
+added mirroring `QueryKnowledge`'s existing retrieval-contract pattern exactly — new
+`ports.ObjectiveRepository.ListObjectives`, its Supabase implementation, `Application.ListObjectives`
+(with `ErrInvalidObjectiveStatus`), and the HTTP handler, wired into `main.go` before the existing
+`GET /v1/objectives/{objectiveId}` route (no path collision, same precedent Knowledge's Slice 3
+established). While implementing, reading `objective_propose.go` confirmed a real, important
+limitation not previously documented anywhere: `CreateObjective` is only ever called from
+`resumeProposeObjective` (the approve-resume path) — a pending or rejected proposal never creates
+an `Objective` row at all (reject falls through to the generic no-op `default` case every
+`CommandType` but `ApproveKnowledgeItem` gets). So `ListObjectives` can only ever return
+already-*approved* Decisions. Surfaced this immediately rather than let the endpoint look like a
+complete solution, which led the project owner to also authorize building **`GET /v1/approvals`**
+(Phase 10 Slice 1's own already-planned endpoint) in the same pass — same pattern, defaults to
+`PENDING`-only (an inbox, oldest-first ordering, the opposite of `ListObjectives`'/`QueryKnowledge`'s
+newest-first history ordering), generalized to accept any status so it also serves Decisions'
+pending/declined half. New `ports.PendingCommandRepository.ListApprovals`, Supabase implementation,
+`Application.ListApprovals` (`ErrInvalidApprovalStatus`), HTTP handler, wired before the existing
+`POST /v1/approvals/{approvalId}/decide` route. The pre-existing `fakePending` test double
+(`fake_repo_test.go`, used by `pipeline_test.go`'s concurrency tests) needed the new method added
+to keep satisfying `ports.PendingCommandRepository` — a one-line no-op, since those tests never
+reach `REQUIRE_APPROVAL`.
+
+Verified: `go build`/`go vet` clean. Six new real-database integration tests, all passing
+(`TestIntegration_ListObjectives_ReturnsCreatedObjectives`, `..._StatusFilterExcludesNonMatching`,
+`TestIntegration_ListApprovals_DefaultsToPending`, `..._StatusFilterAndOrdering`, plus two
+no-DB-needed validation tests for the invalid-status sentinels) — the ordering test in particular
+proves oldest-first for Approvals against newest-first for Objectives is real, not accidental. Full
+existing `ProposeObjective`/`ResolveApproval` suite re-run alongside them with no regressions. Live:
+booted `companyd`, both new routes mount and correctly return `401` unauthenticated, `/health`
+unaffected. `docs/architecture/ui-ux.md`'s screen-inventory table, `docs/ux/data-ui-mapping.md`,
+`docs/ux/screen-inventory.md`, `docs/ux/ui-implementation-plan.md`, and `ROADMAP.md` Phase 10
+Slices 1/3 were all updated to reflect these endpoints existing and to document the
+Objective-row-only-on-approval limitation precisely, rather than leaving the earlier
+`BLOCKED`/gap framing stale. **Nothing committed yet** — same as the UI/UX documentation work
+above, this is sitting in the working tree pending the project owner's go-ahead.

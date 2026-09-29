@@ -153,3 +153,47 @@ func (r *PendingCommandRepository) ResolveApproval(ctx context.Context, approval
 	}
 	return &pc, &appr, nil
 }
+
+// ListApprovals — see ports.PendingCommandRepository.ListApprovals's doc
+// comment for the oldest-first ordering rationale (an inbox, not a history
+// view). No FOR UPDATE here — unlike ResolveApproval, a list read never
+// decides anything, so there's nothing to lock.
+func (r *PendingCommandRepository) ListApprovals(ctx context.Context, organizationID uuid.UUID, statuses []approval.Status, limit, offset int) ([]approval.Approval, error) {
+	statusStrings := make([]string, len(statuses))
+	for i, s := range statuses {
+		statusStrings[i] = string(s)
+	}
+
+	var rows pgx.Rows
+	var err error
+	if len(statusStrings) == 0 {
+		rows, err = r.p.pool.Query(ctx, `
+			SELECT approval_id, organization_id, pending_command_id, requesting_principal_id, action,
+			       resource_type, resource_id, proposal_digest, status, decided_by_principal_id, decided_at, reason, created_at
+			FROM approvals WHERE organization_id=$1
+			ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+			organizationID, limit, offset)
+	} else {
+		rows, err = r.p.pool.Query(ctx, `
+			SELECT approval_id, organization_id, pending_command_id, requesting_principal_id, action,
+			       resource_type, resource_id, proposal_digest, status, decided_by_principal_id, decided_at, reason, created_at
+			FROM approvals WHERE organization_id=$1 AND status = ANY($2::text[])
+			ORDER BY created_at ASC LIMIT $3 OFFSET $4`,
+			organizationID, statusStrings, limit, offset)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var approvals []approval.Approval
+	for rows.Next() {
+		var appr approval.Approval
+		if err := rows.Scan(&appr.ApprovalID, &appr.OrganizationID, &appr.PendingCommandID, &appr.RequestingPrincipalID, &appr.Action,
+			&appr.ResourceType, &appr.ResourceID, &appr.ProposalDigest, &appr.Status, &appr.DecidedByPrincipalID, &appr.DecidedAt, &appr.Reason, &appr.CreatedAt); err != nil {
+			return nil, err
+		}
+		approvals = append(approvals, appr)
+	}
+	return approvals, rows.Err()
+}

@@ -226,4 +226,12 @@ type PendingCommandRepository interface {
 	// access to Kind without a second lookup — the caller already has the
 	// full Principal value (today always fixtures.Registry.ApproverPrincipal()).
 	ResolveApproval(ctx context.Context, approvalID uuid.UUID, decidingPrincipal principal.Principal, approve bool, reason *string) (*command.PendingCommand, *approval.Approval, error)
+
+	// ListApprovals returns every Approval matching statuses (empty means
+	// every status), oldest first — an inbox reads oldest-first so the
+	// longest-waiting item surfaces first, the opposite ordering from
+	// ListObjectives'/QueryKnowledge's newest-first history views. Capped
+	// at limit, starting after offset rows — real page-based pagination
+	// (ROADMAP.md Phase 10), not a client-side slice of one big fetch.
+	ListApprovals(ctx context.Context, organizationID uuid.UUID, statuses []approval.Status, limit, offset int) ([]approval.Approval, error)
 }

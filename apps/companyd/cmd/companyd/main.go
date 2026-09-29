@@ -267,6 +267,7 @@ func main() {
 				mux.HandleFunc("POST /v1/workflows/{workflowId}/results/reject", withAuth(httpapi.RejectResultHandler(app)))
 				mux.HandleFunc("POST /v1/workflows/{workflowId}/cancel", withAuth(httpapi.CancelWorkflowHandler(app)))
 				mux.HandleFunc("GET /v1/workflows/{workflowId}", withAuth(httpapi.GetWorkflowHandler(app)))
+				mux.HandleFunc("GET /v1/approvals", withAuth(httpapi.ListApprovalsHandler(app)))
 				mux.HandleFunc("POST /v1/approvals/{approvalId}/decide", withAuth(httpapi.ResolveApprovalHandler(app)))
 
 				// See docs/workflows/research-loop.md.
@@ -296,6 +297,7 @@ func main() {
 				// above unchanged — ResolveApproval's resume dispatch is
 				// already generic by CommandType.
 				mux.HandleFunc("POST /v1/objectives/propose", withAuth(httpapi.ProposeObjectiveHandler(app)))
+				mux.HandleFunc("GET /v1/objectives", withAuth(httpapi.ListObjectivesHandler(app)))
 				mux.HandleFunc("GET /v1/objectives/{objectiveId}", withAuth(httpapi.GetObjectiveHandler(app)))
 
 				// docs/architecture/knowledge.md's

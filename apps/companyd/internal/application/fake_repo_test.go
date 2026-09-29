@@ -241,3 +241,7 @@ func (fakePending) CreatePendingApproval(context.Context, *command.PendingComman
 func (fakePending) ResolveApproval(context.Context, uuid.UUID, principal.Principal, bool, *string) (*command.PendingCommand, *approval.Approval, error) {
 	return nil, nil, ports.ErrConflict
 }
+
+func (fakePending) ListApprovals(context.Context, uuid.UUID, []approval.Status, int, int) ([]approval.Approval, error) {
+	return nil, nil
+}

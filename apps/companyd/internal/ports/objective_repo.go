@@ -29,4 +29,13 @@ type ObjectiveRepository interface {
 	// — ErrNotFound means no Objective has been proposed from this exact
 	// source yet.
 	GetObjectiveBySource(ctx context.Context, organizationID uuid.UUID, sourceType objective.SourceType, sourceID uuid.UUID) (objective.Objective, error)
+
+	// ListObjectives returns every Objective matching statuses (empty means
+	// every status), most recently created first, capped at limit. An
+	// Objective row only ever exists once a proposal is approved (see
+	// application.resumeProposeObjective — CreateObjective is only called
+	// from the REQUIRE_APPROVAL resume-approve path; a rejected proposal
+	// never creates a row), so this can never surface a pending or rejected
+	// proposal — those exist only as Approval records, not Objectives.
+	ListObjectives(ctx context.Context, organizationID uuid.UUID, statuses []objective.Status, limit, offset int) ([]objective.Objective, error)
 }

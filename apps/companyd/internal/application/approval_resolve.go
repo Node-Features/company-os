@@ -90,6 +90,51 @@ func (a *Application) ResolveApproval(ctx context.Context, req ResolveApprovalRe
 	}
 }
 
+const (
+	defaultApprovalListLimit = 50
+	maxApprovalListLimit     = 200
+)
+
+var validApprovalStatuses = map[approval.Status]bool{
+	approval.StatusPending:   true,
+	approval.StatusApproved:  true,
+	approval.StatusConsumed:  true,
+	approval.StatusRejected:  true,
+	approval.StatusExpired:   true,
+	approval.StatusCancelled: true,
+	approval.StatusRevoked:   true,
+}
+
+// ErrInvalidApprovalStatus is ListApprovals's one validation sentinel —
+// matching ListObjectives'/QueryKnowledge's (value, error) read convention.
+var ErrInvalidApprovalStatus = errors.New("invalid status in approval list query")
+
+// ListApprovals is served by GET /v1/approvals — Phase 10 Slice 1's
+// list-pending endpoint, generalized to any status. Deliberately takes no
+// PrincipalID, matching every other read in this codebase (GetObjective,
+// ListObjectives, QueryKnowledge) — no per-Principal query authority exists
+// yet. Defaults to PENDING-only when no statuses are given, since "what
+// needs a decision right now" is this endpoint's primary purpose (an
+// inbox); pass explicit statuses to see resolved history instead.
+func (a *Application) ListApprovals(ctx context.Context, statuses []approval.Status, limit, offset int) ([]approval.Approval, error) {
+	for _, s := range statuses {
+		if !validApprovalStatuses[s] {
+			return nil, ErrInvalidApprovalStatus
+		}
+	}
+	if len(statuses) == 0 {
+		statuses = []approval.Status{approval.StatusPending}
+	}
+	if limit <= 0 || limit > maxApprovalListLimit {
+		limit = defaultApprovalListLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	orgID := a.Fixtures.Organization().OrganizationID
+	return a.Pending.ListApprovals(ctx, orgID, statuses, limit, offset)
+}
+
 // resumeCancelWorkflow replays the exact original CANCEL_WORKFLOW command
 // envelope now that Approval evidence exists. It deliberately does not
 // call a.store: pc.GovernedPayload's IdempotencyKey was already correctly

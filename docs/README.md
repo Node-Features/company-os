@@ -14,3 +14,4 @@ This directory indexes CompanyOS documentation without duplicating its canonical
 | [Testing](testing/README.md) | Testing and failure-validation strategy | APPROVED | Read when designing validation or implementation tests. |
 | [Features](features/README.md) | Significant feature documentation | NOT YET SPECIFIED | Read when planning or delivering a significant feature. |
 | [Audit](audit/README.md) | Architecture-reality findings and remediation gap docs | APPROVED | Read when scoping a P0/P1 remediation slice, or investigating a known implementation gap. |
+| [UX & product design](ux/README.md) | Product/UX-process layer: personas, IA, screen specs, design system, flows, implementation plan | DRAFT | Read before any Phase 10 UI implementation work; defers to `architecture/ui-ux.md` on screen-inventory/visual-direction decisions. |

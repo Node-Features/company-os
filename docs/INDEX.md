@@ -9,6 +9,7 @@ Use this map to load the smallest sufficient context for a task. Summaries route
 | Domain | Relevant files in [`domain/`](domain/README.md) | [Domain summary](../.companyos/agent-memory/domain-summary.md), relevant accepted ADRs | Unrelated architecture details and features |
 | Architectural decision | [`ARCHITECTURE.md`](../ARCHITECTURE.md), relevant files in [`adr/`](adr/README.md) | [Decision index](../.companyos/agent-memory/decisions.md), relevant references | Unrelated ADRs and features |
 | Feature | Relevant feature directory in [`features/`](features/README.md), affected canonical documents | [Feature index](../.companyos/agent-memory/feature-index.json), relevant references and ADRs | Unaffected features and reference studies |
+| UI/UX or product design | [`architecture/ui-ux.md`](architecture/ui-ux.md) (canonical screen inventory/visual direction), relevant files in [`ux/`](ux/README.md) | Other `ux/` documents not directly relevant to the task | Unrelated screens' detail in `screen-inventory.md` |
 | Reference research | Relevant files in [`references/`](references/README.md) | Architecture or domain owner affected by the research | Unrelated reference projects |
 | Status update | [Current state](../.companyos/agent-memory/current-state.md) | Changed canonical documents and accepted ADRs | Unrelated project documentation |
 | Known gap / remediation | [Audit index](audit/README.md), the specific `gap-*.md` doc being implemented | [Findings](audit/findings.md) for full evidence | Unrelated `gap-*.md` docs |
@@ -21,3 +22,4 @@ Use this map to load the smallest sufficient context for a task. Summaries route
 - [Features](features/README.md)
 - [External references](references/README.md)
 - [Audit](audit/README.md)
+- [UX & product design](ux/README.md)

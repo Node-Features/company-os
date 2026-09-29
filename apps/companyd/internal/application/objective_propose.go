@@ -172,3 +172,41 @@ func (a *Application) GetObjective(ctx context.Context, objectiveID uuid.UUID) (
 	orgID := a.Fixtures.Organization().OrganizationID
 	return a.Objective.GetObjective(ctx, orgID, objectiveID)
 }
+
+const (
+	defaultObjectiveListLimit = 50
+	maxObjectiveListLimit     = 200
+)
+
+var validObjectiveStatuses = map[objdomain.Status]bool{
+	objdomain.StatusProposed: true,
+	objdomain.StatusApproved: true,
+	objdomain.StatusRetired:  true,
+}
+
+// ErrInvalidObjectiveStatus is ListObjectives's one validation sentinel —
+// matching QueryKnowledge's (value, error) read convention rather than a
+// Result/Outcome, since this is a read, not a governed command.
+var ErrInvalidObjectiveStatus = errors.New("invalid status in objective list query")
+
+// ListObjectives is served by GET /v1/objectives. Deliberately takes no
+// PrincipalID, matching GetObjective/GetObjectiveBySource's existing
+// precedent that reads in this codebase don't carry one. See
+// ports.ObjectiveRepository.ListObjectives's doc comment: this can only
+// ever return already-approved proposals — a pending or rejected proposal
+// has no Objective row to list, only an Approval record.
+func (a *Application) ListObjectives(ctx context.Context, statuses []objdomain.Status, limit, offset int) ([]objdomain.Objective, error) {
+	for _, s := range statuses {
+		if !validObjectiveStatuses[s] {
+			return nil, ErrInvalidObjectiveStatus
+		}
+	}
+	if limit <= 0 || limit > maxObjectiveListLimit {
+		limit = defaultObjectiveListLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	orgID := a.Fixtures.Organization().OrganizationID
+	return a.Objective.ListObjectives(ctx, orgID, statuses, limit, offset)
+}

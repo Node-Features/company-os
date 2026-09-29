@@ -176,3 +176,28 @@ func (f *partialFailingExec) ClaimDueIntents(context.Context, uuid.UUID, int, ti
 	}
 	return nil, nil
 }
+
+// commitFailingExec wraps a real ports.ExecutionRepository and fails the
+// next N calls to RecordTerminal, then delegates to the embedded repo for
+// everything (including subsequent RecordTerminal calls) — the "fail on
+// Nth call" idiom already established by
+// internal/adapters/notify/realtime's fakePublisher.failNext, applied here
+// to prove Runtime's crash-equivalent recovery (lease expiry + reclaim)
+// also covers a failed commit, not only a killed process.
+type commitFailingExec struct {
+	ports.ExecutionRepository
+	mu                 sync.Mutex
+	failRecordTerminal int
+	err                error
+}
+
+func (c *commitFailingExec) RecordTerminal(ctx context.Context, attemptID uuid.UUID, fencingToken int64, status execution.AttemptStatus, resultID *uuid.UUID) error {
+	c.mu.Lock()
+	if c.failRecordTerminal > 0 {
+		c.failRecordTerminal--
+		c.mu.Unlock()
+		return c.err
+	}
+	c.mu.Unlock()
+	return c.ExecutionRepository.RecordTerminal(ctx, attemptID, fencingToken, status, resultID)
+}

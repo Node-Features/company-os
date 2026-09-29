@@ -57,22 +57,31 @@ type Registry struct {
 // NewRegistry builds the fixed first-slice fixture set, Organization
 // included as a Go literal. Used by tests and fakes that don't have a real
 // database to load from — cmd/companyd/main.go calls WithOrganization on
-// top of it instead (ROADMAP.md Phase 3 Slice 6), since the DB-backed value
-// the migration seeds is identical to this literal, switching every test to
-// hit a real table wouldn't prove anything new.
+// top of it instead, since the DB-backed value the migration seeds is
+// identical to this literal, switching every test to hit a real table
+// wouldn't prove anything new.
 func NewRegistry() Registry {
 	return newFixedFixtures()
 }
 
 // WithOrganization returns a copy of r with its Organization replaced by
 // org — used by callers that load the real, persisted Organization instead
-// of trusting the hardcoded literal (ROADMAP.md Phase 3 Slice 6). Loading
-// org is the caller's job: this package holds fixed fixture data only and
+// of trusting the hardcoded literal. Loading org is the caller's job: this
+// package holds fixed fixture data only and
 // must not depend on how or where a real Organization is fetched from
 // (docs/architecture/kernel.md's "cannot depend on their concrete
 // implementations" — internal/kernel imports this package for Registry).
 func (r Registry) WithOrganization(org organization.Organization) Registry {
 	r.org = org
+	return r
+}
+
+// WithCapabilityTimeout returns a copy of r with its CapabilityDefinition's
+// Timeout replaced — used by tests that need the real dispatch-context
+// deadline to elapse quickly and deterministically, rather than waiting out
+// the production default.
+func (r Registry) WithCapabilityTimeout(d time.Duration) Registry {
+	r.cap.Timeout = d
 	return r
 }
 

@@ -608,9 +608,33 @@ func TestRealtimePublisher_Publish_WorkflowEventSucceeds(t *testing.T) {
 	// call: does the DATABASE_URL role have EXECUTE on realtime.send()? A
 	// permission-denied error here means that grant is missing on the
 	// Supabase project, not a bug in this code.
-	if err := publisher.Publish(ctx, []event.DomainEvent{evt}); err != nil {
+	err := publisher.Publish(ctx, []event.DomainEvent{evt})
+	if isUndefinedSchema(err) {
+		// realtime.send() is provisioned by the Supabase platform itself,
+		// not by anything in supabase/migrations/ — a plain `postgres:17`
+		// container (this project's CI services, per .github/workflows/
+		// ci.yml and nightly.yml) never has it, only a real Supabase
+		// project's Postgres does (this repo's own dev DATABASE_URL, e.g.).
+		// That gap is unrelated to whether RealtimePublisher.Publish is
+		// correct, so it is a skip, not a failure — same reasoning as
+		// requirePool skipping when there's no DATABASE_URL at all, one
+		// level further down the "how real is this environment" ladder.
+		t.Skip("realtime schema not present on this Postgres instance (expected against CI's plain postgres:17, not a real Supabase project); skipping")
+	}
+	if err != nil {
 		t.Fatalf("Publish: %v (does the DATABASE_URL role have EXECUTE on realtime.send?)", err)
 	}
+}
+
+// isUndefinedSchema reports whether err is Postgres SQLSTATE 3F000
+// (undefined_schema) — the error realtime.send() raises against a Postgres
+// instance that was never provisioned with Supabase's realtime schema.
+func isUndefinedSchema(err error) bool {
+	var pgErr interface{ SQLState() string }
+	if errors.As(err, &pgErr) {
+		return pgErr.SQLState() == "3F000"
+	}
+	return false
 }
 
 func TestRealtimePublisher_Publish_NoWorkflowEventIsNoop(t *testing.T) {
